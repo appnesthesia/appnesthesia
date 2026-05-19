@@ -3620,73 +3620,96 @@ async function promptVerifyAdminPin(){
   });
 }
 
-// --- User Picker ---
+// --- User Picker (lista inline con dropdown nativo + buscador, sin modal) ---
 function renderUserPicker(){
   ensureAllUserDefaults();
   const inst = INSTITUTION ? (INSTITUTION.shortName||INSTITUTION.name) : '';
-  document.getElementById('userPickerInst').textContent = inst;
-  const grid = document.getElementById('userGrid');
-  const staff = (state.staff||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
+  var instEl = document.getElementById('userPickerInst');
+  if(instEl) instEl.textContent = inst;
+  var grid = document.getElementById('userGrid');
+  if(!grid) return;
+  var staff = (state.staff||[]).slice().sort(function(a,b){return String(a.name).localeCompare(String(b.name),'es');});
 
-  const adminLock = state.adminPinHash ? '🔒' : '✨';
-  // 1) Administrador (siempre arriba, full width)
-  let html = '<button class="user-item" onclick="selectAdmin()" style="background:linear-gradient(135deg,#fff8ec 0%,#fef3c7 100%);border-color:#f59e0b">'
+  var adminLock = state.adminPinHash ? '🔒' : '✨';
+  var html = '';
+
+  // 1) Administrador (siempre arriba)
+  html += '<button type="button" class="user-item" onclick="selectAdmin()" style="background:linear-gradient(135deg,#fff8ec 0%,#fef3c7 100%);border-color:#f59e0b">'
     + '<div class="user-item-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">🛡️</div>'
     + '<div style="flex:1;min-width:0"><div class="user-item-name">Administrador</div><div class="user-item-role">Gestión completa del servicio</div></div>'
     + '<div class="user-item-lock">'+adminLock+'</div>'
     + '</button>';
 
-  // 2) Botón grande que abre el listado de staff en un modal con buscador
   if(staff.length === 0){
     html += '<div style="color:var(--muted);font-size:13px;padding:12px;text-align:center">Sin staff. Ingresá como Administrador para agregar miembros.</div>';
   } else {
-    html += '<button class="user-item user-pick-open" onclick="openStaffPicker()" style="background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-color:var(--primary)">'
-      + '<div class="user-item-avatar">👥</div>'
-      + '<div style="flex:1;min-width:0"><div class="user-item-name">Elegir mi nombre</div><div class="user-item-role">'+staff.length+' anestesiólogos · tocá para buscar y seleccionar</div></div>'
-      + '<div class="user-item-lock" style="opacity:1;font-size:18px">›</div>'
-      + '</button>';
+    // 2) Dropdown NATIVO (siempre funciona, no depende de modal)
+    var opts = '<option value="">— Seleccioná tu nombre —</option>';
+    for(var i=0; i<staff.length; i++){
+      var s = staff[i];
+      var lock = s.pinHash ? ' 🔒' : ' ✨';
+      var role = s.role ? ' · '+s.role : '';
+      opts += '<option value="'+s.id+'">'+s.name+role+lock+'</option>';
+    }
+    html += '<div style="margin-top:6px">'
+      + '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600">Tu nombre ('+staff.length+' anestesiólogos)</label>'
+      + '<select id="userSelectDropdown" onchange="onUserSelectChange(this.value)" '
+      + 'style="width:100%;padding:14px;font-size:15px;border:1.5px solid var(--border);border-radius:12px;background:#fff;font-family:inherit;cursor:pointer;-webkit-appearance:menulist;appearance:menulist">'
+      + opts + '</select>'
+      + '</div>';
+
+    // 3) Lista inline con buscador (alternativa visual, también funcional)
+    html += '<div style="margin-top:14px">'
+      + '<input type="text" id="userInlineSearch" placeholder="🔎 O buscá por nombre…" autocomplete="off" oninput="renderInlineUserList()" '
+      + 'style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;margin-bottom:8px" />'
+      + '<div id="userInlineList" class="staff-picker-list"></div>'
+      + '</div>';
   }
+
   grid.innerHTML = html;
+  try{ renderInlineUserList(); }catch(e){}
 }
 
-// Modal con buscador para elegir el nombre del staff
-function openStaffPicker(){
-  ensureAllUserDefaults();
-  modal(`
-    <h3 style="margin-top:0">Seleccioná tu nombre</h3>
-    <div class="field" style="margin:6px 0 10px">
-      <input type="text" id="staffPickerSearch" placeholder="🔎 Buscar por nombre…" autocomplete="off" oninput="renderStaffPickerList()" />
-    </div>
-    <div id="staffPickerList" class="staff-picker-list"></div>
-    <div class="btn-row" style="margin-top:10px"><button class="btn secondary" onclick="closeModal()">Cancelar</button></div>
-  `);
-  // Focus en buscador después de que el modal se haya renderizado
-  setTimeout(()=>{ try{ document.getElementById('staffPickerSearch').focus(); }catch(e){} }, 100);
-  renderStaffPickerList();
+// Handler del <select> nativo
+function onUserSelectChange(userId){
+  if(!userId) return;
+  try{ selectUser(userId); }catch(e){ console.error('selectUser error:', e); alert('Error al seleccionar usuario: '+e.message); }
 }
-function renderStaffPickerList(){
-  const list = document.getElementById('staffPickerList');
+
+// Lista inline con buscador (NO usa modal)
+function renderInlineUserList(){
+  var list = document.getElementById('userInlineList');
   if(!list) return;
-  const q = (document.getElementById('staffPickerSearch')?.value||'').trim().toLowerCase();
-  // Quita tildes para búsqueda
-  const norm = s => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const nq = norm(q);
-  const staff = (state.staff||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
-  const filtered = nq ? staff.filter(s=>norm(s.name).includes(nq) || norm(s.role||'').includes(nq)) : staff;
-  if(filtered.length===0){
-    list.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center;font-size:13px">Sin resultados para "'+q+'"</div>';
+  var searchEl = document.getElementById('userInlineSearch');
+  var q = (searchEl && searchEl.value ? searchEl.value : '').trim().toLowerCase();
+  var norm = function(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var nq = norm(q);
+  var staff = (state.staff||[]).slice().sort(function(a,b){return String(a.name).localeCompare(String(b.name),'es');});
+  var filtered = nq ? staff.filter(function(s){ return norm(s.name).includes(nq) || norm(s.role||'').includes(nq); }) : staff;
+  if(filtered.length === 0){
+    list.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center;font-size:13px">Sin resultados</div>';
     return;
   }
-  list.innerHTML = filtered.map(s=>{
-    const initials = (s.name||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-    const hasPin = s.pinHash ? '🔒' : '✨';
-    return '<button type="button" class="staff-picker-row" onclick="closeModal();selectUser(\''+s.id+'\')">'
+  var html = '';
+  for(var i=0; i<filtered.length; i++){
+    var s = filtered[i];
+    var initials = (s.name||'?').split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
+    var hasPin = s.pinHash ? '🔒' : '✨';
+    html += '<button type="button" class="staff-picker-row" onclick="selectUser(\''+s.id+'\')">'
       + '<div class="user-item-avatar">'+initials+'</div>'
       + '<div style="flex:1;min-width:0;text-align:left"><div class="user-item-name">'+s.name+'</div><div class="user-item-role">'+(s.role||'')+'</div></div>'
       + '<div class="user-item-lock">'+hasPin+'</div>'
       + '</button>';
-  }).join('');
+  }
+  list.innerHTML = html;
 }
+
+// Compatibilidad: si algo viejo todavía llama openStaffPicker, simplemente hace scroll a la lista
+function openStaffPicker(){
+  var el = document.getElementById('userInlineSearch');
+  if(el){ try{ el.focus(); el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
+}
+function renderStaffPickerList(){ try{ renderInlineUserList(); }catch(e){} }
 
 async function selectAdmin(){
   // Primera vez: configurar PIN admin
