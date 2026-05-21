@@ -154,8 +154,11 @@ function save(){
 // SYNC con backend (Cloudflare Worker + KV)
 // ============================================================
 const BACKEND_TOKEN_LS_KEY = 'appnesthesia_backend_token';
-// Campos que NO se sincronizan (son personales/por-dispositivo)
-const LOCAL_ONLY_KEYS = new Set(['isAdmin','adminPinHash','currentUserId','notifShown']);
+// Campos que NO se sincronizan (son personales/por-dispositivo).
+// IMPORTANTE: adminPinHash SÍ se sincroniza → una vez que el admin configura
+// su clave, queda guardada en la nube y ningún otro dispositivo puede
+// volver a configurar el modo administrador.
+const LOCAL_ONLY_KEYS = new Set(['isAdmin','currentUserId','notifShown']);
 let _syncTimer = null;
 let _syncStatus = 'idle';
 let _lastRemoteUpdatedAt = null;
@@ -173,7 +176,15 @@ function setBackendURL(url){
   if(url) localStorage.setItem('appnesthesia_backend_url', url);
   else localStorage.removeItem('appnesthesia_backend_url');
 }
-function getBackendToken(){ return localStorage.getItem(BACKEND_TOKEN_LS_KEY) || ''; }
+function getBackendToken(){
+  // 1) Token guardado en este dispositivo (lo ingresa el admin manualmente)
+  const local = localStorage.getItem(BACKEND_TOKEN_LS_KEY);
+  if(local) return local;
+  // 2) Token publicado en configs/andes.json → así TODOS los usuarios
+  //    (no solo el admin) pueden guardar sus solicitudes en la nube.
+  if(INSTITUTION && INSTITUTION.backendToken) return String(INSTITUTION.backendToken);
+  return '';
+}
 function setBackendToken(t){
   if(t) localStorage.setItem(BACKEND_TOKEN_LS_KEY, t);
   else localStorage.removeItem(BACKEND_TOKEN_LS_KEY);
@@ -240,11 +251,27 @@ async function fetchRemoteState(){
   }
 }
 
+// Fusiona dos listas de objetos por su id. Gana la versión con updatedAt
+// (o createdAt) más reciente. Así dos personas pueden agregar/editar
+// solicitudes "al mismo tiempo" sin pisarse entre ellas.
+function _mergeById(remoteArr, localArr){
+  const map = {};
+  (remoteArr||[]).forEach(it=>{ if(it && it.id) map[it.id] = it; });
+  (localArr||[]).forEach(it=>{
+    if(!it || !it.id) return;
+    const ex = map[it.id];
+    if(!ex){ map[it.id] = it; return; }
+    const tLocal  = it.updatedAt || it.createdAt || '';
+    const tRemote = ex.updatedAt || ex.createdAt || '';
+    if(tLocal >= tRemote) map[it.id] = it;
+  });
+  return Object.values(map);
+}
+
 async function pushRemoteState(){
   if(_isApplyingRemote) return;
   const base = getBackendURL();
   if(!base || !INSTITUTION) return;
-  if(!state || !state.isAdmin) return; // solo admin escribe
   const token = getBackendToken();
   if(!token){
     _setSyncStatus('unauthorized');
@@ -253,10 +280,48 @@ async function pushRemoteState(){
   }
   try{
     _setSyncStatus('syncing');
+
+    // 1) Traer el estado remoto más reciente para no pisar cambios de otros.
+    let remote = null;
+    try{
+      const rr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+      if(rr.ok) remote = await rr.json();
+    }catch(e){ /* sin conexión: se maneja abajo */ }
+
+    // 2) Armar el payload a enviar.
+    let payload;
+    const isAdmin = state && state.isAdmin;
+    if(isAdmin){
+      // El admin es la autoridad: manda todo el estado, pero igual fusiona
+      // las colecciones para no perder solicitudes que otros cargaron mientras.
+      payload = _extractSharedState();
+      if(remote && !remote._empty){
+        payload.vacations = _mergeById(remote.vacations, payload.vacations);
+        payload.exchanges = _mergeById(remote.exchanges, payload.exchanges);
+      }
+    } else {
+      // Usuario normal: NO debe pisar datos del admin (staff, índices, etc.).
+      if(!remote){
+        // No se pudo leer el estado remoto → no arriesgamos. Reintenta luego.
+        _setSyncStatus('offline');
+        return;
+      }
+      if(remote._empty){
+        payload = _extractSharedState();
+      } else {
+        payload = {};
+        Object.keys(remote).forEach(k=>{ if(!k.startsWith('_')) payload[k] = remote[k]; });
+      }
+      // Solo superpone SUS colecciones: vacaciones e intercambios.
+      payload.vacations = _mergeById(remote.vacations, state.vacations);
+      payload.exchanges = _mergeById(remote.exchanges, state.exchanges);
+    }
+
+    // 3) Guardar en la nube.
     const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body: JSON.stringify(_extractSharedState())
+      body: JSON.stringify(payload)
     });
     if(r.status === 401){
       _setSyncStatus('unauthorized');
@@ -266,6 +331,20 @@ async function pushRemoteState(){
     if(!r.ok){ _setSyncStatus('error'); return; }
     const data = await r.json().catch(()=>({}));
     if(data && data._updatedAt) _lastRemoteUpdatedAt = data._updatedAt;
+
+    // 4) Reflejar las colecciones fusionadas en la copia local + pantalla.
+    _isApplyingRemote = true;
+    try{
+      if(payload.vacations) state.vacations = payload.vacations;
+      if(payload.exchanges) state.exchanges = payload.exchanges;
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    } finally { _isApplyingRemote = false; }
+    try{
+      const active = document.querySelector('.view.active');
+      if(active && active.id === 'view-vacaciones') renderVacations();
+      if(active && active.id === 'view-intercambios') renderExchanges();
+    }catch(e){}
+
     _setSyncStatus('synced');
   }catch(e){
     console.warn('pushRemoteState', e);
@@ -389,7 +468,7 @@ function showView(name){
   };
   document.getElementById('hdrTitle').textContent = titles[name] || titles.home;
   // Actualizar badge de vacaciones pendientes en la home
-  const pendingVacs = (state.vacations||[]).filter(v=>v.status==='pending').length;
+  const pendingVacs = (state.vacations||[]).filter(v=>v.status==='pending' && !v.deleted).length;
   const hb = document.getElementById('vacBadgeHome');
   if(hb){ hb.textContent = pendingVacs>0?pendingVacs:''; hb.style.display = pendingVacs>0?'inline-block':'none'; }
   if(name==='calendario'){
@@ -1190,6 +1269,7 @@ function selectExchKind(kind){
     : 'Cedo este turno: alguien lo toma sin devolverme nada';
 }
 function saveExch(){
+  const _now = new Date().toISOString();
   const e = {
     id:'e'+Date.now(),
     kind:document.getElementById('ex_kind').value,
@@ -1199,7 +1279,8 @@ function saveExch(){
     type:document.getElementById('ex_type').value,
     note:document.getElementById('ex_note').value,
     status:'open',
-    createdAt:new Date().toISOString()
+    createdAt:_now,
+    updatedAt:_now
   };
   if(!e.date){toast('Falta la fecha');return;}
   // Auto-vincular al usuario logueado
@@ -1216,6 +1297,7 @@ function takeExch(id){
   const e = state.exchanges.find(x=>x.id===id);
   if(!e) return;
   e.status='taken'; e.takenByName=taker; e.takenAt=new Date().toISOString();
+  e.updatedAt=new Date().toISOString();
   if(cu) e.takenById = cu.id;
   if(typeof logActivity==='function') logActivity('exchange_taken', 'Tomaste un turno · '+e.type+' · '+formatDate(e.date));
   save(); renderExchanges(); toast('Turno tomado. Avisá al colega.');
@@ -1238,7 +1320,7 @@ function switchVacTab(ev, tab){
 }
 function renderVacations(){
   const list = document.getElementById('vacList');
-  let items = state.vacations || [];
+  let items = (state.vacations || []).filter(v=>!v.deleted);
   const pendingCount = items.filter(v=>v.status==='pending').length;
   const badge = document.getElementById('vacCountPending');
   badge.textContent = pendingCount>0?pendingCount:'';
@@ -1271,6 +1353,7 @@ function renderVacations(){
       <div class="what">
         <span class="chip green">${resolved} cobertura${resolved===1?'':'s'} resuelta${resolved===1?'':'s'}</span>
         <span class="chip ${pending>0?'red':'gray'}">${pending} pendiente${pending===1?'':'s'} para el servicio</span>
+        ${v.coberturaPedCv?`<span class="chip ${v.coberturaPedCv==='si'?'green':(v.coberturaPedCv==='no'?'red':'gray')}">Ped/CV: ${ {si:'Sí',no:'No',na:'No aplica'}[v.coberturaPedCv] }</span>`:''}
       </div>
       ${v.notes?`<div class="what" style="font-style:italic;color:var(--muted)">"${v.notes}"</div>`:''}
       ${v.adminNote?`<div class="what" style="font-size:12px;background:#f0f4f5;padding:6px 8px;border-radius:6px;margin-top:4px"><b>Nota del admin:</b> ${v.adminNote}</div>`:''}
@@ -1292,7 +1375,7 @@ function daysBetween(a, b){
 }
 function openVacationModal(v){
   const isNew = !v;
-  v = v || {id:'v'+Date.now(), staffId:state.staff[0]?.id||'', from:'', to:'', resolved:[], pending:[], notes:'', status:'pending', adminNote:'', createdAt:new Date().toISOString()};
+  v = v || {id:'v'+Date.now(), staffId:state.staff[0]?.id||'', from:'', to:'', resolved:[], pending:[], notes:'', coberturaPedCv:'', status:'pending', adminNote:'', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
   const renderCovRows = (arr, key) => (arr||[]).map((c,i)=>`
     <div class="row" style="margin-bottom:6px;align-items:flex-end">
       <div class="field" style="margin:0">
@@ -1338,6 +1421,16 @@ function openVacationModal(v){
       <div id="v_pending">${renderCovRows(v.pending,'pending')||'<div class="help">Ninguna pendiente todavía.</div>'}</div>
       <button class="btn sm secondary" style="margin-top:6px" onclick="addCov('pending')">+ Agregar pendiente</button>
     </div>
+    <div class="field" style="background:#f7fcf9;border:1px solid var(--green-pale);border-radius:10px;padding:10px 12px">
+      <label style="margin-bottom:6px">🏥 ¿Cobertura Pediatría/Cardiovascular resuelta?</label>
+      <select id="v_cobpedcv">
+        <option value="" ${!v.coberturaPedCv?'selected':''}>— Seleccionar —</option>
+        <option value="si" ${v.coberturaPedCv==='si'?'selected':''}>Sí</option>
+        <option value="no" ${v.coberturaPedCv==='no'?'selected':''}>No</option>
+        <option value="na" ${v.coberturaPedCv==='na'?'selected':''}>No aplica</option>
+      </select>
+      <p class="help" style="margin-top:4px">Queda anotado en la solicitud para que la jefatura lo tenga en cuenta.</p>
+    </div>
     <div class="field">
       <label>Observaciones</label>
       <textarea id="v_notes" rows="2" placeholder="Comentario opcional para la jefatura">${(v.notes||'').replace(/</g,'&lt;')}</textarea>
@@ -1378,6 +1471,7 @@ function syncVacFormDraft(){
   const t = document.getElementById('v_to'); if(t) window._vacEditing.to = t.value;
   const s = document.getElementById('v_staff'); if(s) window._vacEditing.staffId = s.value;
   const n = document.getElementById('v_notes'); if(n) window._vacEditing.notes = n.value;
+  const cp = document.getElementById('v_cobpedcv'); if(cp) window._vacEditing.coberturaPedCv = cp.value;
 }
 function saveVacation(id, isNew){
   syncVacFormDraft();
@@ -1386,6 +1480,8 @@ function saveVacation(id, isNew){
   if(!v.from||!v.to){toast('Faltan fechas');return;}
   if(v.from>v.to){toast('La fecha de inicio es posterior a la de fin');return;}
   v.id = id; v.status = v.status || 'pending';
+  v.updatedAt = new Date().toISOString();
+  if(!v.createdAt) v.createdAt = v.updatedAt;
   if(isNew){
     state.vacations = state.vacations || [];
     state.vacations.unshift(v);
@@ -1412,6 +1508,7 @@ function viewVacation(id){
     <div style="font-size:13px;line-height:1.6">
       <b>Período:</b> ${formatDate(v.from)} → ${formatDate(v.to)} (${daysBetween(v.from,v.to)} días)<br>
       <b>Estado:</b> ${v.status==='pending'?'<span class="chip yellow">Pendiente</span>':v.status==='approved'?'<span class="chip green">Aprobada</span>':'<span class="chip red">Rechazada</span>'}<br>
+      <b>¿Cobertura Pediatría/Cardiovascular resuelta?</b> ${v.coberturaPedCv?{si:'Sí',no:'No',na:'No aplica'}[v.coberturaPedCv]:'<i>sin responder</i>'}<br>
       ${v.notes?`<b>Observaciones:</b> ${v.notes}<br>`:''}
       ${v.adminNote?`<b>Nota del admin:</b> ${v.adminNote}<br>`:''}
       <div style="margin-top:10px"><b>✅ Coberturas resueltas:</b>${fmtList(v.resolved)}</div>
@@ -1435,12 +1532,21 @@ function decideVacation(id, decision){
   v.status = decision;
   v.adminNote = note;
   v.decidedAt = new Date().toISOString();
+  v.updatedAt = new Date().toISOString();
   save(); closeModal(); renderVacations();
   toast(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada');
 }
 function deleteVacation(id){
   if(!confirm('¿Eliminar esta solicitud?')) return;
-  state.vacations = state.vacations.filter(v=>v.id!==id);
+  // Borrado lógico (soft-delete): se marca como eliminada en vez de quitarla.
+  // Así la eliminación se propaga a todos los dispositivos por la nube.
+  const v = state.vacations.find(x=>x.id===id);
+  if(v){
+    v.deleted = true;
+    v.updatedAt = new Date().toISOString();
+  } else {
+    state.vacations = state.vacations.filter(x=>x.id!==id);
+  }
   save(); renderVacations(); toast('Eliminada');
 }
 
@@ -3895,7 +4001,7 @@ function renderMiPanel(){
 
   // Stats
   const exchSent = (state.exchanges||[]).filter(e=>e.staffId===u.id).length;
-  const vacApproved = (state.vacations||[]).filter(v=>v.staffId===u.id && v.status==='approved').length;
+  const vacApproved = (state.vacations||[]).filter(v=>v.staffId===u.id && v.status==='approved' && !v.deleted).length;
   const ranking = (state.staff||[]).slice().sort((a,b)=>(b.score||0)-(a.score||0));
   const myRank = ranking.findIndex(s=>s.id===u.id)+1;
   const coberturaRank = (state.staff||[]).slice().sort((a,b)=>(b.coberturaScore||0)-(a.coberturaScore||0));
@@ -3908,7 +4014,7 @@ function renderMiPanel(){
 
   // Solicitudes activas
   const myExch = (state.exchanges||[]).filter(e=>e.staffId===u.id && e.status==='open');
-  const myVacs = (state.vacations||[]).filter(v=>v.staffId===u.id && v.status==='pending');
+  const myVacs = (state.vacations||[]).filter(v=>v.staffId===u.id && v.status==='pending' && !v.deleted);
   const sol = document.getElementById('miSolicitudes');
   if(myExch.length===0 && myVacs.length===0){
     sol.innerHTML = '<div class="empty" style="padding:14px"><span class="big" style="font-size:24px">📭</span>Sin solicitudes activas</div>';
