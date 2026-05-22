@@ -850,42 +850,24 @@ canvas{max-width:100%}
   <div class="section">
     <h3>📈 Resumen del servicio</h3>
     <div class="stat-box">
-      <div class="b"><div class="n" id="statCases">0</div><div class="l">Casos del mes</div></div>
-      <div class="b"><div class="n" id="statHours">0</div><div class="l">Horas quirófano</div></div>
-      <div class="b"><div class="n" id="statStaff">0</div><div class="l">Anestesiólogos</div></div>
-      <div class="b"><div class="n" id="statOnCall">0</div><div class="l">Guardias mes</div></div>
+      <div class="b"><div class="n" id="statHrsDia">0</div><div class="l">Total HRS DIA</div></div>
+      <div class="b"><div class="n" id="statLL1">0</div><div class="l">Total LL1</div></div>
+      <div class="b"><div class="n" id="statLL2">0</div><div class="l">Total LL2</div></div>
+      <div class="b"><div class="n" id="statSabado">0</div><div class="l">Total Sábados</div></div>
     </div>
   </div>
 
   <div class="section admin-only" style="display:none">
     <h3>⚙️ Administración de datos</h3>
-    <p class="help" style="margin-bottom:10px">Cargá un Excel con tu actividad mensual o eliminá los gráficos de muestra.</p>
+    <p class="help" style="margin-bottom:10px">Cargá tu Excel de estadísticas. La app leerá las hojas HRS DIA, LL1, LL2 y SABADO.</p>
     <div class="btn-row" style="flex-wrap:wrap;gap:8px">
       <button class="btn sm accent" onclick="openImportStatsModal()">📂 Importar Excel</button>
-      <button class="btn sm secondary" onclick="restoreSampleStats()">↺ Restaurar datos de muestra</button>
       <button class="btn sm secondary" onclick="resetHiddenCharts()">👁 Mostrar todos los gráficos</button>
     </div>
     <p id="statsImportInfo" class="help" style="margin-top:10px"></p>
   </div>
 
-  <div class="section" id="section-chartCases">
-    <h3>Casos por mes (año en curso)
-      <button class="chart-del admin-only" style="display:none" onclick="hideChart('cases')" title="Eliminar este gráfico">✕</button>
-    </h3>
-    <canvas id="chartCases" height="180"></canvas>
-  </div>
-  <div class="section" id="section-chartType">
-    <h3>Tipo de procedimiento
-      <button class="chart-del admin-only" style="display:none" onclick="hideChart('type')" title="Eliminar este gráfico">✕</button>
-    </h3>
-    <canvas id="chartType" height="180"></canvas>
-  </div>
-  <div class="section" id="section-chartStaff">
-    <h3>Carga por anestesiólogo (últimos 30 días)
-      <button class="chart-del admin-only" style="display:none" onclick="hideChart('staff')" title="Eliminar este gráfico">✕</button>
-    </h3>
-    <canvas id="chartStaff" height="220"></canvas>
-  </div>
+  <div id="sheetChartsWrap"></div>
 </section>
 
 <!-- MI PANEL (perfil personal) -->
@@ -1082,6 +1064,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=31"></script>
+<script src="app.js?v=32"></script>
 </body>
 </html>

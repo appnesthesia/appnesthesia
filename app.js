@@ -24,10 +24,8 @@ const DEFAULT_STATE = {
     {id:'p4', title:'Sangrado masivo', body:'Activar protocolo. Ratio 1:1:1 (GR:Plasma:Plaquetas)...', fileUrl:'', fileName:''},
   ],
   stats: {
-    casesByMonth: [120,135,128,142,150,138,145,160,155,148,140,132],
-    procedureTypes: {General:45, Regional:25, Sedacion:18, Combinada:12},
-    customStaffLoad: null, // [{n:'Dr. X', v:12}] si se cargó desde Excel; null = calcular desde turnos
-    hidden: {cases:false, type:false, staff:false},
+    sheetCharts: [], // [{key, title, items:[{n,v}]}] — un gráfico por hoja del Excel
+    hidden: {},      // {sheetKey:true} para ocultar gráficos puntuales
     lastImport: null // {at:'ISO', filename:'...', sheets:[...]}
   },
   currentMonth: new Date().toISOString().slice(0,7),
@@ -1554,102 +1552,135 @@ function deleteVacation(id){
 // ESTADÍSTICAS
 // ============================================================
 let charts = {};
-function _ensureStatsHidden(){
-  if(!state.stats.hidden) state.stats.hidden = {cases:false, type:false, staff:false};
-  return state.stats.hidden;
-}
-function _renderChartSection(key, sectionId, hasData, renderFn){
-  const hidden = _ensureStatsHidden();
-  const section = document.getElementById(sectionId);
-  if(!section) return;
-  if(hidden[key]){
-    section.style.display = 'none';
-    if(charts[key]){ try{ charts[key].destroy(); }catch(e){} delete charts[key]; }
-    return;
+
+// Detecta el "listado" que está debajo de cada tabla: filas con un nombre en
+// la columna A, un número en la columna B y el resto de columnas vacías.
+function _findSheetListing(rows){
+  const items = [];
+  for(const row of (rows||[])){
+    if(!row || row.length < 2) continue;
+    const name = String(row[0]==null ? '' : row[0]).trim();
+    if(!name) continue;
+    if(/^(nombre|name|total|real|ideal|mes|% ?ideal)$/i.test(name)) continue;
+    const raw = row[1];
+    let num = null;
+    if(typeof raw === 'number') num = raw;
+    else if(raw !== '' && raw != null && !isNaN(parseFloat(raw))) num = parseFloat(raw);
+    if(num === null) continue;
+    // La columna C en adelante debe estar vacía (si no, es una fila de la tabla)
+    const rest = row.slice(2);
+    const restEmpty = rest.every(c => c === '' || c == null || (typeof c === 'string' && c.trim() === ''));
+    if(!restEmpty) continue;
+    items.push({ n: name, v: num });
   }
-  section.style.display = '';
-  if(charts[key]){ try{ charts[key].destroy(); }catch(e){} delete charts[key]; }
-  if(hasData) renderFn();
-  else {
-    // Reemplazar canvas por mensaje vacío temporalmente
-    const canvas = section.querySelector('canvas');
-    if(canvas && !section.querySelector('.empty-chart')){
-      const empty = document.createElement('div');
-      empty.className = 'empty-chart';
-      empty.textContent = 'No hay datos. Cargá tu Excel desde la sección de Administración.';
-      canvas.style.display = 'none';
-      canvas.parentNode.insertBefore(empty, canvas.nextSibling);
-    }
-  }
+  return items;
 }
-function _restoreCanvases(){
-  ['chartCases','chartType','chartStaff'].forEach(id=>{
-    const cv = document.getElementById(id);
-    if(cv){ cv.style.display = ''; }
-    const sec = document.getElementById('section-'+id);
-    if(sec){ const e = sec.querySelector('.empty-chart'); if(e) e.remove(); }
-  });
+
+// Hojas que la app busca en el Excel, con su título amigable.
+const STATS_SHEETS = [
+  { key:'hrsdia', title:'HRS DIA',  match:['hrsdia','horasdia'] },
+  { key:'ll1',    title:'LL1',      match:['ll1','llamada1','primerallamada'] },
+  { key:'ll2',    title:'LL2',      match:['ll2','llamada2','segundallamada'] },
+  { key:'sabado', title:'Sábados',  match:['sabado','sabados'] }
+];
+function _normSheetName(s){
+  return String(s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]/g,'');
 }
 
 function renderStats(){
-  _ensureStatsHidden();
-  _restoreCanvases();
+  if(!state.stats.hidden) state.stats.hidden = {};
+  const sheets = state.stats.sheetCharts || [];
 
-  const cases = state.stats.casesByMonth || [];
-  document.getElementById('statCases').textContent = cases[new Date().getMonth()]||0;
-  document.getElementById('statHours').textContent = Math.round((cases[new Date().getMonth()]||0)*1.8);
-  document.getElementById('statStaff').textContent = state.staff.length;
-  document.getElementById('statOnCall').textContent = (state.shifts||[]).filter(s=>s.type==='Guardia'&&s.date.startsWith(state.currentMonth)).length;
+  // Cajas de resumen: total acumulado de cada hoja
+  const totalOf = (key)=>{
+    const sh = sheets.find(s=>s.key===key);
+    if(!sh) return 0;
+    return sh.items.reduce((a,b)=>a + (Number(b.v)||0), 0);
+  };
+  const setTxt = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent = val; };
+  setTxt('statHrsDia', totalOf('hrsdia'));
+  setTxt('statLL1', totalOf('ll1'));
+  setTxt('statLL2', totalOf('ll2'));
+  setTxt('statSabado', totalOf('sabado'));
 
   // Info de última importación
   const info = document.getElementById('statsImportInfo');
   if(info){
     const li = state.stats.lastImport;
-    info.textContent = li ? `Última importación: ${li.filename} — ${new Date(li.at).toLocaleString()}` : 'Aún no has importado un Excel.';
+    info.textContent = li
+      ? `Última importación: ${li.filename} — ${new Date(li.at).toLocaleString()}`
+      : 'Aún no se ha importado un Excel.';
   }
 
-  // Chart 1: Casos por mes
-  _renderChartSection('cases', 'section-chartCases', cases.length>0 && cases.some(v=>v>0), ()=>{
-    charts.cases = new Chart(document.getElementById('chartCases'), {
-      type:'bar',
-      data:{labels:['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
-        datasets:[{label:'Casos',data:cases,backgroundColor:'#5fb49c'}]},
-      options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-    });
-  });
+  // Destruir gráficos previos
+  Object.keys(charts).forEach(k=>{ try{ charts[k].destroy(); }catch(e){} delete charts[k]; });
 
-  // Chart 2: Tipo de procedimiento
-  const pt = state.stats.procedureTypes || {};
-  _renderChartSection('type', 'section-chartType', Object.keys(pt).length>0, ()=>{
-    charts.type = new Chart(document.getElementById('chartType'), {
-      type:'doughnut',
-      data:{labels:Object.keys(pt),datasets:[{data:Object.values(pt),backgroundColor:['#1e6b54','#2e8b6b','#5fb49c','#88c8b3','#a8d8c5','#3d8a76']}]},
-      options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}}}
-    });
-  });
+  const wrap = document.getElementById('sheetChartsWrap');
+  if(!wrap) return;
 
-  // Chart 3: Carga por anestesiólogo
-  let staffLoad;
-  if(state.stats.customStaffLoad && state.stats.customStaffLoad.length){
-    staffLoad = state.stats.customStaffLoad;
-  } else {
-    const shiftCount = {};
-    (state.shifts||[]).forEach(sh=>{ shiftCount[sh.staffId] = (shiftCount[sh.staffId]||0)+1; });
-    staffLoad = state.staff.map(s=>({n:s.name.replace(/Dr\.|Dra\./,'').split(',')[0].trim(), v:shiftCount[s.id]||0}));
+  if(!sheets.length){
+    wrap.innerHTML = `<div class="section"><div class="empty-chart">Aún no hay datos. ${
+      state.isAdmin
+        ? 'Importá tu Excel desde "Administración de datos", más arriba.'
+        : 'El administrador todavía no ha cargado el Excel de estadísticas.'
+    }</div></div>`;
+    return;
   }
-  _renderChartSection('staff', 'section-chartStaff', staffLoad.length>0, ()=>{
-    charts.staff = new Chart(document.getElementById('chartStaff'), {
+
+  const visible = sheets.filter(sh=>!state.stats.hidden[sh.key]);
+  if(!visible.length){
+    wrap.innerHTML = `<div class="section"><div class="empty-chart">Todos los gráficos están ocultos.${
+      state.isAdmin ? ' Usá "Mostrar todos los gráficos" para volver a verlos.' : ''
+    }</div></div>`;
+    return;
+  }
+
+  wrap.innerHTML = visible.map(sh=>{
+    const h = Math.max(240, sh.items.length * 24 + 60);
+    const delBtn = state.isAdmin
+      ? `<button class="chart-del" onclick="hideChart('${sh.key}')" title="Ocultar este gráfico">✕</button>`
+      : '';
+    return `<div class="section">
+      <h3>${sh.title} ${delBtn}</h3>
+      <div style="position:relative;height:${h}px">
+        <canvas id="chart_${sh.key}"></canvas>
+      </div>
+    </div>`;
+  }).join('');
+
+  visible.forEach(sh=>{
+    const cv = document.getElementById('chart_'+sh.key);
+    if(!cv) return;
+    charts[sh.key] = new Chart(cv, {
       type:'bar',
-      data:{labels:staffLoad.map(x=>x.n),datasets:[{label:'Turnos / casos',data:staffLoad.map(x=>x.v),backgroundColor:'#2e8b6b'}]},
-      options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
+      data:{
+        labels: sh.items.map(x=>x.n),
+        datasets:[{
+          label: sh.title,
+          data: sh.items.map(x=>Number(x.v)||0),
+          backgroundColor:'#2e8b6b'
+        }]
+      },
+      options:{
+        indexAxis:'y',
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ beginAtZero:true },
+          y:{ ticks:{ font:{ size:11 }, autoSkip:false } }
+        }
+      }
     });
   });
 }
 
 function hideChart(key){
   if(!state.isAdmin){ toast('Solo admin'); return; }
-  if(!confirm('¿Eliminar este gráfico de la vista? Podés restaurarlos desde "Mostrar todos los gráficos".')) return;
-  _ensureStatsHidden();
+  if(!confirm('¿Ocultar este gráfico? Podés restaurarlo con "Mostrar todos los gráficos".')) return;
+  if(!state.stats.hidden) state.stats.hidden = {};
   state.stats.hidden[key] = true;
   save();
   renderStats();
@@ -1657,22 +1688,10 @@ function hideChart(key){
 }
 function resetHiddenCharts(){
   if(!state.isAdmin){ toast('Solo admin'); return; }
-  _ensureStatsHidden();
-  state.stats.hidden = {cases:false, type:false, staff:false};
+  state.stats.hidden = {};
   save();
   renderStats();
   toast('Todos los gráficos visibles');
-}
-function restoreSampleStats(){
-  if(!state.isAdmin){ toast('Solo admin'); return; }
-  if(!confirm('¿Restaurar los datos de muestra originales? Se perderán los datos importados.')) return;
-  state.stats.casesByMonth = [120,135,128,142,150,138,145,160,155,148,140,132];
-  state.stats.procedureTypes = {General:45, Regional:25, Sedacion:18, Combinada:12};
-  state.stats.customStaffLoad = null;
-  state.stats.lastImport = null;
-  save();
-  renderStats();
-  toast('Datos de muestra restaurados');
 }
 
 // --- IMPORTACIÓN DE EXCEL ---
@@ -1680,16 +1699,12 @@ function openImportStatsModal(){
   if(!state.isAdmin){ toast('Solo admin'); return; }
   modal(`
     <h3>📂 Importar Excel de estadísticas</h3>
-    <p class="help" style="margin-bottom:10px">Subí un archivo <b>.xlsx</b> con la siguiente estructura recomendada:</p>
-    <div style="background:#f7fcf9;border:1px solid var(--green-pale);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;margin-bottom:14px">
-      <b>Hoja 1 — "Casos por mes":</b> columna A: mes (Ene…Dic), columna B: cantidad de casos.<br>
-      <b>Hoja 2 — "Tipos":</b> columna A: tipo (General, Regional…), columna B: cantidad.<br>
-      <b>Hoja 3 — "Anestesiólogos":</b> columna A: nombre, columna B: casos/turnos.<br>
-      <i>Las hojas que no estén se ignoran. Los nombres se buscan también de forma aproximada.</i>
-    </div>
+    <p class="help" style="margin-bottom:10px">Subí tu archivo <b>.xlsx</b>. La app lee las hojas
+      <b>HRS DIA</b>, <b>LL1</b>, <b>LL2</b> y <b>SABADO</b>, y de cada una toma el listado de
+      totales que está debajo de la tabla para armar un gráfico de barras.</p>
     <div class="field">
       <label>Archivo Excel</label>
-      <input type="file" id="statsFile" accept=".xlsx,.xls,.csv" />
+      <input type="file" id="statsFile" accept=".xlsx,.xls" />
     </div>
     <div class="btn-row">
       <button class="btn accent" onclick="importStatsXLSX()">Importar</button>
@@ -1707,81 +1722,34 @@ function importStatsXLSX(){
   reader.onload = function(e){
     try{
       const wb = XLSX.read(e.target.result, {type:'array'});
-      const results = { casos:false, tipos:false, staff:false, sheets:[] };
-      // Buscar hojas por nombre aproximado
-      const findSheet = (patterns)=>{
+      const sheetCharts = [];
+      const found = [];
+      STATS_SHEETS.forEach(def=>{
+        // Buscar la hoja por nombre aproximado
+        let sheetName = null;
         for(const name of wb.SheetNames){
-          const lower = name.toLowerCase();
-          for(const p of patterns){ if(lower.includes(p)) return name; }
+          const norm = _normSheetName(name);
+          if(def.match.some(m => norm === m || norm.indexOf(m) === 0)){ sheetName = name; break; }
         }
-        return null;
-      };
-      const sheetCasos = findSheet(['caso','mes','mensual']);
-      const sheetTipos = findSheet(['tipo','procedim','categor']);
-      const sheetStaff = findSheet(['anest','staff','medic','equipo']);
-
-      // Casos por mes (12 meses)
-      if(sheetCasos){
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetCasos], {header:1, defval:''});
-        const arr = new Array(12).fill(0);
-        const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-        data.forEach(row=>{
-          if(row.length < 2) return;
-          const m = String(row[0]||'').toLowerCase().slice(0,3);
-          const v = parseFloat(row[1]);
-          const idx = meses.indexOf(m);
-          if(idx>=0 && !isNaN(v)) arr[idx] = v;
-        });
-        if(arr.some(v=>v>0)){
-          state.stats.casesByMonth = arr;
-          results.casos = true;
+        if(!sheetName) return;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+        const items = _findSheetListing(rows);
+        if(items.length){
+          sheetCharts.push({ key:def.key, title:def.title, items });
+          found.push(def.title + ' (' + items.length + ')');
         }
+      });
+      if(!sheetCharts.length){
+        toast('No se encontraron las hojas HRS DIA, LL1, LL2 ni SABADO con un listado válido.');
+        return;
       }
-      // Tipos
-      if(sheetTipos){
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetTipos], {header:1, defval:''});
-        const obj = {};
-        data.forEach(row=>{
-          if(row.length < 2) return;
-          const k = String(row[0]||'').trim();
-          const v = parseFloat(row[1]);
-          if(k && !isNaN(v) && k.toLowerCase()!=='tipo') obj[k] = v;
-        });
-        if(Object.keys(obj).length){
-          state.stats.procedureTypes = obj;
-          results.tipos = true;
-        }
-      }
-      // Staff
-      if(sheetStaff){
-        const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetStaff], {header:1, defval:''});
-        const arr = [];
-        data.forEach(row=>{
-          if(row.length < 2) return;
-          const n = String(row[0]||'').trim();
-          const v = parseFloat(row[1]);
-          if(n && !isNaN(v) && n.toLowerCase().indexOf('nombre')<0) arr.push({n, v});
-        });
-        if(arr.length){
-          state.stats.customStaffLoad = arr;
-          results.staff = true;
-        }
-      }
-      results.sheets = wb.SheetNames;
+      state.stats.sheetCharts = sheetCharts;
+      state.stats.hidden = {};
       state.stats.lastImport = { at:new Date().toISOString(), filename:file.name, sheets:wb.SheetNames };
       save();
       closeModal();
       renderStats();
-
-      const done = [];
-      if(results.casos) done.push('Casos por mes');
-      if(results.tipos) done.push('Tipos');
-      if(results.staff) done.push('Anestesiólogos');
-      if(done.length === 0){
-        toast('No se identificaron hojas válidas. Revisá los nombres y formato.');
-      } else {
-        toast('Importado: ' + done.join(', '));
-      }
+      toast('Importado: ' + found.join(', '));
     }catch(err){
       console.error(err);
       toast('Error al leer el Excel: ' + (err.message||err));
