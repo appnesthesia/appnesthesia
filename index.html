@@ -476,6 +476,32 @@ canvas{max-width:100%}
 .inst-mail-btn .mail-icon{font-size:14px;line-height:1}
 .inst-loading{text-align:center;color:var(--muted);font-size:13px;padding:20px}
 
+/* ============ SELECTOR DE MÓDULO (Staff / Agendamiento / Guías) ============ */
+.mod-screen{position:fixed;inset:0;background:linear-gradient(180deg,#f0faf5 0%,#e6f4ee 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',-apple-system,system-ui,sans-serif;overflow-y:auto}
+.mod-screen.hidden{display:none!important}
+.mod-card{background:#fff;border-radius:22px;padding:30px 24px;max-width:460px;width:100%;box-shadow:0 18px 48px rgba(15,68,53,.18),0 4px 12px rgba(15,68,53,.08);border:1px solid var(--green-pale)}
+.mod-card-logo{width:78px;height:78px;border-radius:20px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));margin:0 auto 10px;box-shadow:0 8px 22px -2px rgba(14,125,117,.45),0 2px 6px rgba(14,125,117,.18);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:32px;font-family:'Manrope','Inter',sans-serif;overflow:hidden}
+.mod-card-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.mod-inst-name{text-align:center;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:4px}
+.mod-card-title{font-family:'Manrope','Inter',sans-serif;font-size:21px;font-weight:800;color:var(--primary-dark);text-align:center;margin:0 0 4px;letter-spacing:.2px}
+.mod-card-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 18px}
+.mod-list{display:flex;flex-direction:column;gap:11px;margin-bottom:14px}
+.mod-item{display:flex;align-items:center;gap:13px;padding:15px;border-radius:14px;border:1.5px solid var(--green-pale);background:linear-gradient(180deg,#fafffd,#f4faf7);cursor:pointer;transition:all .15s;font-family:inherit;color:inherit;text-align:left;width:100%}
+.mod-item:not(.disabled):hover{border-color:var(--green-forest);background:linear-gradient(180deg,#ecfaf3,#dff5ea);transform:translateY(-1px);box-shadow:0 6px 14px -3px rgba(15,68,53,.18)}
+.mod-item:not(.disabled):active{transform:scale(.985)}
+.mod-item.disabled{cursor:not-allowed;opacity:.55;background:#f3f5f4;border-color:#dde8e3;filter:grayscale(.4)}
+.mod-item-ico{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 3px 8px rgba(15,68,53,.25),inset 0 1px 0 rgba(255,255,255,.3)}
+.mod-item.disabled .mod-item-ico{background:linear-gradient(135deg,#9aa6a1,#7d8a85);box-shadow:none}
+.mod-item-body{flex:1;min-width:0}
+.mod-item-name{font-weight:700;color:var(--primary-dark);font-size:15px;line-height:1.3;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.mod-item.disabled .mod-item-name{color:#5a6b66}
+.mod-item-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
+.mod-item-arrow{color:var(--green-forest);font-size:20px;flex-shrink:0;font-weight:600}
+.mod-soon{display:inline-block;font-size:9.5px;background:#e8e8e8;color:#5a6b66;padding:2px 7px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase;font-weight:700}
+.mod-actions{display:flex;gap:8px;justify-content:center;margin-top:6px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
+.mod-actions .btn{font-family:inherit;font-size:12.5px;padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;font-weight:600;transition:all .12s}
+.mod-actions .btn:hover{background:#f0fdf4;color:var(--primary);border-color:var(--accent)}
+
 /* ============ USER PICKER (perfil personal) ============ */
 .user-picker{position:fixed;inset:0;background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 50%,#bbf7d0 100%);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
 .user-picker.hidden{display:none!important}
@@ -563,6 +589,43 @@ canvas{max-width:100%}
   </div>
 </div>
 
+<!-- SELECTOR DE MÓDULO (oculto hasta el boot) -->
+<div id="modulesScreen" class="mod-screen hidden">
+  <div class="mod-card">
+    <div class="mod-card-logo"><img src="icon-512.png?v=29" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div class="mod-inst-name" id="modulesInstName">—</div>
+    <h2 class="mod-card-title">¿A dónde quieres entrar?</h2>
+    <p class="mod-card-sub">Elegí el módulo de la app</p>
+    <div class="mod-list">
+      <button type="button" class="mod-item" onclick="openStaffModule()">
+        <div class="mod-item-ico">👥</div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Staff</div>
+          <div class="mod-item-desc">Acceso para los anestesiólogos del servicio</div>
+        </div>
+        <div class="mod-item-arrow">›</div>
+      </button>
+      <button type="button" class="mod-item disabled" disabled aria-disabled="true">
+        <div class="mod-item-ico">📅</div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Agendamiento de procedimientos <span class="mod-soon">Próximamente</span></div>
+          <div class="mod-item-desc">Reserva de pabellones y procedimientos electivos</div>
+        </div>
+      </button>
+      <button type="button" class="mod-item disabled" disabled aria-disabled="true">
+        <div class="mod-item-ico">📘</div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Guías Perioperatorias <span class="mod-soon">Próximamente</span></div>
+          <div class="mod-item-desc">Protocolos y manejo perioperatorio del paciente</div>
+        </div>
+      </button>
+    </div>
+    <div class="mod-actions">
+      <button class="btn" onclick="cambiarInstitucionFromModules()">‹ Cambiar institución</button>
+    </div>
+  </div>
+</div>
+
 <!-- SELECTOR DE USUARIO (oculto hasta boot) -->
 <div id="userPicker" class="user-picker hidden">
   <div class="user-picker-card">
@@ -571,7 +634,7 @@ canvas{max-width:100%}
     <p class="user-picker-sub">Seleccioná tu perfil para continuar</p>
     <div id="userGrid" class="user-grid"></div>
     <div class="user-picker-actions">
-      <button class="btn sm secondary" onclick="cambiarInstitucionFromPicker()">‹ Cambiar institución</button>
+      <button class="btn sm secondary" onclick="backToModulesFromPicker()">‹ Volver</button>
     </div>
     <div class="user-picker-help">
       ¿No te ves en la lista? Pedile al administrador que te agregue al staff.
@@ -1064,6 +1127,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

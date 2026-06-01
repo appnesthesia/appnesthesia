@@ -3198,13 +3198,14 @@ async function selectInstitution(id){
     migrateLegacyStateIfNeeded(id);
     applyInstitutionConfig(cfg);
     state = load();
-    // Traer estado compartido del backend antes de mostrar la home
+    // Traer estado compartido del backend antes de seguir
     await bootSync();
     save();
     document.getElementById('institutionPicker').classList.add('hidden');
     updateInstitutionUI();
     updateAdminUI();
-    showHome();
+    // Después de elegir institución → pantalla de los 3 módulos
+    showModulesScreen();
   }catch(e){
     console.error(e);
     alert('No se pudo cargar la configuración de la institución: '+e.message);
@@ -3220,6 +3221,72 @@ function cambiarInstitucion(){
 }
 // Variante sin restricción admin: usada desde el user picker (todavía no hay sesión activa)
 function cambiarInstitucionFromPicker(){
+  const ok = confirm('¿Volver a elegir institución? La app se reiniciará. Tus datos locales quedan guardados por institución.');
+  if(!ok) return;
+  localStorage.removeItem(INSTITUTION_LS_KEY);
+  location.reload();
+}
+
+// ============================================================
+// PANTALLA INTERMEDIA: SELECTOR DE MÓDULO (Staff / Agendamiento / Guías)
+// ============================================================
+// Cache de la lista de instituciones para no re-fetchear al volver atrás.
+let INSTITUTIONS_CACHE = null;
+
+// Muestra el selector de institución (usado desde logout y desde "Cambiar institución" si hiciera falta).
+async function showInstitutionPicker(){
+  if(!INSTITUTIONS_CACHE){
+    try{
+      const idx = await loadInstitutionsIndex();
+      INSTITUTIONS_CACHE = idx.institutions || [];
+    }catch(e){
+      INSTITUTIONS_CACHE = (INLINE_INSTITUTIONS_INDEX && INLINE_INSTITUTIONS_INDEX.institutions) || [];
+    }
+  }
+  // Ocultar otras pantallas de boot
+  const mods = document.getElementById('modulesScreen');
+  if(mods) mods.classList.add('hidden');
+  const usr = document.getElementById('userPicker');
+  if(usr) usr.classList.add('hidden');
+  // Renderizar y mostrar
+  try{ renderInstitutionPicker(INSTITUTIONS_CACHE); }catch(e){}
+  const ip = document.getElementById('institutionPicker');
+  if(ip) ip.classList.remove('hidden');
+}
+
+// Muestra la pantalla con los 3 botones (Staff / Agendamiento / Guías).
+function showModulesScreen(){
+  // Ocultar otras pantallas de boot
+  const ip = document.getElementById('institutionPicker');
+  if(ip) ip.classList.add('hidden');
+  const usr = document.getElementById('userPicker');
+  if(usr) usr.classList.add('hidden');
+  // Actualizar el nombre de la institución
+  const el = document.getElementById('modulesInstName');
+  if(el && typeof INSTITUTION !== 'undefined' && INSTITUTION){
+    el.textContent = INSTITUTION.shortName || INSTITUTION.name || '';
+  }
+  // Mostrar
+  const mods = document.getElementById('modulesScreen');
+  if(mods) mods.classList.remove('hidden');
+}
+
+// Botón "Staff" del selector de módulo → abre el picker de usuarios existente.
+function openStaffModule(){
+  const mods = document.getElementById('modulesScreen');
+  if(mods) mods.classList.add('hidden');
+  showUserPicker();
+}
+
+// "Volver" desde el userPicker → vuelve al selector de módulo (no reinicia).
+function backToModulesFromPicker(){
+  const usr = document.getElementById('userPicker');
+  if(usr) usr.classList.add('hidden');
+  showModulesScreen();
+}
+
+// "Cambiar institución" desde el selector de módulo → reinicia para elegir otra institución.
+function cambiarInstitucionFromModules(){
   const ok = confirm('¿Volver a elegir institución? La app se reiniciará. Tus datos locales quedan guardados por institución.');
   if(!ok) return;
   localStorage.removeItem(INSTITUTION_LS_KEY);
@@ -3914,7 +3981,8 @@ function logoutUser(){
     state.isAdmin = false;
     save();
   }
-  showUserPicker();
+  // Cerrar la app interna y volver a la pantalla de institución (manteniendo la institución elegida).
+  try{ showInstitutionPicker(); }catch(e){ showUserPicker(); }
 }
 
 async function changeUserPIN(){
@@ -4033,6 +4101,7 @@ async function boot(){
   // 1) Cargar el índice de instituciones (cacheado por SW)
   const idx = await loadInstitutionsIndex();
   const institutions = idx.institutions||[];
+  INSTITUTIONS_CACHE = institutions; // cache para showInstitutionPicker()
 
   // 2) Ver si ya hay institución elegida
   const saved = localStorage.getItem(INSTITUTION_LS_KEY);
@@ -4071,15 +4140,15 @@ async function boot(){
           state.currentUserId = null;
         }
       }
-      // Sin sesión → mostrar user picker
-      showUserPicker();
+      // Sin sesión → mostrar pantalla con los 3 módulos
+      showModulesScreen();
       return;
     }catch(e){
       console.error('Config inválida, mostrando selector institución',e);
     }
   }
 
-  // 4) Mostrar selector de institución
+  // 4) Sin institución elegida → mostrar selector de institución
   renderInstitutionPicker(institutions);
   document.getElementById('institutionPicker').classList.remove('hidden');
 }
