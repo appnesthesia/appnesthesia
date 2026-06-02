@@ -3556,15 +3556,13 @@ function openGuiasModule(){
   if(g) g.classList.remove('hidden');
   // Estado inicial: buscador limpio, bloque por defecto visible, tablas cerradas.
   const inp = document.getElementById('gpSearchInput');
-  if(inp){ inp.value=''; inp.focus(); }
+  if(inp){ inp.value=''; setTimeout(() => inp.focus(), 50); }
   const def = document.getElementById('gpDefaultBlock');
   if(def) def.classList.remove('hidden');
-  const res = document.getElementById('gpResults');
+  const res = document.getElementById('gpSearchResults');
   if(res) res.innerHTML = '';
-  const ay = document.getElementById('gpAyuno');
-  if(ay) ay.classList.add('hidden');
-  const su = document.getElementById('gpSusp');
-  if(su) su.classList.add('hidden');
+  // Cerrar tablas: el CSS usa la clase 'open' en .gp-section para mostrar el body.
+  document.querySelectorAll('#guiasScreen .gp-section').forEach(s => s.classList.remove('open'));
 }
 
 // Volver desde Guías al selector de módulos.
@@ -3581,7 +3579,7 @@ function onGuiasSearchInput(){
   const def = document.getElementById('gpDefaultBlock');
   if(_gpNorm(q).length === 0){
     if(def) def.classList.remove('hidden');
-    const res = document.getElementById('gpResults');
+    const res = document.getElementById('gpSearchResults');
     if(res) res.innerHTML = '';
     return;
   }
@@ -3598,7 +3596,7 @@ function clearGuiasSearch(){
 
 // Renderiza tarjetas de fármacos que matchean la query.
 function renderGuiasSearchResults(query){
-  const res = document.getElementById('gpResults');
+  const res = document.getElementById('gpSearchResults');
   if(!res) return;
   const q = _gpNorm(query);
   const matches = GUIA_DRUGS.filter(d => {
@@ -3642,21 +3640,22 @@ function renderGuiasSearchResults(query){
 }
 
 // Mostrar/ocultar tablas completas.
+// El CSS controla visibilidad del body con la clase 'open' en .gp-section.
 function toggleGuiasSection(id){
   const el = document.getElementById(id);
   if(!el) return;
-  const wasHidden = el.classList.contains('hidden');
-  // cerrar todas las secciones tipo "tabla"
+  const wasOpen = el.classList.contains('open');
+  // Cerrar todas las secciones
   ['gpAyuno','gpSusp'].forEach(x => {
     const e = document.getElementById(x);
-    if(e) e.classList.add('hidden');
+    if(e) e.classList.remove('open');
   });
-  if(wasHidden){
-    el.classList.remove('hidden');
+  if(!wasOpen){
+    el.classList.add('open');
     if(id === 'gpAyuno') renderGuiasAyunoTable();
     if(id === 'gpSusp') renderGuiasSuspTable();
-    // scroll suave al elemento abierto
-    setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+    // Scroll suave al elemento abierto
+    setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 80);
   }
 }
 
