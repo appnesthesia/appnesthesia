@@ -3294,6 +3294,413 @@ function cambiarInstitucionFromModules(){
 }
 
 // ============================================================
+// MÓDULO: GUÍAS PERIOPERATORIAS
+// Buscador de fármacos + tablas (Ayuno + Suspensión perioperatoria)
+// ============================================================
+
+// Catálogo de fármacos con recomendaciones perioperatorias.
+// action: 'suspender' | 'mantener' | 'individualizar'
+const GUIA_DRUGS = [
+  // --- Cardiovasculares ---
+  { name:'IECA (Enalapril, Captopril, Lisinopril, Ramipril)', category:'Cardiovascular',
+    aliases:['enalapril','captopril','lisinopril','ramipril','perindopril','quinapril','iecas','ieca','renitec','capoten'],
+    action:'suspender', when:'24 h antes de la cirugía',
+    summary:'Suspender el día previo si se usan para HTA. Mantener si la indicación es insuficiencia cardíaca con disfunción sistólica.',
+    notes:['Riesgo de hipotensión refractaria intraoperatoria.','Reiniciar al recuperar volemia y función renal estables.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'ARA-II (Losartán, Valsartán, Candesartán, Telmisartán)', category:'Cardiovascular',
+    aliases:['losartan','valsartan','candesartan','telmisartan','irbesartan','olmesartan','ara2','ara-ii','araii','cozaar','diovan'],
+    action:'suspender', when:'24 h antes de la cirugía',
+    summary:'Mismo manejo que IECA: suspender 24 h antes si se usan para HTA.',
+    notes:['Mantener si están indicados por IC con disfunción sistólica.','Reiniciar postoperatorio con volemia y función renal recuperadas.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Betabloqueadores (Atenolol, Bisoprolol, Carvedilol, Propranolol, Metoprolol, Nebivolol)', category:'Cardiovascular',
+    aliases:['atenolol','bisoprolol','carvedilol','propranolol','metoprolol','nebivolol','labetalol','betabloqueador','betabloqueadores','bb'],
+    action:'mantener', when:'Incluido el día de la cirugía',
+    summary:'No suspender. Administrar la dosis habitual la mañana de la cirugía.',
+    notes:['La suspensión brusca aumenta el riesgo de isquemia, arritmias e hipertensión de rebote.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Diuréticos (Furosemida, Hidroclorotiazida, Espironolactona)', category:'Cardiovascular',
+    aliases:['furosemida','hidroclorotiazida','hctz','espironolactona','clortalidona','indapamida','torasemida','diuretico','diureticos','lasix','aldactone'],
+    action:'suspender', when:'La mañana de la cirugía',
+    summary:'Omitir la dosis matinal del día de la cirugía.',
+    notes:['Riesgo de hipovolemia e hipokalemia perioperatoria.','Mantener si la indicación es IC descompensada (evaluar caso a caso).'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Estatinas (Atorvastatina, Simvastatina, Rosuvastatina, Pravastatina)', category:'Cardiovascular',
+    aliases:['atorvastatina','simvastatina','rosuvastatina','pravastatina','lovastatina','estatina','estatinas','lipitor','crestor'],
+    action:'mantener', when:'Incluido el día de la cirugía',
+    summary:'No suspender. Continuar el régimen habitual.',
+    notes:['Efecto pleiotrópico cardioprotector perioperatorio.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Antiarrítmicos (Amiodarona, Digoxina, Flecainida)', category:'Cardiovascular',
+    aliases:['amiodarona','digoxina','flecainida','propafenona','sotalol','antiarritmico','antiarritmicos','cordarone'],
+    action:'mantener', when:'Incluido el día de la cirugía',
+    summary:'No suspender. Mantener el esquema habitual.',
+    notes:['Vigilar QT, función tiroidea (amiodarona) y niveles plasmáticos cuando aplique.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  // --- Antiagregantes ---
+  { name:'Aspirina (AAS)', category:'Antiagregante',
+    aliases:['aspirina','aas','acido acetilsalicilico','ácido acetilsalicílico','cardioaspirina','ecotrin'],
+    action:'individualizar', when:'Según riesgo trombótico vs hemorrágico',
+    summary:'Mantener en prevención secundaria de alto riesgo (stent reciente, ACV, IAM). Suspender 5–7 días antes en prevención primaria o cirugías de alto riesgo hemorrágico (neurocirugía, columna, ocular cámara posterior).',
+    notes:['Coordinar con cardiología en stents <12 meses.','En cirugía mayor habitual: la mayoría se mantiene.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Clopidogrel (Plavix)', category:'Antiagregante',
+    aliases:['clopidogrel','plavix','iscover'],
+    action:'suspender', when:'5–7 días antes de la cirugía',
+    summary:'Suspender al menos 5 días antes (idealmente 7).',
+    notes:['Evaluar puente con AAS en stent reciente.','Reiniciar 24 h postoperatorio si hemostasia adecuada.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Ticagrelor (Brilinta)', category:'Antiagregante',
+    aliases:['ticagrelor','brilinta','brilique'],
+    action:'suspender', when:'5 días antes de la cirugía',
+    summary:'Suspender 5 días antes.',
+    notes:['Coordinar con cardiología en SCA reciente o stent <12 meses.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Prasugrel (Effient)', category:'Antiagregante',
+    aliases:['prasugrel','effient'],
+    action:'suspender', when:'7 días antes de la cirugía',
+    summary:'Suspender 7 días antes.',
+    notes:['Mayor riesgo hemorrágico que clopidogrel.','Coordinar con cardiología.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  // --- Anticoagulantes ---
+  { name:'Warfarina / Acenocumarol', category:'Anticoagulante',
+    aliases:['warfarina','acenocumarol','coumadin','sintrom','neosintrom','tao','aco'],
+    action:'suspender', when:'5 días antes (warfarina) / 3 días antes (acenocumarol)',
+    summary:'Suspender warfarina 5 días antes y acenocumarol 3 días antes. Control INR el día previo (objetivo <1.5).',
+    notes:['Evaluar terapia puente con HBPM en alto riesgo trombótico (FA con CHA₂DS₂-VASc alto, prótesis mecánica mitral, TVP/TEP reciente).','Reiniciar 12–24 h postoperatorio con hemostasia adecuada.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'DOACs — Rivaroxabán, Apixabán, Edoxabán', category:'Anticoagulante',
+    aliases:['rivaroxaban','rivaroxabán','xarelto','apixaban','apixabán','eliquis','edoxaban','edoxabán','lixiana','daiichi','doac','noac','aod'],
+    action:'suspender', when:'24–48 h antes según riesgo hemorrágico y función renal',
+    summary:'Bajo riesgo hemorrágico: suspender 24 h antes. Alto riesgo hemorrágico: suspender 48 h antes.',
+    notes:['Función renal normal (ClCr ≥50 mL/min): manejo estándar.','ClCr 30–49 mL/min: prolongar suspensión 48–72 h.','ClCr <30 mL/min: revisar caso a caso y considerar suspensión más prolongada.','Reiniciar a las 24–48 h postoperatorio según riesgo de sangrado.','No requieren terapia puente con HBPM.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Dabigatrán (Pradaxa)', category:'Anticoagulante',
+    aliases:['dabigatran','dabigatrán','pradaxa'],
+    action:'suspender', when:'Según función renal',
+    summary:'ClCr ≥50 mL/min: suspender 48 h antes (bajo riesgo) o 72 h antes (alto riesgo). ClCr 30–49 mL/min: suspender 72 h antes (bajo riesgo) o 96 h antes (alto riesgo).',
+    notes:['Más dependiente de función renal que el resto de los DOACs.','Antídoto específico: idarucizumab.','Reiniciar a las 24–48 h postoperatorio con hemostasia.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  // --- Hipoglicemiantes ---
+  { name:'Metformina', category:'Hipoglicemiante',
+    aliases:['metformina','glucophage','glafornil','dimefor'],
+    action:'suspender', when:'La mañana de la cirugía (o 24–48 h antes si insuficiencia renal)',
+    summary:'Suspender la mañana de la cirugía. Si VFG <30 mL/min o cirugía con uso de contraste yodado: suspender 24–48 h antes.',
+    notes:['Riesgo de acidosis láctica en hipoperfusión o falla renal aguda.','Reiniciar 48 h postoperatorio confirmando función renal estable.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'iSGLT-2 (Empagliflozina, Dapagliflozina, Canagliflozina)', category:'Hipoglicemiante',
+    aliases:['empagliflozina','dapagliflozina','canagliflozina','ertugliflozina','isglt2','sglt2','jardiance','forxiga','invokana','flozinas','flozina'],
+    action:'suspender', when:'3–4 días antes de la cirugía',
+    summary:'Suspender al menos 3 días antes (idealmente 4 días) por riesgo de cetoacidosis euglicémica perioperatoria.',
+    notes:['Riesgo aumentado con ayuno prolongado, sepsis o estrés quirúrgico.','Reiniciar al recuperar ingesta oral normal y estabilidad hemodinámica.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Insulina basal (Glargina, Detemir, Degludec, NPH)', category:'Hipoglicemiante',
+    aliases:['insulina','glargina','lantus','toujeo','detemir','levemir','degludec','tresiba','nph','insulatard','basal'],
+    action:'individualizar', when:'Ajuste de dosis la mañana de la cirugía',
+    summary:'Reducir la dosis matinal de insulina basal al 50–80% (según tipo y control glicémico). Suspender insulinas de acción rápida con el ayuno.',
+    notes:['Control de HGT cada 1–2 h en intraoperatorio.','Objetivo: 140–180 mg/dL.','Reiniciar régimen habitual con tolerancia oral.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  // --- Análogos GLP-1 ---
+  { name:'Semaglutida oral (Rybelsus)', category:'GLP-1 (oral)',
+    aliases:['semaglutida oral','rybelsus','semaglutida vo'],
+    action:'suspender', when:'El día previo a la cirugía',
+    summary:'Suspender el día previo (formulación oral diaria).',
+    notes:['Riesgo de retraso del vaciamiento gástrico y aspiración.','Ayuno estricto según protocolo.'],
+    source:'Ayuno Perioperatorio y Suspensión de GLP-1' },
+
+  { name:'Liraglutida (Victoza, Saxenda)', category:'GLP-1 (diario SC)',
+    aliases:['liraglutida','victoza','saxenda'],
+    action:'suspender', when:'El día previo a la cirugía',
+    summary:'Suspender el día previo (inyección diaria subcutánea).',
+    notes:['Retraso del vaciamiento gástrico — riesgo de aspiración.','Reiniciar al tolerar dieta oral.'],
+    source:'Ayuno Perioperatorio y Suspensión de GLP-1' },
+
+  { name:'Semaglutida semanal (Ozempic, Wegovy)', category:'GLP-1 (semanal SC)',
+    aliases:['semaglutida','ozempic','wegovy','semaglutida sc','semaglutida semanal'],
+    action:'suspender', when:'1 semana antes de la cirugía',
+    summary:'Suspender la dosis semanal al menos 7 días antes del procedimiento.',
+    notes:['Retraso significativo del vaciamiento gástrico (efecto residual prolongado).','Considerar imagen gástrica (eco) si dudas sobre contenido residual.','Reiniciar al tolerar dieta oral postoperatoria.'],
+    source:'Ayuno Perioperatorio y Suspensión de GLP-1' },
+
+  { name:'Dulaglutida (Trulicity)', category:'GLP-1 (semanal SC)',
+    aliases:['dulaglutida','trulicity'],
+    action:'suspender', when:'1 semana antes de la cirugía',
+    summary:'Suspender 7 días antes (administración semanal).',
+    notes:['Retraso del vaciamiento gástrico — riesgo de aspiración.','Reiniciar al tolerar dieta oral.'],
+    source:'Ayuno Perioperatorio y Suspensión de GLP-1' },
+
+  { name:'Tirzepatida (Mounjaro)', category:'GLP-1/GIP (semanal SC)',
+    aliases:['tirzepatida','mounjaro','zepbound'],
+    action:'suspender', when:'1 semana antes de la cirugía',
+    summary:'Suspender 7 días antes (administración semanal, agonista dual GLP-1/GIP).',
+    notes:['Efecto sobre vaciamiento gástrico potencialmente mayor que GLP-1 puros.','Reiniciar al tolerar dieta oral postoperatoria.'],
+    source:'Ayuno Perioperatorio y Suspensión de GLP-1' },
+
+  // --- Neurología / Psiquiatría ---
+  { name:'Antiparkinsonianos (Levodopa/Carbidopa, Pramipexol)', category:'Neurología',
+    aliases:['levodopa','carbidopa','sinemet','madopar','pramipexol','ropinirol','rasagilina','selegilina','parkinson'],
+    action:'mantener', when:'Incluido el día de la cirugía',
+    summary:'No suspender. Administrar la dosis matinal con un sorbo de agua y reanudar lo antes posible postoperatorio.',
+    notes:['La suspensión causa rigidez, disfagia y riesgo de síndrome neuroléptico maligno.','Evitar antieméticos antagonistas dopaminérgicos (metoclopramida, droperidol).'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Antiepilépticos (Ácido valproico, Carbamazepina, Lamotrigina, Levetiracetam)', category:'Neurología',
+    aliases:['acido valproico','ácido valproico','valproato','depakine','carbamazepina','tegretol','lamotrigina','lamictal','levetiracetam','keppra','fenitoina','fenitoína','antiepileptico','antiepilepticos','anticonvulsivante'],
+    action:'mantener', when:'Incluido el día de la cirugía',
+    summary:'No suspender. Mantener el esquema habitual para evitar crisis epilépticas perioperatorias.',
+    notes:['Reanudar vía oral lo antes posible.','Vigilar interacciones (inducción enzimática) con anestésicos.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'Antidepresivos tricíclicos (Amitriptilina, Imipramina, Nortriptilina)', category:'Psiquiatría',
+    aliases:['amitriptilina','imipramina','nortriptilina','clomipramina','tricíclico','triciclico','tricíclicos','tca'],
+    action:'individualizar', when:'Evaluar según riesgo cardiovascular',
+    summary:'Habitualmente se mantienen. Considerar suspensión solo en pacientes con arritmias o QT prolongado.',
+    notes:['Vigilar interacciones con vasopresores (efecto exagerado).','Evitar simpaticomiméticos indirectos (efedrina) — preferir fenilefrina/noradrenalina.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' },
+
+  { name:'IMAO (Tranilcipromina, Fenelzina, Selegilina)', category:'Psiquiatría',
+    aliases:['imao','tranilcipromina','fenelzina','selegilina','isocarboxazida','moclobemida'],
+    action:'individualizar', when:'Idealmente suspender 2 semanas antes (coordinar con psiquiatría)',
+    summary:'Riesgo de crisis hipertensiva y síndrome serotoninérgico con anestesia. Suspender 2 semanas antes si es posible. Si no es posible: técnica anestésica "IMAO-safe".',
+    notes:['Evitar petidina (meperidina), dextrometorfano, tramadol.','Evitar simpaticomiméticos indirectos (efedrina).','Coordinar suspensión con psiquiatra tratante.'],
+    source:'Guía de Suspensión de Fármacos Perioperatorios' }
+];
+
+// Tabla de Ayuno Perioperatorio + GLP-1
+const AYUNO_TABLE_DATA = {
+  rows: [
+    { ingesta:'Líquidos claros (agua, té, café sin leche, jugos sin pulpa, bebidas isotónicas)', tiempo:'2 horas' },
+    { ingesta:'Leche materna', tiempo:'4 horas' },
+    { ingesta:'Fórmula láctea infantil', tiempo:'6 horas' },
+    { ingesta:'Leche no humana / lácteos', tiempo:'6 horas' },
+    { ingesta:'Comida ligera (tostada + líquido claro)', tiempo:'6 horas' },
+    { ingesta:'Comida pesada (frituras, grasas, carnes)', tiempo:'8 horas' }
+  ],
+  glp1Rows: [
+    { farmaco:'Semaglutida oral (Rybelsus)', suspension:'El día previo' },
+    { farmaco:'Liraglutida (Victoza, Saxenda) — diario SC', suspension:'El día previo' },
+    { farmaco:'Semaglutida semanal (Ozempic, Wegovy)', suspension:'1 semana antes' },
+    { farmaco:'Dulaglutida (Trulicity)', suspension:'1 semana antes' },
+    { farmaco:'Tirzepatida (Mounjaro)', suspension:'1 semana antes' }
+  ]
+};
+
+// Tabla resumen de suspensión perioperatoria
+const SUSP_TABLE_DATA = [
+  { grupo:'Cardiovascular', farmaco:'IECA', accion:'Suspender', tiempo:'24 h antes (si HTA). Mantener si IC.' },
+  { grupo:'Cardiovascular', farmaco:'ARA-II', accion:'Suspender', tiempo:'24 h antes (si HTA). Mantener si IC.' },
+  { grupo:'Cardiovascular', farmaco:'Betabloqueadores', accion:'Mantener', tiempo:'Incluido el día de cirugía' },
+  { grupo:'Cardiovascular', farmaco:'Diuréticos', accion:'Suspender', tiempo:'Omitir dosis matinal' },
+  { grupo:'Cardiovascular', farmaco:'Estatinas', accion:'Mantener', tiempo:'Sin cambios' },
+  { grupo:'Cardiovascular', farmaco:'Antiarrítmicos (amiodarona, digoxina)', accion:'Mantener', tiempo:'Sin cambios' },
+  { grupo:'Antiagregantes', farmaco:'Aspirina', accion:'Individualizar', tiempo:'Mantener en alto riesgo trombótico; suspender 5–7 d en alto riesgo hemorrágico' },
+  { grupo:'Antiagregantes', farmaco:'Clopidogrel', accion:'Suspender', tiempo:'5–7 días antes' },
+  { grupo:'Antiagregantes', farmaco:'Ticagrelor', accion:'Suspender', tiempo:'5 días antes' },
+  { grupo:'Antiagregantes', farmaco:'Prasugrel', accion:'Suspender', tiempo:'7 días antes' },
+  { grupo:'Anticoagulantes', farmaco:'Warfarina', accion:'Suspender', tiempo:'5 días antes (INR <1.5)' },
+  { grupo:'Anticoagulantes', farmaco:'Acenocumarol', accion:'Suspender', tiempo:'3 días antes (INR <1.5)' },
+  { grupo:'Anticoagulantes', farmaco:'DOACs (rivaroxabán, apixabán, edoxabán)', accion:'Suspender', tiempo:'24–48 h antes según función renal y riesgo' },
+  { grupo:'Anticoagulantes', farmaco:'Dabigatrán', accion:'Suspender', tiempo:'48–96 h antes según ClCr' },
+  { grupo:'Hipoglicemiantes', farmaco:'Metformina', accion:'Suspender', tiempo:'Día de cirugía (24–48 h si VFG <30)' },
+  { grupo:'Hipoglicemiantes', farmaco:'iSGLT-2 (flozinas)', accion:'Suspender', tiempo:'3–4 días antes' },
+  { grupo:'Hipoglicemiantes', farmaco:'Insulina basal', accion:'Individualizar', tiempo:'50–80% de dosis habitual' },
+  { grupo:'Neurología', farmaco:'Antiparkinsonianos', accion:'Mantener', tiempo:'Dosis matinal con sorbo de agua' },
+  { grupo:'Neurología', farmaco:'Antiepilépticos', accion:'Mantener', tiempo:'Sin cambios' },
+  { grupo:'Psiquiatría', farmaco:'IMAO', accion:'Individualizar', tiempo:'2 semanas antes (coordinar con psiquiatría)' }
+];
+
+// Normalización (lowercase + sin acentos) para búsqueda tolerante.
+function _gpNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+// Escape HTML
+function _gpEsc(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Color del badge según acción
+function _gpActionClass(action){
+  if(action === 'suspender') return 'gp-badge-suspender';
+  if(action === 'mantener') return 'gp-badge-mantener';
+  return 'gp-badge-indiv';
+}
+function _gpActionLabel(action){
+  if(action === 'suspender') return 'SUSPENDER';
+  if(action === 'mantener') return 'MANTENER';
+  return 'INDIVIDUALIZAR';
+}
+
+// Abre el módulo Guías Perioperatorias (overlay fullscreen, sin login).
+function openGuiasModule(){
+  const mod = document.getElementById('modulesScreen');
+  if(mod) mod.classList.add('hidden');
+  const g = document.getElementById('guiasScreen');
+  if(g) g.classList.remove('hidden');
+  // Estado inicial: buscador limpio, bloque por defecto visible, tablas cerradas.
+  const inp = document.getElementById('gpSearchInput');
+  if(inp){ inp.value=''; inp.focus(); }
+  const def = document.getElementById('gpDefaultBlock');
+  if(def) def.classList.remove('hidden');
+  const res = document.getElementById('gpResults');
+  if(res) res.innerHTML = '';
+  const ay = document.getElementById('gpAyuno');
+  if(ay) ay.classList.add('hidden');
+  const su = document.getElementById('gpSusp');
+  if(su) su.classList.add('hidden');
+}
+
+// Volver desde Guías al selector de módulos.
+function backToModulesFromGuias(){
+  const g = document.getElementById('guiasScreen');
+  if(g) g.classList.add('hidden');
+  showModulesScreen();
+}
+
+// Búsqueda en vivo.
+function onGuiasSearchInput(){
+  const inp = document.getElementById('gpSearchInput');
+  const q = inp ? inp.value : '';
+  const def = document.getElementById('gpDefaultBlock');
+  if(_gpNorm(q).length === 0){
+    if(def) def.classList.remove('hidden');
+    const res = document.getElementById('gpResults');
+    if(res) res.innerHTML = '';
+    return;
+  }
+  if(def) def.classList.add('hidden');
+  renderGuiasSearchResults(q);
+}
+
+// Botón "X" → limpia búsqueda y vuelve al estado inicial.
+function clearGuiasSearch(){
+  const inp = document.getElementById('gpSearchInput');
+  if(inp){ inp.value=''; inp.focus(); }
+  onGuiasSearchInput();
+}
+
+// Renderiza tarjetas de fármacos que matchean la query.
+function renderGuiasSearchResults(query){
+  const res = document.getElementById('gpResults');
+  if(!res) return;
+  const q = _gpNorm(query);
+  const matches = GUIA_DRUGS.filter(d => {
+    if(_gpNorm(d.name).includes(q)) return true;
+    if(_gpNorm(d.category).includes(q)) return true;
+    if((d.aliases||[]).some(a => _gpNorm(a).includes(q))) return true;
+    return false;
+  });
+
+  if(matches.length === 0){
+    res.innerHTML = `
+      <div class="gp-empty">
+        <p><strong>Sin resultados</strong> para "${_gpEsc(query)}".</p>
+        <p>Sugerencia: probá con el principio activo (ej: "rivaroxabán") o nombre comercial (ej: "Xarelto").</p>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+  for(const d of matches){
+    const cls = _gpActionClass(d.action);
+    const lbl = _gpActionLabel(d.action);
+    let notesHtml = '';
+    if(d.notes && d.notes.length){
+      notesHtml = '<ul class="gp-notes">' + d.notes.map(n => `<li>${_gpEsc(n)}</li>`).join('') + '</ul>';
+    }
+    html += `
+      <div class="gp-card">
+        <div class="gp-card-head">
+          <div class="gp-card-name">${_gpEsc(d.name)}</div>
+          <span class="gp-badge ${cls}">${lbl}</span>
+        </div>
+        <div class="gp-card-cat">${_gpEsc(d.category)}</div>
+        <div class="gp-card-when"><strong>Tiempo:</strong> ${_gpEsc(d.when)}</div>
+        <div class="gp-card-sum">${_gpEsc(d.summary)}</div>
+        ${notesHtml ? '<div class="gp-card-notes-title">Notas adicionales:</div>' + notesHtml : ''}
+        <div class="gp-card-src">Fuente: ${_gpEsc(d.source)}</div>
+      </div>`;
+  }
+  res.innerHTML = html;
+}
+
+// Mostrar/ocultar tablas completas.
+function toggleGuiasSection(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const wasHidden = el.classList.contains('hidden');
+  // cerrar todas las secciones tipo "tabla"
+  ['gpAyuno','gpSusp'].forEach(x => {
+    const e = document.getElementById(x);
+    if(e) e.classList.add('hidden');
+  });
+  if(wasHidden){
+    el.classList.remove('hidden');
+    if(id === 'gpAyuno') renderGuiasAyunoTable();
+    if(id === 'gpSusp') renderGuiasSuspTable();
+    // scroll suave al elemento abierto
+    setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+  }
+}
+
+// Render tabla Ayuno + GLP-1
+function renderGuiasAyunoTable(){
+  const cont = document.getElementById('gpAyunoBody');
+  if(!cont) return;
+  let html = '';
+  html += '<h3 class="gp-section-title">Tiempos de Ayuno Preoperatorio</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Tipo de ingesta</th><th>Tiempo mínimo</th></tr></thead><tbody>';
+  for(const r of AYUNO_TABLE_DATA.rows){
+    html += `<tr><td>${_gpEsc(r.ingesta)}</td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += '<h3 class="gp-section-title">Suspensión de Análogos GLP-1</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Fármaco</th><th>Suspensión</th></tr></thead><tbody>';
+  for(const r of AYUNO_TABLE_DATA.glp1Rows){
+    html += `<tr><td>${_gpEsc(r.farmaco)}</td><td>${_gpEsc(r.suspension)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += '<p class="gp-foot-note">Referencia: Guía de Ayuno Perioperatorio y Suspensión de GLP-1 — Clínica Universidad de los Andes.</p>';
+  cont.innerHTML = html;
+}
+
+// Render tabla Suspensión de Fármacos
+function renderGuiasSuspTable(){
+  const cont = document.getElementById('gpSuspBody');
+  if(!cont) return;
+  let html = '';
+  html += '<h3 class="gp-section-title">Suspensión Perioperatoria de Fármacos</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Acción</th><th>Tiempo / Observación</th></tr></thead><tbody>';
+  let lastGrupo = '';
+  for(const r of SUSP_TABLE_DATA){
+    const grupoCell = (r.grupo !== lastGrupo) ? `<td><strong>${_gpEsc(r.grupo)}</strong></td>` : '<td></td>';
+    lastGrupo = r.grupo;
+    const accionCls = _gpActionClass(r.accion.toLowerCase());
+    html += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td><span class="gp-badge ${accionCls}">${_gpEsc(r.accion.toUpperCase())}</span></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += '<p class="gp-foot-note">Referencia: Guía de Suspensión de Fármacos Perioperatorios — Clínica Universidad de los Andes. Las recomendaciones son orientativas; cada paciente debe evaluarse individualmente.</p>';
+  cont.innerHTML = html;
+}
+
+// ============================================================
 // NOTIFICACIONES (Nivel 2 — sistema operativo mientras app abierta)
 // ============================================================
 function notifSupported(){ return 'Notification' in window; }
