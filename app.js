@@ -3395,6 +3395,55 @@ const GUIA_DRUGS = [
     notes:['Más dependiente de función renal que el resto de los DOACs.','Antídoto específico: idarucizumab.','Reiniciar a las 24–48 h postoperatorio con hemostasia.'],
     source:'Guía de Suspensión de Fármacos Perioperatorios' },
 
+  { name:'Enoxaparina (Clexane, Lovenox)', category:'Anticoagulante',
+    aliases:['enoxaparina','clexane','lovenox','hbpm','heparina bajo peso','heparina de bajo peso molecular','enoxa'],
+    action:'suspender', when:'Dosis profiláctica: 12 h antes. Dosis terapéutica: 24 h antes',
+    summary:'Dosis profiláctica (40 mg/día o 20 mg/día): suspender última dosis al menos 12 h antes de la cirugía o de un bloqueo neuroaxial. Dosis terapéutica (1 mg/kg cada 12 h o 1,5 mg/kg/día): suspender al menos 24 h antes.',
+    notes:['ClCr <30 mL/min: prolongar suspensión (24 h profilaxis, 48 h terapéutica) por acumulación.','Bloqueo neuroaxial / catéter epidural: respetar estrictamente intervalos ASRA (12 h profilaxis, 24 h terapéutica) para evitar hematoma espinal.','Reiniciar profilaxis: 6–12 h postoperatorio con hemostasia. Dosis terapéutica: 24 h post si bajo riesgo de sangrado, 48–72 h si alto riesgo.','Útil como terapia puente en pacientes con warfarina y alto riesgo trombótico (prótesis mecánica mitral, FA con CHA₂DS₂-VASc ≥7, TVP/TEP <3 meses).','Retirar catéter epidural ≥12 h después de última dosis profiláctica y ≥24 h de terapéutica; siguiente dosis ≥4 h después del retiro.'],
+    source:'ASRA 2018 · ACCP CHEST 2022 · ESA 2018' },
+
+  { name:'Dalteparina (Fragmin)', category:'Anticoagulante',
+    aliases:['dalteparina','fragmin','hbpm','heparina bajo peso'],
+    action:'suspender', when:'Dosis profiláctica: 12 h antes. Dosis terapéutica: 24 h antes',
+    summary:'Dosis profiláctica (2500–5000 UI/día): suspender 12 h antes. Dosis terapéutica (200 UI/kg/día o 100 UI/kg cada 12 h): suspender al menos 24 h antes.',
+    notes:['Mismas precauciones que enoxaparina para bloqueo neuroaxial (12 h profilaxis, 24 h terapéutica).','Ajustar en falla renal moderada-severa.','Útil como puente en alto riesgo trombótico con anticoagulación oral.'],
+    source:'ASRA 2018 · ACCP CHEST 2022' },
+
+  { name:'Nadroparina (Fraxiparina)', category:'Anticoagulante',
+    aliases:['nadroparina','fraxiparina','fraxiparine','hbpm'],
+    action:'suspender', when:'Dosis profiláctica: 12 h antes. Dosis terapéutica: 24 h antes',
+    summary:'Profilaxis (2850–5700 UI/día): suspender 12 h antes. Terapéutica (85,5 UI/kg cada 12 h): suspender 24 h antes.',
+    notes:['Mismas precauciones neuroaxiales que enoxaparina/dalteparina (intervalos ASRA).','Ajuste de dosis si ClCr <30 mL/min.'],
+    source:'ASRA 2018 · ACCP CHEST 2022' },
+
+  { name:'Tinzaparina (Innohep)', category:'Anticoagulante',
+    aliases:['tinzaparina','innohep','hbpm'],
+    action:'suspender', when:'Dosis profiláctica: 12 h antes. Dosis terapéutica: 24 h antes',
+    summary:'Profilaxis (3500–4500 UI/día): suspender 12 h antes. Terapéutica (175 UI/kg/día): suspender al menos 24 h antes.',
+    notes:['Mejor perfil en insuficiencia renal leve-moderada que otras HBPM (menor acumulación).','Mismas precauciones neuroaxiales que el resto de HBPM.'],
+    source:'ASRA 2018 · ACCP CHEST 2022' },
+
+  { name:'Heparina no fraccionada (HNF) SC / IV', category:'Anticoagulante',
+    aliases:['heparina','hnf','heparina no fraccionada','heparina sodica','heparina sódica','liquemine','heparin'],
+    action:'suspender', when:'SC profiláctica: 4–6 h antes. IV terapéutica: 4 h antes (control TTPa)',
+    summary:'HNF subcutánea profiláctica (5000 UI cada 8–12 h): suspender 4–6 h antes. HNF IV en infusión terapéutica: suspender 4 h antes y verificar TTPa <40 s antes del bloqueo o cirugía.',
+    notes:['Vida media corta (1–2 h IV) la hace útil como puente cuando se requiere reversión rápida.','Reiniciar 1 h postoperatorio (profilaxis SC) o 6–12 h postoperatorio sin bolo (IV) según riesgo de sangrado.','Útil como puente con HNF IV en pacientes con prótesis valvular mecánica que toleren hospitalización prolongada.','Vigilar plaquetas (riesgo de HIT) si uso >5 días.'],
+    source:'ASRA 2018 · ACCP CHEST 2022' },
+
+  { name:'Fondaparinux (Arixtra)', category:'Anticoagulante',
+    aliases:['fondaparinux','arixtra'],
+    action:'suspender', when:'Dosis profiláctica (2,5 mg): 36–42 h antes. Terapéutica: 4 días antes',
+    summary:'Pentasacárido sintético anti-Xa. Profilaxis (2,5 mg/día): suspender 36–42 h antes. Dosis terapéutica (5–10 mg/día según peso): suspender al menos 4 días antes.',
+    notes:['Vida media larga (17–21 h) → mayor latencia para revertir.','Sin antídoto específico (no neutralizado por protamina).','Bloqueo neuroaxial: ASRA contraindica anestesia neuroaxial si paciente recibe fondaparinux profiláctico salvo punción atraumática única.','Reiniciar 6–8 h postoperatorio (profilaxis) con hemostasia confirmada.','Ajustar/contraindicar si ClCr <30 mL/min.'],
+    source:'ASRA 2018 · ACCP CHEST 2022' },
+
+  { name:'Terapia puente con HBPM (bridging)', category:'Anticoagulante',
+    aliases:['puente','bridging','bridge','terapia puente','heparinizacion puente','heparinización puente'],
+    action:'individualizar', when:'Solo en alto riesgo trombótico',
+    summary:'Indicado solo en alto riesgo trombótico al suspender anticoagulación oral (warfarina): prótesis valvular mecánica mitral, válvula aórtica con factores de riesgo, FA con CHA₂DS₂-VASc ≥7 o ACV/AIT <3 meses, TVP/TEP <3 meses, trombofilia severa.',
+    notes:['Esquema típico: HBPM terapéutica (enoxaparina 1 mg/kg cada 12 h) iniciada el día -3, última dosis terapéutica completa 24 h antes de la cirugía (luego solo media dosis o suspender).','BRIDGE trial (NEJM 2015): en FA SIN alto riesgo, el puente con HBPM aumenta sangrado sin reducir tromboembolismo. NO usar puente en FA de bajo-moderado riesgo.','Reiniciar HBPM 24 h postoperatorio si bajo riesgo de sangrado, 48–72 h si alto riesgo.','Reiniciar warfarina en cuanto se tolere VO; mantener HBPM hasta INR terapéutico (≥2,0 en dos controles).','DOACs NO requieren terapia puente.'],
+    source:'ACCP CHEST 2022 · BRIDGE trial NEJM 2015 · ESA 2018' },
+
   // --- Hipoglicemiantes ---
   { name:'Metformina', category:'Hipoglicemiante',
     aliases:['metformina','glucophage','glafornil','dimefor'],
@@ -3763,7 +3812,10 @@ const AGEND_SALAS = [
   { id:'otros',        name:'Otros procedimientos', ico:'💉', color:'#F97316', desc:'Sedación dental, punción lumbar, QMT intratecal, acceso venoso central' }
 ];
 
-const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // 08:00..19:00 (último slot termina 20:00)
+const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // 08:00..19:00 (legacy, sólo para visualizar la grilla horaria de fondo)
+const AGEND_SLOT_GRANULARITY_MIN = 30;   // granularidad para selectores de horario (30 min)
+const AGEND_DAY_START_MIN = 8 * 60;      // 08:00
+const AGEND_DAY_END_MIN   = 20 * 60;     // 20:00
 const AGEND_DATA_LS_KEY    = 'appx_agend_data_v1';
 const AGEND_SESSION_LS_KEY = 'appx_agend_sess_v1';
 
@@ -3777,7 +3829,9 @@ const AGEND_STATE = {
   salaId: null,
   calYear: 0, calMonth: 0,
   selectedDate: null,    // 'YYYY-MM-DD'
-  formHour: null,
+  formHour: null,        // legacy (compat)
+  formStartMin: null,    // minutos desde 00:00 (nuevo rango flexible)
+  formEndMin: null,
   detalleId: null,
   overviewTab: 'pendiente',
   navStack: []
@@ -3821,14 +3875,84 @@ const _agendDiasES = ['domingo','lunes','martes','miércoles','jueves','viernes'
 function _agendGetSala(salaId){ return AGEND_SALAS.find(s => s.id === salaId); }
 function _agendGetUnidad(code){ return AGEND_UNIDADES.find(u => u.code === code); }
 function _agendGenId(){ return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+
+// --- Helpers de tiempo (minutos desde 00:00) ---
+function _agendMinToHHMM(min){
+  const h = Math.floor(min/60), m = min%60;
+  return `${_agendPad(h)}:${_agendPad(m)}`;
+}
+function _agendHHMMToMin(hhmm){
+  if(typeof hhmm !== 'string') return null;
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  return parseInt(m[1],10)*60 + parseInt(m[2],10);
+}
+function _agendTimeOptions(){
+  // Devuelve [{value:'08:00',label:'08:00'}, ... '20:00'] cada 30 min
+  const out = [];
+  for(let t = AGEND_DAY_START_MIN; t <= AGEND_DAY_END_MIN; t += AGEND_SLOT_GRANULARITY_MIN){
+    const s = _agendMinToHHMM(t);
+    out.push({ value: s, label: s });
+  }
+  return out;
+}
+function _agendFmtRange(startMin, endMin){
+  return `${_agendMinToHHMM(startMin)}–${_agendMinToHHMM(endMin)}`;
+}
+
+// --- Migración: convierte estructura antigua data[sala][date][hourKey]=req
+//                 a la nueva data[sala][date]=[req,...] con startMin/endMin.
+//     Es idempotente: si ya es array, no hace nada.
+function _agendMigrateDayEntry(entry){
+  if(Array.isArray(entry)) return entry;
+  if(!entry || typeof entry !== 'object') return [];
+  const out = [];
+  Object.keys(entry).forEach(hourKey => {
+    const r = entry[hourKey];
+    if(!r) return;
+    if(typeof r.startMin === 'number' && typeof r.endMin === 'number'){
+      out.push(r);
+      return;
+    }
+    const h = parseInt(hourKey,10);
+    if(isNaN(h)) return;
+    out.push({
+      ...r,
+      startMin: h*60,
+      endMin:   (h+1)*60
+    });
+  });
+  out.sort((a,b) => (a.startMin - b.startMin) || (a.endMin - b.endMin));
+  return out;
+}
+function _agendEnsureMigratedAndSave(){
+  const data = agendLoadData();
+  let dirty = false;
+  Object.keys(data).forEach(salaId => {
+    const bySala = data[salaId] || {};
+    Object.keys(bySala).forEach(dateStr => {
+      const entry = bySala[dateStr];
+      if(!Array.isArray(entry)){
+        bySala[dateStr] = _agendMigrateDayEntry(entry);
+        dirty = true;
+      }
+    });
+  });
+  if(dirty) agendSaveData(data);
+  return data;
+}
+
+// Devuelve siempre un array de solicitudes (ordenado) para ese día/sala
 function _agendGetDaySlots(salaId, dateStr){
   const data = agendLoadData();
-  return (((data[salaId]||{})[dateStr])||{});
+  const raw = ((data[salaId]||{})[dateStr]);
+  if(Array.isArray(raw)) return raw.slice().sort((a,b) => a.startMin - b.startMin);
+  return _agendMigrateDayEntry(raw);
 }
 function _agendCountDay(salaId, dateStr){
   const slots = _agendGetDaySlots(salaId, dateStr);
   let pend=0, aprob=0, rech=0;
-  Object.values(slots).forEach(r => {
+  slots.forEach(r => {
     if(r.estado === 'pendiente') pend++;
     else if(r.estado === 'aprobada') aprob++;
     else if(r.estado === 'rechazada') rech++;
@@ -3840,8 +3964,11 @@ function _agendAllRequests(){
   const data = agendLoadData();
   Object.keys(data).forEach(salaId => {
     Object.keys(data[salaId]||{}).forEach(dateStr => {
-      Object.keys(data[salaId][dateStr]||{}).forEach(hour => {
-        out.push({ salaId, dateStr, hour, ...data[salaId][dateStr][hour] });
+      const arr = Array.isArray(data[salaId][dateStr])
+        ? data[salaId][dateStr]
+        : _agendMigrateDayEntry(data[salaId][dateStr]);
+      arr.forEach(r => {
+        out.push({ salaId, dateStr, ...r });
       });
     });
   });
@@ -3851,11 +3978,27 @@ function _agendFindRequest(reqId){
   const data = agendLoadData();
   for(const salaId of Object.keys(data)){
     for(const dateStr of Object.keys(data[salaId]||{})){
-      for(const hour of Object.keys(data[salaId][dateStr]||{})){
-        if(data[salaId][dateStr][hour].id === reqId){
-          return { salaId, dateStr, hour, req: data[salaId][dateStr][hour] };
+      const arr = Array.isArray(data[salaId][dateStr])
+        ? data[salaId][dateStr]
+        : _agendMigrateDayEntry(data[salaId][dateStr]);
+      for(let i=0; i<arr.length; i++){
+        if(arr[i] && arr[i].id === reqId){
+          return { salaId, dateStr, index: i, req: arr[i] };
         }
       }
+    }
+  }
+  return null;
+}
+// Devuelve la solicitud que solapa con el rango (excluye reqIdExcluir opcional).
+// Rechazadas no bloquean. Solapamiento estricto: a.start < b.end && a.end > b.start.
+function _agendFindOverlap(salaId, dateStr, startMin, endMin, reqIdExcluir){
+  const slots = _agendGetDaySlots(salaId, dateStr);
+  for(const r of slots){
+    if(reqIdExcluir && r.id === reqIdExcluir) continue;
+    if(r.estado === 'rechazada') continue;
+    if(startMin < r.endMin && endMin > r.startMin){
+      return r;
     }
   }
   return null;
@@ -3871,6 +4014,8 @@ function _agendShowView(name, pushToStack){
     v.classList.toggle('active', v.getAttribute('data-view') === name);
   });
   document.querySelector('#agendScreen .agend-body').scrollTop = 0;
+  // El chip de Admin se refresca en cada cambio de vista (siempre visible si mode='admin')
+  if(typeof _agendRefreshAdminChip === 'function') _agendRefreshAdminChip();
 }
 function _agendSetTitle(title, sub){
   document.getElementById('agendTitle').textContent = title || 'Agendamiento';
@@ -3906,11 +4051,24 @@ function agendCloseModule(){
   document.getElementById('agendScreen').classList.add('hidden');
   AGEND_STATE.view = null;
   AGEND_STATE.navStack = [];
+  // Limpiar modo Admin al cerrar el módulo (no se persiste entre aperturas)
+  if(AGEND_STATE.mode === 'admin'){
+    AGEND_STATE.mode = null;
+    AGEND_STATE.staffNombre = '';
+  }
   showModulesScreen();
 }
 function _agendRefreshChromeForView(view){
+  // Mostrar/ocultar chip de Admin en TODAS las vistas si la sesión está activa
+  _agendRefreshAdminChip();
+  // Mostrar/ocultar banner de Admin en la vista landing
+  _agendRefreshLandingForAdmin();
   if(view === 'landing') {
-    _agendSetTitle('Agendamiento de procedimientos','');
+    if(AGEND_STATE.mode === 'admin'){
+      _agendSetTitle('Modo Administrador', AGEND_STATE.staffNombre || '');
+    } else {
+      _agendSetTitle('Agendamiento de procedimientos','');
+    }
     _agendSetHeadAction(null);
   } else if(view === 'unidadLogin'){
     _agendSetTitle('Identificación de unidad','');
@@ -3924,7 +4082,55 @@ function _agendRefreshChromeForView(view){
       _agendSetTitle('Salas disponibles', u ? u.name : '');
       _agendSetHeadAction('Salir', () => agendLogoutUnidad());
     }
+  } else if(view === 'overview'){
+    _agendSetTitle('Bandeja de solicitudes', AGEND_STATE.mode === 'admin' ? (AGEND_STATE.staffNombre || 'Admin') : '');
+    _agendSetHeadAction('Salas', () => agendShowSalasView());
   }
+}
+
+function _agendRefreshAdminChip(){
+  const chip = document.getElementById('agendAdminChip');
+  const chipName = document.getElementById('agendAdminChipName');
+  if(!chip) return;
+  if(AGEND_STATE.mode === 'admin'){
+    chip.classList.remove('hidden');
+    if(chipName) chipName.textContent = AGEND_STATE.staffNombre || 'Admin';
+  } else {
+    chip.classList.add('hidden');
+  }
+}
+
+function _agendRefreshLandingForAdmin(){
+  const banner = document.getElementById('agendLandingAdminBanner');
+  const bannerName = document.getElementById('agendAdminBannerName');
+  const ctas = document.getElementById('agendLandingCtas');
+  if(!banner) return;
+  if(AGEND_STATE.mode === 'admin'){
+    banner.style.display = 'block';
+    if(bannerName) bannerName.textContent = AGEND_STATE.staffNombre || 'Anestesia';
+    // Ocultar las CTAs originales (solicitar / visar) — el banner ya tiene las acciones de Admin
+    if(ctas) ctas.style.display = 'none';
+    const title = document.getElementById('agendLandingTitle');
+    const sub = document.getElementById('agendLandingSub');
+    if(title) title.style.display = 'none';
+    if(sub) sub.style.display = 'none';
+  } else {
+    banner.style.display = 'none';
+    if(ctas) ctas.style.display = '';
+    const title = document.getElementById('agendLandingTitle');
+    const sub = document.getElementById('agendLandingSub');
+    if(title) title.style.display = '';
+    if(sub) sub.style.display = '';
+  }
+}
+
+function agendSalirAdminConfirm(){
+  if(!confirm('¿Salir del modo Administrador?\n\nVas a volver al inicio del módulo Agendamiento. Tu sesión de Staff principal seguirá activa.')) return;
+  AGEND_STATE.mode = null;
+  AGEND_STATE.staffNombre = '';
+  AGEND_STATE.navStack = [];
+  _agendShowView('landing', false);
+  _agendRefreshChromeForView('landing');
 }
 
 // --- Apertura / cierre del módulo ---
@@ -3933,6 +4139,9 @@ function openAgendamientoModule(){
   if(mod) mod.classList.add('hidden');
   const ov = document.getElementById('agendScreen');
   if(ov) ov.classList.remove('hidden');
+  // Migrar al vuelo cualquier data en formato antiguo (hora-keyed) a la nueva
+  // estructura de array con startMin/endMin. Idempotente.
+  try { _agendEnsureMigratedAndSave(); } catch(e){ console.warn('migración v38 falló', e); }
   AGEND_STATE.navStack = [];
   AGEND_STATE.mode = null;
   AGEND_STATE.unidadCode = null;
@@ -4018,16 +4227,24 @@ function agendGoToAdmin(){
     alert('Para visar solicitudes necesitás iniciar sesión como Staff de Anestesia.\nVolvé a la pantalla principal → Staff → tu usuario y clave.');
     return;
   }
-  const usr = (state.users||[]).find(u => u.id === state.currentUserId);
+  const u = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+  const usr = u || (state.staff||[]).find(s => s.id === state.currentUserId);
   AGEND_STATE.mode = 'admin';
-  AGEND_STATE.staffNombre = usr ? (usr.displayName || usr.name || usr.id) : '';
+  AGEND_STATE.staffNombre = usr ? (usr.displayName || usr.name || usr.id) : 'Anestesia';
   AGEND_STATE.navStack = [];
+  // Vamos a salas; agendShowSalasView empujará 'landing' al stack (porque estamos en admin)
   agendShowSalasView();
 }
 
 // --- Vista: Salas ---
 function agendShowSalasView(){
-  _agendShowView('salas', false);
+  const prev = AGEND_STATE.view;
+  // Si el admin viene desde landing u overview, empujar al stack para que 'Volver' lo lleve ahí.
+  // En modo unidad, salas es el "home" → no empujar.
+  const shouldPush = AGEND_STATE.mode === 'admin'
+                     && prev && prev !== 'salas'
+                     && (prev === 'landing' || prev === 'overview');
+  _agendShowView('salas', shouldPush);
   _agendRefreshChromeForView('salas');
   const cont = document.getElementById('agendSalaList');
   if(!cont) return;
@@ -4121,50 +4338,105 @@ function agendOpenDia(dateStr){
 function agendRenderSlots(){
   const cont = document.getElementById('agendSlots');
   if(!cont) return;
-  const slots = _agendGetDaySlots(AGEND_STATE.salaId, AGEND_STATE.selectedDate);
+  // Solicitudes ocupando rangos (excluye rechazadas para la visualización del día,
+  // pero las mostramos al final como aviso).
+  const todas = _agendGetDaySlots(AGEND_STATE.salaId, AGEND_STATE.selectedDate);
+  const activas   = todas.filter(r => r.estado !== 'rechazada')
+                         .sort((a,b) => a.startMin - b.startMin);
+  const rechazadas = todas.filter(r => r.estado === 'rechazada')
+                         .sort((a,b) => a.startMin - b.startMin);
+
   let html = '';
-  for(const h of AGEND_SLOT_HOURS){
-    const key = _agendPad(h);
-    const r = slots[key];
-    const hourLabel = `${_agendPad(h)}:00`;
-    const hourEnd = `${_agendPad(h+1)}:00`;
-    if(!r){
-      // Slot libre
-      html += `
-        <button type="button" class="agend-slot libre" onclick="agendOpenFormForHour(${h})">
-          <div class="agend-slot-hour">${hourLabel}</div>
-          <div class="agend-slot-body"><span class="agend-slot-libre-text">Libre · ${hourLabel}–${hourEnd}</span></div>
-          <div class="agend-slot-libre-cta">+ Solicitar</div>
-        </button>`;
-    } else {
-      const est = r.estado || 'pendiente';
-      const unidad = _agendGetUnidad(r.unidadCode);
-      html += `
-        <button type="button" class="agend-slot ${est}" onclick="agendOpenDetalle('${r.id}')">
-          <div class="agend-slot-hour">${hourLabel}</div>
-          <div class="agend-slot-body">
-            <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''}</div>
-            <div class="agend-slot-proc">${_gpEsc(r.procedimiento)}</div>
-            <div class="agend-slot-meta">${unidad?unidad.ico+' '+_gpEsc(unidad.name):''} · ${_gpEsc(r.solicitanteNombre||'')}</div>
-          </div>
-          <div class="agend-slot-status ${est}">${est}</div>
-        </button>`;
+
+  // Render entrelazado: hueco libre, ocupado, hueco libre, ...
+  let cursor = AGEND_DAY_START_MIN;
+  const renderLibre = (startMin, endMin) => {
+    if(endMin <= startMin) return '';
+    const dur = endMin - startMin;
+    const horas = Math.floor(dur/60), mins = dur%60;
+    const durStr = horas>0
+      ? (mins>0 ? `${horas} h ${mins} min` : `${horas} h`)
+      : `${mins} min`;
+    return `
+      <button type="button" class="agend-slot libre" onclick="agendOpenFormForRange('${_agendMinToHHMM(startMin)}','${_agendMinToHHMM(endMin)}')">
+        <div class="agend-slot-hour">${_agendMinToHHMM(startMin)}</div>
+        <div class="agend-slot-body">
+          <span class="agend-slot-libre-text">Libre · ${_agendFmtRange(startMin,endMin)} <span style="color:#9ca3af">(${durStr})</span></span>
+        </div>
+        <div class="agend-slot-libre-cta">+ Solicitar</div>
+      </button>`;
+  };
+  const renderOcup = (r) => {
+    const est = r.estado || 'pendiente';
+    const unidad = _agendGetUnidad(r.unidadCode);
+    return `
+      <button type="button" class="agend-slot ${est}" onclick="agendOpenDetalle('${r.id}')">
+        <div class="agend-slot-hour">${_agendMinToHHMM(r.startMin)}</div>
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''}</div>
+          <div class="agend-slot-proc">${_gpEsc(r.procedimiento)}</div>
+          <div class="agend-slot-meta">⏱ ${_agendFmtRange(r.startMin, r.endMin)} · ${unidad?unidad.ico+' '+_gpEsc(unidad.name):''} · ${_gpEsc(r.solicitanteNombre||'')}</div>
+        </div>
+        <div class="agend-slot-status ${est}">${est}</div>
+      </button>`;
+  };
+
+  for(const r of activas){
+    const start = Math.max(r.startMin, AGEND_DAY_START_MIN);
+    const end   = Math.min(r.endMin,   AGEND_DAY_END_MIN);
+    if(start > cursor){
+      html += renderLibre(cursor, start);
     }
+    html += renderOcup(r);
+    if(end > cursor) cursor = end;
   }
+  if(cursor < AGEND_DAY_END_MIN){
+    html += renderLibre(cursor, AGEND_DAY_END_MIN);
+  }
+
+  // Rechazadas al final (informativas, no bloquean)
+  if(rechazadas.length){
+    html += `<div class="agend-day-section">Solicitudes rechazadas</div>`;
+    for(const r of rechazadas) html += renderOcup(r);
+  }
+
   cont.innerHTML = html;
 }
 
 // --- Vista: Form solicitud ---
-function agendOpenFormForHour(h){
+// Helper interno: rellena ambos selectores y elige defaults razonables.
+function _agendFillTimeSelects(defaultStartMin, defaultEndMin){
+  const selStart = document.getElementById('afHoraInicio');
+  const selEnd   = document.getElementById('afHoraFin');
+  if(!selStart || !selEnd) return;
+  const opts = _agendTimeOptions();
+  // Start: todas menos la última (no puede empezar a 20:00)
+  selStart.innerHTML = opts.slice(0, -1)
+    .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  // End: todas menos la primera (no puede terminar a 08:00)
+  selEnd.innerHTML = opts.slice(1)
+    .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  selStart.value = _agendMinToHHMM(defaultStartMin);
+  selEnd.value   = _agendMinToHHMM(defaultEndMin);
+}
+
+// Llamado al hacer click en un hueco libre del día (con rango sugerido)
+function agendOpenFormForRange(startHHMM, endHHMM){
   if(AGEND_STATE.mode !== 'unidad'){
     alert('Para solicitar un agendamiento entrá como Unidad solicitante.\nVolvé al inicio del módulo Agendamiento → "Solicitar agendamiento".');
     return;
   }
-  AGEND_STATE.formHour = h;
+  const startMin = _agendHHMMToMin(startHHMM) ?? AGEND_DAY_START_MIN;
+  const endMinHueco = _agendHHMMToMin(endHHMM) ?? AGEND_DAY_END_MIN;
+  // Default: 1 hora desde el inicio (o el hueco entero si es menor)
+  let endMin = Math.min(startMin + 60, endMinHueco);
+  if(endMin <= startMin) endMin = Math.min(startMin + AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_END_MIN);
+  AGEND_STATE.formStartMin = startMin;
+  AGEND_STATE.formEndMin   = endMin;
   _agendShowView('form', true);
   const sala = _agendGetSala(AGEND_STATE.salaId);
   const dt = _agendParseDateStr(AGEND_STATE.selectedDate);
-  const fmt = `${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${_agendPad(h)}:00–${_agendPad(h+1)}:00`;
+  const fmt = `${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${_agendFmtRange(startMin, endMin)}`;
   _agendSetTitle('Nueva solicitud', fmt);
   _agendSetHeadAction(null);
   const head = document.getElementById('agendFormHead');
@@ -4176,15 +4448,68 @@ function agendOpenFormForHour(h){
         <div class="agend-day-head-sala">${sala?sala.name:''}</div>
       </div>`;
   }
-  // Reset form
+  // Reset form + rellenar selectores
   document.getElementById('afPaciente').value = '';
   document.getElementById('afEdad').value = '';
   document.getElementById('afRut').value = '';
   document.getElementById('afProc').value = '';
   document.getElementById('afNotas').value = '';
   document.getElementById('afPrioridad').value = 'electiva';
+  _agendFillTimeSelects(startMin, endMin);
+  _agendUpdateRangoHint();
   setTimeout(() => document.getElementById('afPaciente').focus(), 80);
 }
+
+// Compatibilidad: si en algún lugar legado se llama a la antigua firma agendOpenFormForHour(h)
+function agendOpenFormForHour(h){
+  const start = _agendMinToHHMM(h*60);
+  const end   = _agendMinToHHMM(Math.min((h+1)*60, AGEND_DAY_END_MIN));
+  agendOpenFormForRange(start, end);
+}
+
+// Cuando el usuario cambia el horario de inicio/fin: validación + hint visual
+function _agendOnTimeChange(which){
+  const selStart = document.getElementById('afHoraInicio');
+  const selEnd   = document.getElementById('afHoraFin');
+  if(!selStart || !selEnd) return;
+  let startMin = _agendHHMMToMin(selStart.value);
+  let endMin   = _agendHHMMToMin(selEnd.value);
+  // Si cambian inicio y el fin queda <= inicio, llevar fin a inicio + 30 min
+  if(which === 'start' && endMin <= startMin){
+    endMin = Math.min(startMin + AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_END_MIN);
+    selEnd.value = _agendMinToHHMM(endMin);
+  }
+  // Si cambian fin y queda <= inicio, llevar inicio a fin - 30 min
+  if(which === 'end' && endMin <= startMin){
+    startMin = Math.max(endMin - AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_START_MIN);
+    selStart.value = _agendMinToHHMM(startMin);
+  }
+  _agendUpdateRangoHint();
+}
+
+function _agendUpdateRangoHint(){
+  const hint = document.getElementById('afRangoHint');
+  if(!hint) return;
+  const selStart = document.getElementById('afHoraInicio');
+  const selEnd   = document.getElementById('afHoraFin');
+  const startMin = _agendHHMMToMin(selStart.value);
+  const endMin   = _agendHHMMToMin(selEnd.value);
+  if(startMin == null || endMin == null || endMin <= startMin){
+    hint.innerHTML = `<span style="color:#dc2626">⚠ El horario de término debe ser mayor que el de inicio.</span>`;
+    return;
+  }
+  const dur = endMin - startMin;
+  const horas = Math.floor(dur/60), mins = dur%60;
+  const durStr = horas>0 ? (mins>0 ? `${horas} h ${mins} min` : `${horas} h`) : `${mins} min`;
+  // Chequeo de solapamiento
+  const overlap = _agendFindOverlap(AGEND_STATE.salaId, AGEND_STATE.selectedDate, startMin, endMin);
+  if(overlap){
+    hint.innerHTML = `<span style="color:#dc2626">⚠ Choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} · ${_gpEsc(overlap.paciente||'')} (${overlap.estado}).</span>`;
+  } else {
+    hint.innerHTML = `<span style="color:#16a34a">✓ Horario disponible · Duración ${durStr}</span>`;
+  }
+}
+
 function agendSubmitSolicitud(ev){
   if(ev) ev.preventDefault();
   const paciente = document.getElementById('afPaciente').value.trim();
@@ -4193,22 +4518,39 @@ function agendSubmitSolicitud(ev){
   const proc = document.getElementById('afProc').value.trim();
   const notas = document.getElementById('afNotas').value.trim();
   const prio = document.getElementById('afPrioridad').value;
+  const startHHMM = document.getElementById('afHoraInicio').value;
+  const endHHMM   = document.getElementById('afHoraFin').value;
   if(!paciente){ alert('Falta el nombre del paciente.'); return; }
   if(!proc){ alert('Falta el procedimiento.'); return; }
+  const startMin = _agendHHMMToMin(startHHMM);
+  const endMin   = _agendHHMMToMin(endHHMM);
+  if(startMin == null || endMin == null){
+    alert('Horario inválido.'); return;
+  }
+  if(endMin <= startMin){
+    alert('El horario de término debe ser mayor que el de inicio.'); return;
+  }
+  if(startMin < AGEND_DAY_START_MIN || endMin > AGEND_DAY_END_MIN){
+    alert(`Horario fuera del rango permitido (${_agendMinToHHMM(AGEND_DAY_START_MIN)}–${_agendMinToHHMM(AGEND_DAY_END_MIN)}).`); return;
+  }
   const salaId = AGEND_STATE.salaId;
   const dateStr = AGEND_STATE.selectedDate;
-  const hourKey = _agendPad(AGEND_STATE.formHour);
+  // Verificar solapamiento contra estado actual del almacén
+  const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin);
+  if(overlap){
+    alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElegí otro horario.`);
+    _agendUpdateRangoHint();
+    return;
+  }
   const data = agendLoadData();
   data[salaId] = data[salaId] || {};
-  data[salaId][dateStr] = data[salaId][dateStr] || {};
-  if(data[salaId][dateStr][hourKey]){
-    alert('Ese horario acaba de ser ocupado por otra solicitud. Elegí otro horario.');
-    agendOpenDia(dateStr);
-    return;
+  if(!Array.isArray(data[salaId][dateStr])){
+    data[salaId][dateStr] = _agendMigrateDayEntry(data[salaId][dateStr]);
   }
   const req = {
     id: _agendGenId(),
     paciente, edad, rut, procedimiento: proc, notas, prioridad: prio,
+    startMin, endMin,
     unidadCode: AGEND_STATE.unidadCode,
     solicitanteNombre: AGEND_STATE.solicitanteNombre,
     solicitanteTel: AGEND_STATE.solicitanteTel,
@@ -4216,11 +4558,10 @@ function agendSubmitSolicitud(ev){
     createdAt: Date.now(),
     visadoBy: null, visadoAt: null, comentarioVisado: ''
   };
-  data[salaId][dateStr][hourKey] = req;
+  data[salaId][dateStr].push(req);
+  data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
   alert('Solicitud enviada. El Servicio de Anestesia será notificado.');
-  // Volver al día
-  AGEND_STATE.navStack.pop(); // saca 'form' del stack (ya está)... realmente reemplaza
   agendOpenDia(dateStr);
 }
 
@@ -4230,11 +4571,14 @@ function agendOpenDetalle(reqId){
   const found = _agendFindRequest(reqId);
   if(!found){ alert('No se encontró la solicitud.'); return; }
   _agendShowView('detalle', true);
-  const {salaId, dateStr, hour, req} = found;
+  const {salaId, dateStr, req} = found;
   const sala = _agendGetSala(salaId);
   const unidad = _agendGetUnidad(req.unidadCode);
   const dt = _agendParseDateStr(dateStr);
-  const fmt = `${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${hour}:00–${_agendPad(parseInt(hour)+1)}:00`;
+  const rangoTxt = (typeof req.startMin === 'number' && typeof req.endMin === 'number')
+    ? _agendFmtRange(req.startMin, req.endMin)
+    : '—';
+  const fmt = `${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${rangoTxt}`;
   _agendSetTitle('Detalle de solicitud', fmt);
   _agendSetHeadAction(null);
   const head = document.getElementById('agendDetalleHead');
@@ -4289,7 +4633,21 @@ function agendVisarSolicitud(reqId, nuevoEstado){
     comentario = prompt('Comentario para el solicitante (opcional):') || '';
   }
   const data = agendLoadData();
-  const slot = data[found.salaId][found.dateStr][found.hour];
+  if(!Array.isArray(data[found.salaId][found.dateStr])){
+    data[found.salaId][found.dateStr] = _agendMigrateDayEntry(data[found.salaId][found.dateStr]);
+  }
+  const arr = data[found.salaId][found.dateStr];
+  const idx = arr.findIndex(r => r && r.id === reqId);
+  if(idx < 0) return;
+  const slot = arr[idx];
+  // Si vamos a revertir a pendiente o aprobar y antes estaba rechazada, validar overlap
+  if(nuevoEstado !== 'rechazada'){
+    const overlap = _agendFindOverlap(found.salaId, found.dateStr, slot.startMin, slot.endMin, reqId);
+    if(overlap){
+      alert(`No se puede ${nuevoEstado === 'aprobada' ? 'aprobar' : 'revertir'}: choca con otra solicitud activa (${_agendFmtRange(overlap.startMin, overlap.endMin)}).`);
+      return;
+    }
+  }
   slot.estado = nuevoEstado;
   slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
   slot.visadoAt = Date.now();
@@ -4302,8 +4660,7 @@ function agendVisarSolicitud(reqId, nuevoEstado){
 function agendShowOverview(tab){
   AGEND_STATE.overviewTab = tab || 'pendiente';
   _agendShowView('overview', true);
-  _agendSetTitle('Solicitudes', 'Panel Anestesia');
-  _agendSetHeadAction(null);
+  _agendRefreshChromeForView('overview');
   agendOverviewTab(AGEND_STATE.overviewTab);
 }
 function agendOverviewTab(tab){
@@ -4317,10 +4674,14 @@ function agendOverviewTab(tab){
   document.getElementById('ovCountPend').textContent = counts.pendiente;
   document.getElementById('ovCountAprob').textContent = counts.aprobada;
   document.getElementById('ovCountRech').textContent = counts.rechazada;
-  // Filtrar y ordenar por fecha+hora ascendente
+  // Filtrar y ordenar por fecha+inicio ascendente
   const list = all
     .filter(r => r.estado === tab)
-    .sort((a,b) => (a.dateStr+a.hour).localeCompare(b.dateStr+b.hour));
+    .sort((a,b) => {
+      const cmp = a.dateStr.localeCompare(b.dateStr);
+      if(cmp !== 0) return cmp;
+      return (a.startMin||0) - (b.startMin||0);
+    });
   const cont = document.getElementById('agendOverviewList');
   if(list.length === 0){
     cont.innerHTML = `<div class="agend-empty">Sin solicitudes <strong>${tab}s</strong>.</div>`;
@@ -4330,12 +4691,16 @@ function agendOverviewTab(tab){
     const sala = _agendGetSala(r.salaId);
     const unidad = _agendGetUnidad(r.unidadCode);
     const dt = _agendParseDateStr(r.dateStr);
+    const rangoTxt = (typeof r.startMin === 'number' && typeof r.endMin === 'number')
+      ? _agendFmtRange(r.startMin, r.endMin)
+      : '—';
+    const horaCorta = (typeof r.startMin === 'number') ? _agendMinToHHMM(r.startMin) : '—';
     return `
       <button type="button" class="agend-slot ${r.estado}" onclick="agendOpenDetalle('${r.id}')">
-        <div class="agend-slot-hour">${r.hour}:00</div>
+        <div class="agend-slot-hour">${horaCorta}</div>
         <div class="agend-slot-body">
           <div class="agend-slot-name">${_gpEsc(r.paciente)} · ${_gpEsc(r.procedimiento)}</div>
-          <div class="agend-slot-meta">${sala?sala.ico+' '+sala.name:''} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${unidad?unidad.name:''}</div>
+          <div class="agend-slot-meta">${sala?sala.ico+' '+sala.name:''} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${rangoTxt} · ${unidad?unidad.name:''}</div>
         </div>
         <div class="agend-slot-status ${r.estado}">${r.estado}</div>
       </button>`;
@@ -5087,13 +5452,40 @@ function renderMiPanel(){
   // Stats
   const exchSent = (state.exchanges||[]).filter(e=>e.staffId===u.id).length;
   const vacApproved = (state.vacations||[]).filter(v=>v.staffId===u.id && v.status==='approved' && !v.deleted).length;
-  const ranking = (state.staff||[]).slice().sort((a,b)=>(b.score||0)-(a.score||0));
-  const myRank = ranking.findIndex(s=>s.id===u.id)+1;
-  const coberturaRank = (state.staff||[]).slice().sort((a,b)=>(b.coberturaScore||0)-(a.coberturaScore||0));
-  const myCovRank = coberturaRank.findIndex(s=>s.id===u.id)+1;
+  // --- Índice de Permanencia ---
+  // Mismo cálculo y orden ASCENDENTE que renderRanking (menor puntaje = #1 = más prioritario)
+  const rankPerm = (state.staff||[])
+    .map(s => ({ id: s.id, name: s.name, score: computeScore(s) }))
+    .sort((a,b) => (a.score - b.score) || a.name.localeCompare(b.name));
+  const myPermIdx = rankPerm.findIndex(s => s.id === u.id);
+  const myPermRank = myPermIdx >= 0 ? (myPermIdx + 1) : null;
+  const myPermScore = myPermIdx >= 0 ? rankPerm[myPermIdx].score : null;
+  // --- Cobertura de Urgencia ---
+  // Mismo cálculo y orden ASCENDENTE que renderCobertura, excluyendo exentos
+  const rankCov = (state.staff||[])
+    .filter(s => !s.exentoCobertura)
+    .map(s => ({ id: s.id, name: s.name, score: computeCoberturaScore(s) }))
+    .sort((a,b) => (a.score - b.score) || a.name.localeCompare(b.name));
+  const myCovIdx = rankCov.findIndex(s => s.id === u.id);
+  const meCob = (state.staff||[]).find(s => s.id === u.id);
+  const exento = !!(meCob && meCob.exentoCobertura);
+  let myCovRankTxt, myCovScoreTxt;
+  if(exento){
+    myCovRankTxt = 'Exento';
+    myCovScoreTxt = '—';
+  } else if(myCovIdx >= 0){
+    myCovRankTxt = '#' + (myCovIdx + 1);
+    myCovScoreTxt = rankCov[myCovIdx].score + ' pts';
+  } else {
+    myCovRankTxt = '—';
+    myCovScoreTxt = '—';
+  }
+  const permRankTxt = myPermRank ? ('#' + myPermRank) : '—';
+  const permScoreTxt = (myPermScore !== null) ? (myPermScore + ' pts · de ' + rankPerm.length) : '—';
+  const covSubTxt = exento ? 'No participa' : (myCovScoreTxt + (myCovIdx >= 0 ? (' · de ' + rankCov.length) : ''));
   document.getElementById('miStatGrid').innerHTML =
-    '<div class="mi-stat"><div class="mi-stat-value">#'+(myRank||'—')+'</div><div class="mi-stat-label">Índice permanencia</div></div>'
-    +'<div class="mi-stat"><div class="mi-stat-value">#'+(myCovRank||'—')+'</div><div class="mi-stat-label">Cobertura emerg.</div></div>'
+    '<div class="mi-stat"><div class="mi-stat-value">'+permRankTxt+'</div><div class="mi-stat-label">Índice permanencia</div><div class="mi-stat-sub">'+permScoreTxt+'</div></div>'
+    +'<div class="mi-stat"><div class="mi-stat-value">'+myCovRankTxt+'</div><div class="mi-stat-label">Cobertura emerg.</div><div class="mi-stat-sub">'+covSubTxt+'</div></div>'
     +'<div class="mi-stat"><div class="mi-stat-value">'+exchSent+'</div><div class="mi-stat-label">Intercambios publicados</div></div>'
     +'<div class="mi-stat"><div class="mi-stat-value">'+vacApproved+'</div><div class="mi-stat-label">Vacaciones aprobadas</div></div>';
 

@@ -594,6 +594,17 @@ canvas{max-width:100%}
 .agend-head-action{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;padding:7px 12px;border-radius:8px;font-family:inherit;flex-shrink:0}
 .agend-head-action.hidden{display:none}
 .agend-head-action:hover{background:rgba(255,255,255,.3)}
+.agend-admin-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(255,193,7,.25);color:#fff;border:1px solid rgba(255,255,255,.35);font-size:10.5px;font-weight:600;cursor:pointer;padding:2px 8px;border-radius:11px;font-family:inherit;margin-top:3px;line-height:1.4;letter-spacing:.2px}
+.agend-admin-chip.hidden{display:none}
+.agend-admin-chip:hover{background:rgba(255,193,7,.4)}
+.agend-admin-chip-ico{font-size:11px}
+.agend-admin-chip-x{opacity:.85;margin-left:2px}
+.agend-admin-banner{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #f59e0b;border-radius:12px;padding:12px 14px;margin-bottom:14px;color:#78350f;font-size:13px;line-height:1.5}
+.agend-admin-banner b{color:#78350f}
+.agend-admin-banner-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.agend-admin-banner-btn{background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.agend-admin-banner-btn.secondary{background:#fff;color:#92400e;border:1px solid #f59e0b}
+.agend-admin-banner-btn:hover{filter:brightness(1.05)}
 .agend-body{flex:1;overflow-y:auto;padding:18px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-width:760px;margin:0 auto;width:100%}
 .agend-view{display:none}
 .agend-view.active{display:block}
@@ -686,6 +697,12 @@ canvas{max-width:100%}
 .agend-slot-libre-text{color:var(--muted);font-size:13px;font-style:italic}
 .agend-slot-libre-cta{color:var(--green-forest);font-weight:700;font-size:12.5px;white-space:nowrap}
 
+/* Hint del rango horario en el form de solicitud */
+.agend-form-hint{font-size:12.5px;line-height:1.45;margin:-4px 0 12px;padding:8px 10px;background:#f3f4f6;border-radius:8px;min-height:18px}
+
+/* Separador "Solicitudes rechazadas" en la vista de día */
+.agend-day-section{margin:18px 4px 6px;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
 /* Detalle solicitud */
 .agend-detalle-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px;box-shadow:0 2px 12px rgba(15,68,53,.06)}
 .agend-detalle-row{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.45}
@@ -769,6 +786,7 @@ canvas{max-width:100%}
 .mi-stat{background:#fafbfc;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
 .mi-stat-value{font-size:22px;font-weight:800;color:var(--primary-dark);font-family:'Manrope',sans-serif}
 .mi-stat-label{font-size:10.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.mi-stat-sub{font-size:10.5px;color:var(--primary);margin-top:4px;font-weight:600}
 .mi-section-title{font-size:13px;font-weight:700;color:var(--primary-dark);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .mi-activity-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px}
 .mi-activity-item:last-child{border-bottom:none}
@@ -911,19 +929,29 @@ canvas{max-width:100%}
 <div id="agendScreen" class="agend-screen hidden">
   <div class="agend-head">
     <button type="button" class="back-btn" onclick="agendBack()">‹ Volver</button>
-    <div class="logo"><img src="icon-192.png?v=37" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
-    <div style="flex:1">
+    <div class="logo"><img src="icon-192.png?v=38" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div style="flex:1;min-width:0">
       <h1 id="agendTitle">Agendamiento</h1>
       <div id="agendSub" class="agend-sub"></div>
+      <button type="button" id="agendAdminChip" class="agend-admin-chip hidden" onclick="agendSalirAdminConfirm()"><span class="agend-admin-chip-ico">🛡️</span><span id="agendAdminChipName">Admin</span><span class="agend-admin-chip-x">·  Salir</span></button>
     </div>
     <button type="button" id="agendHeadAction" class="agend-head-action hidden" onclick="agendHeadActionClick()"></button>
   </div>
   <div class="agend-body">
     <!-- Vista: Landing -->
     <div class="agend-view active" data-view="landing">
-      <h2 class="agend-landing-h">¿Qué querés hacer?</h2>
-      <p class="agend-landing-sub">Las unidades clínicas pueden solicitar agendamiento de procedimientos con sedación. El Servicio de Anestesia visa las solicitudes.</p>
-      <div class="agend-cta-list">
+      <div id="agendLandingAdminBanner" class="agend-admin-banner" style="display:none">
+        <div><b>🛡️ Estás en Modo Administrador</b> · <span id="agendAdminBannerName">—</span></div>
+        <div style="margin-top:4px;font-size:12px;opacity:.9">Tu sesión de Admin permanece activa mientras navegues por el módulo Agendamiento. Podés visar solicitudes desde la bandeja o entrar a las salas.</div>
+        <div class="agend-admin-banner-actions">
+          <button type="button" class="agend-admin-banner-btn" onclick="agendShowOverview('pendiente')">📋 Bandeja de solicitudes</button>
+          <button type="button" class="agend-admin-banner-btn" onclick="agendShowSalasView()">🚪 Ver salas</button>
+          <button type="button" class="agend-admin-banner-btn secondary" onclick="agendSalirAdminConfirm()">Salir del modo Admin</button>
+        </div>
+      </div>
+      <h2 class="agend-landing-h" id="agendLandingTitle">¿Qué querés hacer?</h2>
+      <p class="agend-landing-sub" id="agendLandingSub">Las unidades clínicas pueden solicitar agendamiento de procedimientos con sedación. El Servicio de Anestesia visa las solicitudes.</p>
+      <div class="agend-cta-list" id="agendLandingCtas">
         <button type="button" class="agend-cta" onclick="agendGoToUnidadLogin()">
           <div class="agend-cta-ico">📤</div>
           <div class="agend-cta-body">
@@ -993,6 +1021,18 @@ canvas{max-width:100%}
     <div class="agend-view" data-view="form">
       <div id="agendFormHead" class="agend-day-head"></div>
       <form id="agendForm" class="agend-form-block" onsubmit="agendSubmitSolicitud(event)">
+        <label>Horario (08:00 a 20:00, bloques de 30 min) *</label>
+        <div class="row2">
+          <div>
+            <label style="font-size:12px;color:var(--muted);font-weight:500">Inicio</label>
+            <select id="afHoraInicio" onchange="_agendOnTimeChange('start')"></select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted);font-weight:500">Término</label>
+            <select id="afHoraFin" onchange="_agendOnTimeChange('end')"></select>
+          </div>
+        </div>
+        <div id="afRangoHint" class="agend-form-hint"></div>
         <label>Nombre del paciente *</label>
         <input type="text" id="afPaciente" required autocomplete="off" />
         <div class="row2">
@@ -1539,6 +1579,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>
