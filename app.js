@@ -3491,7 +3491,7 @@ const AYUNO_TABLE_DATA = {
     { ingesta:'Fórmula láctea infantil', tiempo:'6 horas' },
     { ingesta:'Leche no humana / lácteos', tiempo:'6 horas' },
     { ingesta:'Comida ligera (tostada + líquido claro)', tiempo:'6 horas' },
-    { ingesta:'Comida pesada (frituras, grasas, carnes)', tiempo:'8 horas' }
+    { ingesta:'Comida copiosa, alta en grasas y/o proteínas (frituras, carnes rojas, lácteos enteros, comidas abundantes)', tiempo:'8 horas' }
   ],
   glp1Rows: [
     { farmaco:'Semaglutida oral (Rybelsus)', suspension:'El día previo' },
@@ -3536,15 +3536,24 @@ function _gpEsc(s){
   return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// Color del badge según acción
+// Clase modificadora del badge — el CSS define .gp-badge.suspender/.mantener/.individualizar
 function _gpActionClass(action){
-  if(action === 'suspender') return 'gp-badge-suspender';
-  if(action === 'mantener') return 'gp-badge-mantener';
-  return 'gp-badge-indiv';
+  const a = String(action||'').toLowerCase();
+  if(a === 'suspender') return 'suspender';
+  if(a === 'mantener') return 'mantener';
+  return 'individualizar';
+}
+// Clase del card para borde lateral coloreado (.gp-card.action-suspender etc.)
+function _gpCardClass(action){
+  const a = String(action||'').toLowerCase();
+  if(a === 'suspender') return 'action-suspender';
+  if(a === 'mantener') return 'action-mantener';
+  return 'action-individualizar';
 }
 function _gpActionLabel(action){
-  if(action === 'suspender') return 'SUSPENDER';
-  if(action === 'mantener') return 'MANTENER';
+  const a = String(action||'').toLowerCase();
+  if(a === 'suspender') return 'SUSPENDER';
+  if(a === 'mantener') return 'MANTENER';
   return 'INDIVIDUALIZAR';
 }
 
@@ -3608,35 +3617,62 @@ function renderGuiasSearchResults(query){
 
   if(matches.length === 0){
     res.innerHTML = `
-      <div class="gp-empty">
-        <p><strong>Sin resultados</strong> para "${_gpEsc(query)}".</p>
-        <p>Sugerencia: probá con el principio activo (ej: "rivaroxabán") o nombre comercial (ej: "Xarelto").</p>
+      <div class="gp-results-header">Resultados para «<strong>${_gpEsc(query)}</strong>» (0)</div>
+      <div class="gp-no-results">
+        <strong>Sin resultados</strong> para "${_gpEsc(query)}".<br>
+        Probá con el principio activo (ej: "rivaroxabán") o nombre comercial (ej: "Xarelto").
       </div>`;
     return;
   }
 
-  let html = '';
+  let cards = '';
   for(const d of matches){
-    const cls = _gpActionClass(d.action);
+    const badgeCls = _gpActionClass(d.action);
+    const cardCls = _gpCardClass(d.action);
     const lbl = _gpActionLabel(d.action);
     let notesHtml = '';
     if(d.notes && d.notes.length){
-      notesHtml = '<ul class="gp-notes">' + d.notes.map(n => `<li>${_gpEsc(n)}</li>`).join('') + '</ul>';
+      notesHtml = `
+        <div class="gp-row">
+          <div class="gp-row-k">Notas adicionales</div>
+          <div class="gp-row-v"><ul class="gp-notes-list">${d.notes.map(n => `<li>${_gpEsc(n)}</li>`).join('')}</ul></div>
+        </div>`;
     }
-    html += `
-      <div class="gp-card">
+    let aliasesHtml = '';
+    if(d.aliases && d.aliases.length){
+      const visible = d.aliases.slice(0, 8);
+      aliasesHtml = `<div class="gp-aliases">También: ${visible.map(a => _gpEsc(a)).join(' · ')}${d.aliases.length>8?' …':''}</div>`;
+    }
+    cards += `
+      <div class="gp-card ${cardCls}">
         <div class="gp-card-head">
           <div class="gp-card-name">${_gpEsc(d.name)}</div>
-          <span class="gp-badge ${cls}">${lbl}</span>
+          <span class="gp-badge ${badgeCls}">${lbl}</span>
         </div>
-        <div class="gp-card-cat">${_gpEsc(d.category)}</div>
-        <div class="gp-card-when"><strong>Tiempo:</strong> ${_gpEsc(d.when)}</div>
-        <div class="gp-card-sum">${_gpEsc(d.summary)}</div>
-        ${notesHtml ? '<div class="gp-card-notes-title">Notas adicionales:</div>' + notesHtml : ''}
-        <div class="gp-card-src">Fuente: ${_gpEsc(d.source)}</div>
+        <div class="gp-row">
+          <div class="gp-row-k">Categoría</div>
+          <div class="gp-row-v">${_gpEsc(d.category)}</div>
+        </div>
+        <div class="gp-row">
+          <div class="gp-row-k">Cuándo</div>
+          <div class="gp-row-v when">${_gpEsc(d.when)}</div>
+        </div>
+        <div class="gp-row">
+          <div class="gp-row-k">Recomendación</div>
+          <div class="gp-row-v">${_gpEsc(d.summary)}</div>
+        </div>
+        ${notesHtml}
+        ${aliasesHtml}
+        <div class="gp-source">
+          <span>${_gpEsc(d.source)}</span>
+          <span class="gp-source-tag">Andes</span>
+        </div>
       </div>`;
   }
-  res.innerHTML = html;
+
+  res.innerHTML = `
+    <div class="gp-results-header">Resultados para «<strong>${_gpEsc(query)}</strong>» · ${matches.length} ${matches.length===1?'fármaco':'fármacos'}</div>
+    <div class="gp-results">${cards}</div>`;
 }
 
 // Mostrar/ocultar tablas completas.
@@ -3664,16 +3700,19 @@ function renderGuiasAyunoTable(){
   const cont = document.getElementById('gpAyunoBody');
   if(!cont) return;
   let html = '';
-  html += '<h3 class="gp-section-title">Tiempos de Ayuno Preoperatorio</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Tipo de ingesta</th><th>Tiempo mínimo</th></tr></thead><tbody>';
+  html += '<table class="gp-table" style="margin-bottom:12px"><thead><tr><th>Tipo de ingesta</th><th class="col-time">Tiempo mínimo</th></tr></thead><tbody>';
   for(const r of AYUNO_TABLE_DATA.rows){
-    html += `<tr><td>${_gpEsc(r.ingesta)}</td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+    html += `<tr><td>${_gpEsc(r.ingesta)}</td><td class="col-time">${_gpEsc(r.tiempo)}</td></tr>`;
   }
   html += '</tbody></table>';
-  html += '<h3 class="gp-section-title">Suspensión de Análogos GLP-1</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Fármaco</th><th>Suspensión</th></tr></thead><tbody>';
+  html += `
+    <div class="gp-callout">
+      <strong>⚠ En caso de duda</strong> sobre el cumplimiento del ayuno o el contenido gástrico, será criterio del <strong>anestesiólogo</strong> posponer o realizar el procedimiento, eventualmente apoyado en una <strong>ecografía gástrica</strong> para evaluar el contenido residual.
+    </div>`;
+  html += '<h3 style="font-size:14px;font-weight:700;color:var(--primary-dark);margin:18px 0 8px;font-family:Manrope,Inter,sans-serif">Suspensión de Análogos GLP-1</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Fármaco</th><th class="col-time">Suspensión</th></tr></thead><tbody>';
   for(const r of AYUNO_TABLE_DATA.glp1Rows){
-    html += `<tr><td>${_gpEsc(r.farmaco)}</td><td>${_gpEsc(r.suspension)}</td></tr>`;
+    html += `<tr><td>${_gpEsc(r.farmaco)}</td><td class="col-time">${_gpEsc(r.suspension)}</td></tr>`;
   }
   html += '</tbody></table>';
   html += '<p class="gp-foot-note">Referencia: Guía de Ayuno Perioperatorio y Suspensión de GLP-1 — Clínica Universidad de los Andes.</p>';
@@ -3685,18 +3724,622 @@ function renderGuiasSuspTable(){
   const cont = document.getElementById('gpSuspBody');
   if(!cont) return;
   let html = '';
-  html += '<h3 class="gp-section-title">Suspensión Perioperatoria de Fármacos</h3>';
   html += '<table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Acción</th><th>Tiempo / Observación</th></tr></thead><tbody>';
   let lastGrupo = '';
   for(const r of SUSP_TABLE_DATA){
-    const grupoCell = (r.grupo !== lastGrupo) ? `<td><strong>${_gpEsc(r.grupo)}</strong></td>` : '<td></td>';
+    const grupoCell = (r.grupo !== lastGrupo) ? `<td class="group-cell">${_gpEsc(r.grupo)}</td>` : '<td></td>';
     lastGrupo = r.grupo;
-    const accionCls = _gpActionClass(r.accion.toLowerCase());
+    const accionCls = _gpActionClass(r.accion);
     html += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td><span class="gp-badge ${accionCls}">${_gpEsc(r.accion.toUpperCase())}</span></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
   }
   html += '</tbody></table>';
   html += '<p class="gp-foot-note">Referencia: Guía de Suspensión de Fármacos Perioperatorios — Clínica Universidad de los Andes. Las recomendaciones son orientativas; cada paciente debe evaluarse individualmente.</p>';
   cont.innerHTML = html;
+}
+
+// ============================================================
+// MÓDULO: AGENDAMIENTO DE PROCEDIMIENTOS
+// Salas (Endoscopía / Imagenología / Otros) + Calendario mensual + Slots
+// Unidades solicitantes ↔ Panel admin (Anestesia) para visar
+// Persistencia: localStorage por ahora (TODO: backend Cloudflare KV/D1)
+// ============================================================
+
+// --- Catálogos ---
+const AGEND_UNIDADES = [
+  { code:'endo_dig',  name:'Endoscopía Digestiva', ico:'🔬' },
+  { code:'radio',     name:'Imagenología',         ico:'🩻' },
+  { code:'odonto',    name:'Odontología',          ico:'🦷' },
+  { code:'neuro',     name:'Neurología',           ico:'🧠' },
+  { code:'onco',      name:'Oncología / Hemato',   ico:'🎗️' },
+  { code:'pedia',     name:'Pediatría',            ico:'🧒' },
+  { code:'urolo',     name:'Urología',             ico:'🩺' },
+  { code:'otra',      name:'Otra unidad',          ico:'➕' }
+];
+const AGEND_DEFAULT_PIN = '1234';
+
+const AGEND_SALAS = [
+  { id:'endoscopia',   name:'Endoscopía',           ico:'🔬', color:'#0EA5E9', desc:'Endoscopías digestivas altas y bajas, colonoscopías, CPRE' },
+  { id:'imagenologia', name:'Imagenología',         ico:'🩻', color:'#A855F7', desc:'TAC, RM con sedación, intervencionismo radiológico' },
+  { id:'otros',        name:'Otros procedimientos', ico:'💉', color:'#F97316', desc:'Sedación dental, punción lumbar, QMT intratecal, acceso venoso central' }
+];
+
+const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // 08:00..19:00 (último slot termina 20:00)
+const AGEND_DATA_LS_KEY    = 'appx_agend_data_v1';
+const AGEND_SESSION_LS_KEY = 'appx_agend_sess_v1';
+
+// --- Estado en memoria ---
+const AGEND_STATE = {
+  mode: null,            // 'unidad' | 'admin'
+  unidadCode: null,
+  solicitanteNombre: '',
+  solicitanteTel: '',
+  staffNombre: '',
+  salaId: null,
+  calYear: 0, calMonth: 0,
+  selectedDate: null,    // 'YYYY-MM-DD'
+  formHour: null,
+  detalleId: null,
+  overviewTab: 'pendiente',
+  navStack: []
+};
+
+// --- Persistencia ---
+function agendLoadData(){
+  try{ return JSON.parse(localStorage.getItem(AGEND_DATA_LS_KEY) || '{}'); }
+  catch(e){ return {}; }
+}
+function agendSaveData(data){
+  try{ localStorage.setItem(AGEND_DATA_LS_KEY, JSON.stringify(data)); }
+  catch(e){ console.error('No se pudo guardar agendamiento', e); }
+}
+function agendLoadSession(){
+  try{ return JSON.parse(localStorage.getItem(AGEND_SESSION_LS_KEY) || 'null'); }
+  catch(e){ return null; }
+}
+function agendSaveSession(sess){
+  if(sess) localStorage.setItem(AGEND_SESSION_LS_KEY, JSON.stringify(sess));
+  else localStorage.removeItem(AGEND_SESSION_LS_KEY);
+}
+
+// --- Helpers de fecha ---
+function _agendPad(n){ return String(n).padStart(2,'0'); }
+function _agendDateStr(year, month0, day){
+  return `${year}-${_agendPad(month0+1)}-${_agendPad(day)}`;
+}
+function _agendTodayStr(){
+  const d = new Date();
+  return _agendDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function _agendParseDateStr(s){
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+const _agendMesesES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const _agendDiasES = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+// --- Helpers de slots ---
+function _agendGetSala(salaId){ return AGEND_SALAS.find(s => s.id === salaId); }
+function _agendGetUnidad(code){ return AGEND_UNIDADES.find(u => u.code === code); }
+function _agendGenId(){ return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function _agendGetDaySlots(salaId, dateStr){
+  const data = agendLoadData();
+  return (((data[salaId]||{})[dateStr])||{});
+}
+function _agendCountDay(salaId, dateStr){
+  const slots = _agendGetDaySlots(salaId, dateStr);
+  let pend=0, aprob=0, rech=0;
+  Object.values(slots).forEach(r => {
+    if(r.estado === 'pendiente') pend++;
+    else if(r.estado === 'aprobada') aprob++;
+    else if(r.estado === 'rechazada') rech++;
+  });
+  return {pend, aprob, rech, total: pend+aprob+rech};
+}
+function _agendAllRequests(){
+  const out = [];
+  const data = agendLoadData();
+  Object.keys(data).forEach(salaId => {
+    Object.keys(data[salaId]||{}).forEach(dateStr => {
+      Object.keys(data[salaId][dateStr]||{}).forEach(hour => {
+        out.push({ salaId, dateStr, hour, ...data[salaId][dateStr][hour] });
+      });
+    });
+  });
+  return out;
+}
+function _agendFindRequest(reqId){
+  const data = agendLoadData();
+  for(const salaId of Object.keys(data)){
+    for(const dateStr of Object.keys(data[salaId]||{})){
+      for(const hour of Object.keys(data[salaId][dateStr]||{})){
+        if(data[salaId][dateStr][hour].id === reqId){
+          return { salaId, dateStr, hour, req: data[salaId][dateStr][hour] };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// --- Navegación / vistas ---
+function _agendShowView(name, pushToStack){
+  if(pushToStack && AGEND_STATE.view && AGEND_STATE.view !== name){
+    AGEND_STATE.navStack.push(AGEND_STATE.view);
+  }
+  AGEND_STATE.view = name;
+  document.querySelectorAll('#agendScreen .agend-view').forEach(v => {
+    v.classList.toggle('active', v.getAttribute('data-view') === name);
+  });
+  document.querySelector('#agendScreen .agend-body').scrollTop = 0;
+}
+function _agendSetTitle(title, sub){
+  document.getElementById('agendTitle').textContent = title || 'Agendamiento';
+  document.getElementById('agendSub').textContent = sub || '';
+}
+function _agendSetHeadAction(label, onclick){
+  const btn = document.getElementById('agendHeadAction');
+  if(!btn) return;
+  if(label){
+    btn.textContent = label;
+    btn.classList.remove('hidden');
+    btn._agendCb = onclick;
+  } else {
+    btn.classList.add('hidden');
+    btn._agendCb = null;
+  }
+}
+function agendHeadActionClick(){
+  const btn = document.getElementById('agendHeadAction');
+  if(btn && typeof btn._agendCb === 'function') btn._agendCb();
+}
+function agendBack(){
+  if(AGEND_STATE.navStack.length){
+    const prev = AGEND_STATE.navStack.pop();
+    _agendShowView(prev, false);
+    _agendRefreshChromeForView(prev);
+    return;
+  }
+  // Sin stack → cerrar overlay
+  agendCloseModule();
+}
+function agendCloseModule(){
+  document.getElementById('agendScreen').classList.add('hidden');
+  AGEND_STATE.view = null;
+  AGEND_STATE.navStack = [];
+  showModulesScreen();
+}
+function _agendRefreshChromeForView(view){
+  if(view === 'landing') {
+    _agendSetTitle('Agendamiento de procedimientos','');
+    _agendSetHeadAction(null);
+  } else if(view === 'unidadLogin'){
+    _agendSetTitle('Identificación de unidad','');
+    _agendSetHeadAction(null);
+  } else if(view === 'salas'){
+    if(AGEND_STATE.mode === 'admin'){
+      _agendSetTitle('Panel Anestesia · Salas', AGEND_STATE.staffNombre ? AGEND_STATE.staffNombre : '');
+      _agendSetHeadAction('Solicitudes', () => agendShowOverview('pendiente'));
+    } else {
+      const u = _agendGetUnidad(AGEND_STATE.unidadCode);
+      _agendSetTitle('Salas disponibles', u ? u.name : '');
+      _agendSetHeadAction('Salir', () => agendLogoutUnidad());
+    }
+  }
+}
+
+// --- Apertura / cierre del módulo ---
+function openAgendamientoModule(){
+  const mod = document.getElementById('modulesScreen');
+  if(mod) mod.classList.add('hidden');
+  const ov = document.getElementById('agendScreen');
+  if(ov) ov.classList.remove('hidden');
+  AGEND_STATE.navStack = [];
+  AGEND_STATE.mode = null;
+  AGEND_STATE.unidadCode = null;
+  AGEND_STATE.solicitanteNombre = '';
+  AGEND_STATE.solicitanteTel = '';
+  // Restaurar sesión si existe
+  const sess = agendLoadSession();
+  if(sess && sess.tipo === 'unidad' && sess.unidadCode){
+    AGEND_STATE.mode = 'unidad';
+    AGEND_STATE.unidadCode = sess.unidadCode;
+    AGEND_STATE.solicitanteNombre = sess.nombre || '';
+    AGEND_STATE.solicitanteTel = sess.tel || '';
+    agendShowSalasView();
+    return;
+  }
+  // Sin sesión → landing
+  _agendShowView('landing', false);
+  _agendRefreshChromeForView('landing');
+}
+
+// --- Landing → unidadLogin ---
+function agendGoToUnidadLogin(){
+  _agendShowView('unidadLogin', true);
+  _agendRefreshChromeForView('unidadLogin');
+  _agendRenderUnidadGrid();
+  // Reset selection
+  document.getElementById('agendUnidadFormBlock').classList.add('hidden');
+  document.getElementById('agendUnidadPin').value = '';
+  document.getElementById('agendUnidadNombre').value = '';
+  document.getElementById('agendUnidadTel').value = '';
+  AGEND_STATE._tempUnidadCode = null;
+}
+function _agendRenderUnidadGrid(){
+  const cont = document.getElementById('agendUnidadGrid');
+  if(!cont) return;
+  cont.innerHTML = AGEND_UNIDADES.map(u => `
+    <button type="button" class="agend-unidad-card" data-code="${u.code}" onclick="agendSelectUnidad('${u.code}')">
+      <span class="agend-unidad-ico">${u.ico}</span>
+      <div class="agend-unidad-name">${u.name}</div>
+    </button>`).join('');
+}
+function agendSelectUnidad(code){
+  AGEND_STATE._tempUnidadCode = code;
+  document.querySelectorAll('#agendUnidadGrid .agend-unidad-card').forEach(c => {
+    c.classList.toggle('selected', c.getAttribute('data-code') === code);
+  });
+  document.getElementById('agendUnidadFormBlock').classList.remove('hidden');
+  setTimeout(() => document.getElementById('agendUnidadPin').focus(), 80);
+}
+function agendUnidadDoLogin(){
+  const code = AGEND_STATE._tempUnidadCode;
+  if(!code){ alert('Seleccioná una unidad primero.'); return; }
+  const pin = document.getElementById('agendUnidadPin').value.trim();
+  const nom = document.getElementById('agendUnidadNombre').value.trim();
+  const tel = document.getElementById('agendUnidadTel').value.trim();
+  if(pin !== AGEND_DEFAULT_PIN){ alert('PIN incorrecto. (PIN inicial: 1234)'); return; }
+  if(!nom){ alert('Ingresá el nombre del solicitante.'); return; }
+  AGEND_STATE.mode = 'unidad';
+  AGEND_STATE.unidadCode = code;
+  AGEND_STATE.solicitanteNombre = nom;
+  AGEND_STATE.solicitanteTel = tel;
+  agendSaveSession({ tipo:'unidad', unidadCode:code, nombre:nom, tel });
+  // Limpiar navStack porque venimos de un login
+  AGEND_STATE.navStack = [];
+  agendShowSalasView();
+}
+function agendLogoutUnidad(){
+  if(!confirm('¿Cerrar la sesión de tu unidad?')) return;
+  agendSaveSession(null);
+  AGEND_STATE.mode = null;
+  AGEND_STATE.unidadCode = null;
+  AGEND_STATE.solicitanteNombre = '';
+  AGEND_STATE.solicitanteTel = '';
+  AGEND_STATE.navStack = [];
+  _agendShowView('landing', false);
+  _agendRefreshChromeForView('landing');
+}
+
+// --- Acceso modo Admin ---
+function agendGoToAdmin(){
+  // En esta versión: el admin debe estar logueado como Staff. Si no, le pedimos hacerlo.
+  if(!state || !state.currentUserId){
+    alert('Para visar solicitudes necesitás iniciar sesión como Staff de Anestesia.\nVolvé a la pantalla principal → Staff → tu usuario y clave.');
+    return;
+  }
+  const usr = (state.users||[]).find(u => u.id === state.currentUserId);
+  AGEND_STATE.mode = 'admin';
+  AGEND_STATE.staffNombre = usr ? (usr.displayName || usr.name || usr.id) : '';
+  AGEND_STATE.navStack = [];
+  agendShowSalasView();
+}
+
+// --- Vista: Salas ---
+function agendShowSalasView(){
+  _agendShowView('salas', false);
+  _agendRefreshChromeForView('salas');
+  const cont = document.getElementById('agendSalaList');
+  if(!cont) return;
+  cont.innerHTML = AGEND_SALAS.map(s => `
+    <button type="button" class="agend-sala-card" onclick="agendOpenSala('${s.id}')">
+      <div class="agend-sala-ico" style="background:${s.color}">${s.ico}</div>
+      <div class="agend-sala-body">
+        <div class="agend-sala-name">${s.name}</div>
+        <div class="agend-sala-desc">${s.desc}</div>
+      </div>
+      <div class="agend-sala-arrow">›</div>
+    </button>`).join('');
+}
+
+// --- Vista: Calendario ---
+function agendOpenSala(salaId){
+  AGEND_STATE.salaId = salaId;
+  const d = new Date();
+  AGEND_STATE.calYear = d.getFullYear();
+  AGEND_STATE.calMonth = d.getMonth();
+  _agendShowView('calendario', true);
+  const s = _agendGetSala(salaId);
+  _agendSetTitle(s ? s.name : 'Calendario', AGEND_STATE.mode === 'admin' ? 'Modo Admin' : (_agendGetUnidad(AGEND_STATE.unidadCode)||{}).name || '');
+  _agendSetHeadAction(null);
+  agendRenderCalendario();
+}
+function agendNavMonth(delta){
+  let m = AGEND_STATE.calMonth + delta;
+  let y = AGEND_STATE.calYear;
+  if(m < 0){ m = 11; y--; }
+  if(m > 11){ m = 0; y++; }
+  AGEND_STATE.calMonth = m;
+  AGEND_STATE.calYear = y;
+  agendRenderCalendario();
+}
+function agendRenderCalendario(){
+  const y = AGEND_STATE.calYear, m = AGEND_STATE.calMonth;
+  const title = document.getElementById('agendCalTitle');
+  if(title) title.textContent = `${_agendMesesES[m]} ${y}`;
+  const grid = document.getElementById('agendCalGrid');
+  if(!grid) return;
+  const firstDow = new Date(y, m, 1).getDay(); // 0=domingo
+  const offset = (firstDow + 6) % 7; // L=0, M=1, ... D=6
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const todayStr = _agendTodayStr();
+  let html = '';
+  for(let i=0; i<offset; i++) html += `<div class="agend-cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = _agendDateStr(y, m, d);
+    const counts = _agendCountDay(AGEND_STATE.salaId, ds);
+    const isPast = (ds < todayStr);
+    const isToday = (ds === todayStr);
+    let badge = '';
+    if(counts.total > 0){
+      let cls = 'bd-pend', txt = `${counts.total}`;
+      if(counts.pend === 0 && counts.aprob > 0) cls = 'bd-aprob';
+      else if(counts.pend > 0 && counts.aprob > 0) cls = 'bd-mix';
+      badge = `<div class="agend-cal-badge ${cls}">${txt}</div>`;
+    }
+    const cls = ['agend-cal-day'];
+    if(isToday) cls.push('today');
+    if(isPast) cls.push('past');
+    const handler = isPast ? '' : `onclick="agendOpenDia('${ds}')"`;
+    html += `<button type="button" class="${cls.join(' ')}" ${handler}><div class="agend-cal-d">${d}</div>${badge}</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+// --- Vista: Día (slots) ---
+function agendOpenDia(dateStr){
+  AGEND_STATE.selectedDate = dateStr;
+  _agendShowView('dia', true);
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  const dt = _agendParseDateStr(dateStr);
+  const dayName = _agendDiasES[dt.getDay()];
+  const fmt = `${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} ${dt.getFullYear()}`;
+  _agendSetTitle(fmt, sala ? sala.name : '');
+  _agendSetHeadAction(null);
+  // Render header
+  const head = document.getElementById('agendDayHead');
+  if(head){
+    head.innerHTML = `
+      <div class="agend-day-head-ico" style="background:${sala?sala.color:'#16a34a'}">${sala?sala.ico:'📅'}</div>
+      <div class="agend-day-head-body">
+        <div class="agend-day-head-date">${fmt}</div>
+        <div class="agend-day-head-sala">${sala?sala.name:''} · Horario 08:00 a 20:00</div>
+      </div>`;
+  }
+  agendRenderSlots();
+}
+function agendRenderSlots(){
+  const cont = document.getElementById('agendSlots');
+  if(!cont) return;
+  const slots = _agendGetDaySlots(AGEND_STATE.salaId, AGEND_STATE.selectedDate);
+  let html = '';
+  for(const h of AGEND_SLOT_HOURS){
+    const key = _agendPad(h);
+    const r = slots[key];
+    const hourLabel = `${_agendPad(h)}:00`;
+    const hourEnd = `${_agendPad(h+1)}:00`;
+    if(!r){
+      // Slot libre
+      html += `
+        <button type="button" class="agend-slot libre" onclick="agendOpenFormForHour(${h})">
+          <div class="agend-slot-hour">${hourLabel}</div>
+          <div class="agend-slot-body"><span class="agend-slot-libre-text">Libre · ${hourLabel}–${hourEnd}</span></div>
+          <div class="agend-slot-libre-cta">+ Solicitar</div>
+        </button>`;
+    } else {
+      const est = r.estado || 'pendiente';
+      const unidad = _agendGetUnidad(r.unidadCode);
+      html += `
+        <button type="button" class="agend-slot ${est}" onclick="agendOpenDetalle('${r.id}')">
+          <div class="agend-slot-hour">${hourLabel}</div>
+          <div class="agend-slot-body">
+            <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''}</div>
+            <div class="agend-slot-proc">${_gpEsc(r.procedimiento)}</div>
+            <div class="agend-slot-meta">${unidad?unidad.ico+' '+_gpEsc(unidad.name):''} · ${_gpEsc(r.solicitanteNombre||'')}</div>
+          </div>
+          <div class="agend-slot-status ${est}">${est}</div>
+        </button>`;
+    }
+  }
+  cont.innerHTML = html;
+}
+
+// --- Vista: Form solicitud ---
+function agendOpenFormForHour(h){
+  if(AGEND_STATE.mode !== 'unidad'){
+    alert('Para solicitar un agendamiento entrá como Unidad solicitante.\nVolvé al inicio del módulo Agendamiento → "Solicitar agendamiento".');
+    return;
+  }
+  AGEND_STATE.formHour = h;
+  _agendShowView('form', true);
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  const dt = _agendParseDateStr(AGEND_STATE.selectedDate);
+  const fmt = `${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${_agendPad(h)}:00–${_agendPad(h+1)}:00`;
+  _agendSetTitle('Nueva solicitud', fmt);
+  _agendSetHeadAction(null);
+  const head = document.getElementById('agendFormHead');
+  if(head){
+    head.innerHTML = `
+      <div class="agend-day-head-ico" style="background:${sala?sala.color:'#16a34a'}">${sala?sala.ico:'📅'}</div>
+      <div class="agend-day-head-body">
+        <div class="agend-day-head-date">${fmt}</div>
+        <div class="agend-day-head-sala">${sala?sala.name:''}</div>
+      </div>`;
+  }
+  // Reset form
+  document.getElementById('afPaciente').value = '';
+  document.getElementById('afEdad').value = '';
+  document.getElementById('afRut').value = '';
+  document.getElementById('afProc').value = '';
+  document.getElementById('afNotas').value = '';
+  document.getElementById('afPrioridad').value = 'electiva';
+  setTimeout(() => document.getElementById('afPaciente').focus(), 80);
+}
+function agendSubmitSolicitud(ev){
+  if(ev) ev.preventDefault();
+  const paciente = document.getElementById('afPaciente').value.trim();
+  const edad = document.getElementById('afEdad').value.trim();
+  const rut = document.getElementById('afRut').value.trim();
+  const proc = document.getElementById('afProc').value.trim();
+  const notas = document.getElementById('afNotas').value.trim();
+  const prio = document.getElementById('afPrioridad').value;
+  if(!paciente){ alert('Falta el nombre del paciente.'); return; }
+  if(!proc){ alert('Falta el procedimiento.'); return; }
+  const salaId = AGEND_STATE.salaId;
+  const dateStr = AGEND_STATE.selectedDate;
+  const hourKey = _agendPad(AGEND_STATE.formHour);
+  const data = agendLoadData();
+  data[salaId] = data[salaId] || {};
+  data[salaId][dateStr] = data[salaId][dateStr] || {};
+  if(data[salaId][dateStr][hourKey]){
+    alert('Ese horario acaba de ser ocupado por otra solicitud. Elegí otro horario.');
+    agendOpenDia(dateStr);
+    return;
+  }
+  const req = {
+    id: _agendGenId(),
+    paciente, edad, rut, procedimiento: proc, notas, prioridad: prio,
+    unidadCode: AGEND_STATE.unidadCode,
+    solicitanteNombre: AGEND_STATE.solicitanteNombre,
+    solicitanteTel: AGEND_STATE.solicitanteTel,
+    estado: 'pendiente',
+    createdAt: Date.now(),
+    visadoBy: null, visadoAt: null, comentarioVisado: ''
+  };
+  data[salaId][dateStr][hourKey] = req;
+  agendSaveData(data);
+  alert('Solicitud enviada. El Servicio de Anestesia será notificado.');
+  // Volver al día
+  AGEND_STATE.navStack.pop(); // saca 'form' del stack (ya está)... realmente reemplaza
+  agendOpenDia(dateStr);
+}
+
+// --- Vista: Detalle solicitud ---
+function agendOpenDetalle(reqId){
+  AGEND_STATE.detalleId = reqId;
+  const found = _agendFindRequest(reqId);
+  if(!found){ alert('No se encontró la solicitud.'); return; }
+  _agendShowView('detalle', true);
+  const {salaId, dateStr, hour, req} = found;
+  const sala = _agendGetSala(salaId);
+  const unidad = _agendGetUnidad(req.unidadCode);
+  const dt = _agendParseDateStr(dateStr);
+  const fmt = `${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${hour}:00–${_agendPad(parseInt(hour)+1)}:00`;
+  _agendSetTitle('Detalle de solicitud', fmt);
+  _agendSetHeadAction(null);
+  const head = document.getElementById('agendDetalleHead');
+  if(head){
+    head.innerHTML = `
+      <div class="agend-day-head-ico" style="background:${sala?sala.color:'#16a34a'}">${sala?sala.ico:'📅'}</div>
+      <div class="agend-day-head-body">
+        <div class="agend-day-head-date">${fmt}</div>
+        <div class="agend-day-head-sala">${sala?sala.name:''}</div>
+      </div>`;
+  }
+  // Detalle body
+  const body = document.getElementById('agendDetalleBody');
+  const visadoTxt = req.visadoBy
+    ? `${req.visadoBy} · ${new Date(req.visadoAt).toLocaleString('es-CL')}${req.comentarioVisado?`<br><em>"${_gpEsc(req.comentarioVisado)}"</em>`:''}`
+    : '—';
+  let actionsHtml = '';
+  if(AGEND_STATE.mode === 'admin' && req.estado === 'pendiente'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-action-btn aprobar" onclick="agendVisarSolicitud('${req.id}','aprobada')">✓ Aprobar</button>
+        <button type="button" class="agend-action-btn rechazar" onclick="agendVisarSolicitud('${req.id}','rechazada')">✗ Rechazar</button>
+      </div>`;
+  } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:#fff;color:var(--muted)">Revertir a pendiente</button>
+      </div>`;
+  }
+  body.innerHTML = `
+    <div class="agend-detalle-card">
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Estado</div><div class="agend-detalle-v"><span class="agend-slot-status ${req.estado}">${req.estado}</span></div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Paciente</div><div class="agend-detalle-v">${_gpEsc(req.paciente)}${req.edad?` · ${_gpEsc(String(req.edad))} años`:''}${req.rut?` · ${_gpEsc(req.rut)}`:''}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Procedimiento</div><div class="agend-detalle-v">${_gpEsc(req.procedimiento)}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Prioridad</div><div class="agend-detalle-v">${_gpEsc(req.prioridad||'electiva')}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Antecedentes</div><div class="agend-detalle-v">${req.notas?_gpEsc(req.notas):'<em style="color:#9ca3af">Sin antecedentes adicionales</em>'}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Unidad</div><div class="agend-detalle-v">${unidad?unidad.ico+' '+_gpEsc(unidad.name):'—'}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Solicitante</div><div class="agend-detalle-v">${_gpEsc(req.solicitanteNombre||'—')}${req.solicitanteTel?`<br><span style="color:var(--muted);font-size:12px">${_gpEsc(req.solicitanteTel)}</span>`:''}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Creada</div><div class="agend-detalle-v">${new Date(req.createdAt).toLocaleString('es-CL')}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Visado</div><div class="agend-detalle-v">${visadoTxt}</div></div>
+      ${actionsHtml}
+    </div>`;
+}
+
+function agendVisarSolicitud(reqId, nuevoEstado){
+  const found = _agendFindRequest(reqId);
+  if(!found) return;
+  let comentario = '';
+  if(nuevoEstado === 'rechazada'){
+    comentario = prompt('Motivo del rechazo (opcional, queda registrado):') || '';
+  } else if(nuevoEstado === 'aprobada'){
+    comentario = prompt('Comentario para el solicitante (opcional):') || '';
+  }
+  const data = agendLoadData();
+  const slot = data[found.salaId][found.dateStr][found.hour];
+  slot.estado = nuevoEstado;
+  slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
+  slot.visadoAt = Date.now();
+  slot.comentarioVisado = comentario;
+  agendSaveData(data);
+  agendOpenDetalle(reqId);
+}
+
+// --- Vista: Overview admin (pendientes / aprobadas / rechazadas) ---
+function agendShowOverview(tab){
+  AGEND_STATE.overviewTab = tab || 'pendiente';
+  _agendShowView('overview', true);
+  _agendSetTitle('Solicitudes', 'Panel Anestesia');
+  _agendSetHeadAction(null);
+  agendOverviewTab(AGEND_STATE.overviewTab);
+}
+function agendOverviewTab(tab){
+  AGEND_STATE.overviewTab = tab;
+  document.querySelectorAll('#agendScreen .agend-overview-tab').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+  });
+  const all = _agendAllRequests();
+  const counts = { pendiente:0, aprobada:0, rechazada:0 };
+  all.forEach(r => { if(counts[r.estado]!==undefined) counts[r.estado]++; });
+  document.getElementById('ovCountPend').textContent = counts.pendiente;
+  document.getElementById('ovCountAprob').textContent = counts.aprobada;
+  document.getElementById('ovCountRech').textContent = counts.rechazada;
+  // Filtrar y ordenar por fecha+hora ascendente
+  const list = all
+    .filter(r => r.estado === tab)
+    .sort((a,b) => (a.dateStr+a.hour).localeCompare(b.dateStr+b.hour));
+  const cont = document.getElementById('agendOverviewList');
+  if(list.length === 0){
+    cont.innerHTML = `<div class="agend-empty">Sin solicitudes <strong>${tab}s</strong>.</div>`;
+    return;
+  }
+  cont.innerHTML = list.map(r => {
+    const sala = _agendGetSala(r.salaId);
+    const unidad = _agendGetUnidad(r.unidadCode);
+    const dt = _agendParseDateStr(r.dateStr);
+    return `
+      <button type="button" class="agend-slot ${r.estado}" onclick="agendOpenDetalle('${r.id}')">
+        <div class="agend-slot-hour">${r.hour}:00</div>
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">${_gpEsc(r.paciente)} · ${_gpEsc(r.procedimiento)}</div>
+          <div class="agend-slot-meta">${sala?sala.ico+' '+sala.name:''} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${unidad?unidad.name:''}</div>
+        </div>
+        <div class="agend-slot-status ${r.estado}">${r.estado}</div>
+      </button>`;
+  }).join('');
 }
 
 // ============================================================

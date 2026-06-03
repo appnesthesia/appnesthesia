@@ -515,7 +515,13 @@ canvas{max-width:100%}
 .gp-intro{margin-bottom:14px}
 .gp-intro h2{font-family:'Manrope','Inter',sans-serif;font-size:20px;font-weight:800;margin:0 0 4px;color:var(--primary-dark)}
 .gp-intro p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
-.gp-search-wrap{position:relative;margin:14px 0 10px}
+.gp-search-wrap{position:sticky;top:0;z-index:50;margin:-4px 0 12px;padding:10px 0 8px;background:linear-gradient(180deg,#f0faf5 0%,#f0faf5 75%,rgba(240,250,245,0) 100%)}
+.gp-results-header{font-size:11.5px;color:var(--muted);margin:4px 4px 12px;font-weight:700;text-transform:uppercase;letter-spacing:.45px}
+.gp-results-header strong{color:var(--primary-dark);text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:800}
+.gp-notes-list{margin:4px 0 0;padding-left:18px;line-height:1.5;color:var(--text);font-size:12.5px}
+.gp-notes-list li{margin:3px 0}
+.gp-callout{background:#fff7ed;border:1.5px solid #fed7aa;border-left:5px solid #f97316;padding:11px 14px;border-radius:10px;font-size:13px;color:#7c2d12;line-height:1.5;margin:0 0 14px}
+.gp-callout strong{color:#9a3412}
 .gp-search{width:100%;padding:14px 14px 14px 44px;font-size:15px;font-family:inherit;border:2px solid var(--green-pale);border-radius:14px;background:#fff;box-shadow:0 4px 12px rgba(15,68,53,.06);transition:all .15s}
 .gp-search:focus{outline:none;border-color:var(--green-forest);box-shadow:0 6px 18px rgba(15,68,53,.12)}
 .gp-search-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;opacity:.55;pointer-events:none}
@@ -573,6 +579,138 @@ canvas{max-width:100%}
   .gp-row-k{width:auto;padding-top:0}
   .gp-table{font-size:11.5px}
   .gp-table th,.gp-table td{padding:7px 7px}
+}
+
+/* ============ AGENDAMIENTO DE PROCEDIMIENTOS (full-screen overlay) ============ */
+.agend-screen{position:fixed;inset:0;background:linear-gradient(180deg,#f0faf5 0%,#e6f4ee 100%);z-index:9999;display:flex;flex-direction:column;font-family:'Inter',-apple-system,system-ui,sans-serif}
+.agend-screen.hidden{display:none!important}
+.agend-head{position:sticky;top:0;background:linear-gradient(135deg,var(--green-deep) 0%,var(--green-forest) 100%);color:#fff;padding:14px 18px;padding-top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;gap:12px;box-shadow:0 3px 14px rgba(15,68,53,.18);z-index:10;flex-shrink:0}
+.agend-head .back-btn{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;border-radius:9px;font-family:inherit;flex-shrink:0}
+.agend-head .back-btn:hover{background:rgba(255,255,255,.25)}
+.agend-head h1{font-size:16px;font-weight:600;margin:0;flex:1;line-height:1.25}
+.agend-head .agend-sub{font-size:11px;opacity:.85;margin-top:2px;font-weight:500}
+.agend-head-action{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;padding:7px 12px;border-radius:8px;font-family:inherit;flex-shrink:0}
+.agend-head-action.hidden{display:none}
+.agend-head-action:hover{background:rgba(255,255,255,.3)}
+.agend-body{flex:1;overflow-y:auto;padding:18px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-width:760px;margin:0 auto;width:100%}
+.agend-view{display:none}
+.agend-view.active{display:block}
+
+/* Landing (2 grandes botones) */
+.agend-landing-h{font-family:'Manrope','Inter',sans-serif;font-size:20px;font-weight:800;color:var(--primary-dark);margin:4px 0 4px}
+.agend-landing-sub{color:var(--muted);font-size:13.5px;line-height:1.45;margin:0 0 18px}
+.agend-cta-list{display:flex;flex-direction:column;gap:12px}
+.agend-cta{display:flex;align-items:center;gap:14px;padding:18px 18px;border-radius:16px;border:1.5px solid var(--green-pale);background:#fff;cursor:pointer;font-family:inherit;color:inherit;text-align:left;width:100%;transition:all .15s;box-shadow:0 2px 10px rgba(15,68,53,.06)}
+.agend-cta:hover{border-color:var(--green-forest);background:#f0fdf4;transform:translateY(-1px);box-shadow:0 6px 18px rgba(15,68,53,.12)}
+.agend-cta-ico{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.agend-cta-body{flex:1}
+.agend-cta-name{font-weight:800;color:var(--primary-dark);font-size:16px;line-height:1.25;font-family:'Manrope','Inter',sans-serif}
+.agend-cta-desc{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+.agend-cta-arrow{color:var(--green-forest);font-size:22px;font-weight:700}
+
+/* Login de Unidad solicitante */
+.agend-unidad-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:14px 0 18px}
+.agend-unidad-card{padding:14px 10px;border:1.5px solid var(--green-pale);border-radius:12px;background:#fff;cursor:pointer;font-family:inherit;text-align:center;transition:all .15s;color:inherit}
+.agend-unidad-card:hover{border-color:var(--green-forest);background:#f0fdf4;transform:translateY(-1px)}
+.agend-unidad-card.selected{border-color:var(--green-forest);background:linear-gradient(180deg,#dcfce7,#bbf7d0);box-shadow:0 4px 12px rgba(15,68,53,.12)}
+.agend-unidad-ico{font-size:22px;display:block;margin-bottom:6px}
+.agend-unidad-name{font-size:12.5px;font-weight:700;color:var(--primary-dark);line-height:1.25}
+.agend-form-block{background:#fff;border:1.5px solid var(--green-pale);border-radius:14px;padding:16px;margin-top:14px}
+.agend-form-block label{display:block;font-size:11.5px;font-weight:700;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.agend-form-block input,.agend-form-block select,.agend-form-block textarea{width:100%;padding:11px 12px;font-size:14px;font-family:inherit;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--text);box-sizing:border-box;margin-bottom:12px}
+.agend-form-block input:focus,.agend-form-block select:focus,.agend-form-block textarea:focus{outline:none;border-color:var(--green-forest);box-shadow:0 0 0 3px rgba(15,68,53,.1)}
+.agend-form-block textarea{resize:vertical;min-height:80px}
+.agend-form-block .hint{font-size:11.5px;color:var(--muted);margin:-8px 0 12px;line-height:1.4}
+.agend-form-block .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.agend-btn-primary{background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;border:none;padding:13px 18px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;letter-spacing:.3px;transition:all .15s;box-shadow:0 4px 12px rgba(15,68,53,.2)}
+.agend-btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(15,68,53,.28)}
+.agend-btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.agend-btn-secondary{background:#fff;color:var(--green-forest);border:1.5px solid var(--green-pale);padding:11px 16px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;margin-top:8px}
+.agend-btn-secondary:hover{background:#f0fdf4;border-color:var(--green-forest)}
+
+/* Salas */
+.agend-sala-list{display:flex;flex-direction:column;gap:12px}
+.agend-sala-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:all .15s;color:inherit;box-shadow:0 2px 10px rgba(15,68,53,.06)}
+.agend-sala-card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(15,68,53,.12)}
+.agend-sala-ico{width:50px;height:50px;border-radius:13px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.agend-sala-body{flex:1}
+.agend-sala-name{font-weight:800;color:var(--primary-dark);font-size:16px;line-height:1.25;font-family:'Manrope','Inter',sans-serif}
+.agend-sala-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+.agend-sala-arrow{color:var(--muted);font-size:22px;font-weight:700}
+
+/* Calendario mensual */
+.agend-cal-nav{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px solid var(--green-pale);border-radius:12px;padding:8px 8px;margin-bottom:12px}
+.agend-cal-nav button{background:#f0fdf4;color:var(--primary-dark);border:none;padding:8px 14px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.agend-cal-nav button:hover{background:#dcfce7}
+.agend-cal-nav .agend-cal-title{font-size:15px;font-weight:800;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;text-transform:capitalize}
+.agend-cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.agend-cal-weekdays div{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;padding:6px 0;text-transform:uppercase;letter-spacing:.4px}
+.agend-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.agend-cal-day{aspect-ratio:1/1;border:1.5px solid var(--border);background:#fff;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;color:inherit;transition:all .12s;position:relative;padding:4px;min-height:48px}
+.agend-cal-day:hover{border-color:var(--green-forest);background:#f0fdf4}
+.agend-cal-day.empty{visibility:hidden}
+.agend-cal-day.today{border-color:var(--green-forest);background:#dcfce7;font-weight:800}
+.agend-cal-day.past{opacity:.45;background:#f6f8f7;cursor:not-allowed}
+.agend-cal-day.past:hover{border-color:var(--border);background:#f6f8f7;transform:none}
+.agend-cal-day .agend-cal-d{font-size:14px;font-weight:700;color:var(--primary-dark);line-height:1}
+.agend-cal-day .agend-cal-badge{position:absolute;bottom:3px;right:3px;font-size:9px;font-weight:800;padding:1px 5px;border-radius:7px;line-height:1.3;letter-spacing:.2px}
+.agend-cal-badge.bd-pend{background:#fef3c7;color:#92400e}
+.agend-cal-badge.bd-aprob{background:#dcfce7;color:#166534}
+.agend-cal-badge.bd-mix{background:#dbeafe;color:#1e40af}
+
+/* Día — slots */
+.agend-day-head{background:#fff;border:1.5px solid var(--green-pale);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.agend-day-head-ico{width:38px;height:38px;border-radius:10px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.agend-day-head-body{flex:1}
+.agend-day-head-date{font-family:'Manrope','Inter',sans-serif;font-size:15px;font-weight:800;color:var(--primary-dark);text-transform:capitalize}
+.agend-day-head-sala{font-size:12px;color:var(--muted);margin-top:2px}
+.agend-slot-list{display:flex;flex-direction:column;gap:8px}
+.agend-slot{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;font-family:inherit;text-align:left;width:100%;color:inherit;cursor:pointer;transition:all .12s}
+.agend-slot:hover{border-color:var(--green-forest);background:#f0fdf4}
+.agend-slot.libre{background:#fafafa;border-style:dashed}
+.agend-slot.libre:hover{background:#f0fdf4;border-style:solid}
+.agend-slot.pendiente{background:linear-gradient(90deg,#fef3c7 0%,#fff 60%);border-color:#fde68a;border-left:4px solid #f59e0b}
+.agend-slot.aprobada{background:linear-gradient(90deg,#dcfce7 0%,#fff 60%);border-color:#bbf7d0;border-left:4px solid #16a34a}
+.agend-slot.rechazada{background:#fef2f2;border-color:#fecaca;border-left:4px solid var(--danger);opacity:.7}
+.agend-slot-hour{font-family:'Manrope','Inter',sans-serif;font-size:15px;font-weight:800;color:var(--primary-dark);min-width:62px;letter-spacing:.4px}
+.agend-slot-body{flex:1;font-size:13px;line-height:1.4}
+.agend-slot-name{font-weight:700;color:var(--primary-dark);font-size:13.5px}
+.agend-slot-proc{color:var(--text);margin-top:2px}
+.agend-slot-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.agend-slot-status{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;flex-shrink:0}
+.agend-slot-status.pendiente{background:#fef3c7;color:#92400e}
+.agend-slot-status.aprobada{background:#dcfce7;color:#166534}
+.agend-slot-status.rechazada{background:#fee2e2;color:#991b1b}
+.agend-slot-libre-text{color:var(--muted);font-size:13px;font-style:italic}
+.agend-slot-libre-cta{color:var(--green-forest);font-weight:700;font-size:12.5px;white-space:nowrap}
+
+/* Detalle solicitud */
+.agend-detalle-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px;box-shadow:0 2px 12px rgba(15,68,53,.06)}
+.agend-detalle-row{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.45}
+.agend-detalle-row:first-of-type{border-top:none}
+.agend-detalle-k{color:var(--muted);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;min-width:130px;padding-top:2px}
+.agend-detalle-v{flex:1;color:var(--text)}
+.agend-detalle-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.agend-action-btn{flex:1;min-width:120px;padding:12px 16px;border:none;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;transition:all .15s;letter-spacing:.3px}
+.agend-action-btn.aprobar{background:linear-gradient(135deg,#15803d,#16a34a);box-shadow:0 4px 12px rgba(22,163,74,.25)}
+.agend-action-btn.rechazar{background:linear-gradient(135deg,#b91c1c,#dc2626);box-shadow:0 4px 12px rgba(220,38,38,.25)}
+.agend-action-btn:hover{transform:translateY(-1px)}
+.agend-empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Vista overview (admin) */
+.agend-overview-tabs{display:flex;gap:6px;margin-bottom:14px;background:#fff;border:1.5px solid var(--green-pale);border-radius:12px;padding:5px}
+.agend-overview-tab{flex:1;padding:9px 8px;background:transparent;border:none;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.agend-overview-tab.active{background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;box-shadow:0 3px 10px rgba(15,68,53,.18)}
+.agend-overview-count{display:inline-block;margin-left:4px;background:rgba(255,255,255,.25);padding:1px 6px;border-radius:8px;font-size:10.5px}
+.agend-overview-tab:not(.active) .agend-overview-count{background:#e5e7eb;color:var(--muted)}
+
+@media (max-width:540px){
+  .agend-unidad-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  .agend-form-block .row2{grid-template-columns:1fr}
+  .agend-cal-day{min-height:42px}
+  .agend-cal-day .agend-cal-d{font-size:13px}
+  .agend-detalle-row{flex-direction:column;gap:2px}
+  .agend-detalle-k{min-width:0}
 }
 
 /* ============ USER PICKER (perfil personal) ============ */
@@ -678,12 +816,13 @@ canvas{max-width:100%}
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
-      <button type="button" class="mod-item disabled" disabled aria-disabled="true">
+      <button type="button" class="mod-item" onclick="openAgendamientoModule()">
         <div class="mod-item-ico">📅</div>
         <div class="mod-item-body">
-          <div class="mod-item-name">Agendamiento de procedimientos <span class="mod-soon">Próximamente</span></div>
-          <div class="mod-item-desc">Reserva de pabellones y procedimientos electivos</div>
+          <div class="mod-item-name">Agendamiento de procedimientos</div>
+          <div class="mod-item-desc">Salas de Endoscopía, Imagenología y otros procedimientos con sedación</div>
         </div>
+        <div class="mod-item-arrow">›</div>
       </button>
       <button type="button" class="mod-item" onclick="openGuiasModule()">
         <div class="mod-item-ico">📘</div>
@@ -762,6 +901,136 @@ canvas{max-width:100%}
 
     <div class="gp-foot-note">
       <b>⚠ Nota clínica.</b> Esta guía sintetiza las recomendaciones de los protocolos institucionales de la Clínica Universidad de los Andes. La decisión final debe individualizarse considerando comorbilidades, tipo de cirugía, técnica anestésica y riesgo trombótico/hemorrágico del paciente. Ante dudas, coordinar con Cardiología, Endocrinología o el médico tratante según corresponda.
+    </div>
+  </div>
+</div>
+
+<!-- AGENDAMIENTO DE PROCEDIMIENTOS (overlay full-screen) -->
+<div id="agendScreen" class="agend-screen hidden">
+  <div class="agend-head">
+    <button type="button" class="back-btn" onclick="agendBack()">‹ Volver</button>
+    <div style="flex:1">
+      <h1 id="agendTitle">Agendamiento</h1>
+      <div id="agendSub" class="agend-sub"></div>
+    </div>
+    <button type="button" id="agendHeadAction" class="agend-head-action hidden" onclick="agendHeadActionClick()"></button>
+  </div>
+  <div class="agend-body">
+    <!-- Vista: Landing -->
+    <div class="agend-view active" data-view="landing">
+      <h2 class="agend-landing-h">¿Qué querés hacer?</h2>
+      <p class="agend-landing-sub">Las unidades clínicas pueden solicitar agendamiento de procedimientos con sedación. El Servicio de Anestesia visa las solicitudes.</p>
+      <div class="agend-cta-list">
+        <button type="button" class="agend-cta" onclick="agendGoToUnidadLogin()">
+          <div class="agend-cta-ico">📤</div>
+          <div class="agend-cta-body">
+            <div class="agend-cta-name">Solicitar agendamiento</div>
+            <div class="agend-cta-desc">Para Endoscopía, Imagenología, Odontología, Oncología y otras unidades</div>
+          </div>
+          <div class="agend-cta-arrow">›</div>
+        </button>
+        <button type="button" class="agend-cta" onclick="agendGoToAdmin()">
+          <div class="agend-cta-ico">✅</div>
+          <div class="agend-cta-body">
+            <div class="agend-cta-name">Visar solicitudes (Anestesia)</div>
+            <div class="agend-cta-desc">Panel del Servicio de Anestesia para aprobar o rechazar solicitudes</div>
+          </div>
+          <div class="agend-cta-arrow">›</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Vista: Login Unidad solicitante -->
+    <div class="agend-view" data-view="unidadLogin">
+      <h2 class="agend-landing-h">Identificá tu unidad</h2>
+      <p class="agend-landing-sub">Seleccioná la unidad solicitante e ingresá los datos del responsable.</p>
+      <div id="agendUnidadGrid" class="agend-unidad-grid"></div>
+      <div id="agendUnidadFormBlock" class="agend-form-block hidden">
+        <label>PIN de la unidad</label>
+        <input type="password" id="agendUnidadPin" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="off" />
+        <div class="hint">PIN inicial: 1234 (el admin podrá cambiarlo)</div>
+        <label>Nombre del solicitante</label>
+        <input type="text" id="agendUnidadNombre" placeholder="Dr/a. apellido, nombre" autocomplete="name" />
+        <label>Teléfono / anexo de contacto</label>
+        <input type="text" id="agendUnidadTel" placeholder="Ej: anexo 4321 o +56 9 ..." />
+        <button type="button" class="agend-btn-primary" onclick="agendUnidadDoLogin()">Entrar</button>
+      </div>
+    </div>
+
+    <!-- Vista: Salas -->
+    <div class="agend-view" data-view="salas">
+      <h2 class="agend-landing-h">Elegí la sala</h2>
+      <p class="agend-landing-sub" id="agendSalasSub">Cada sala tiene su propio calendario.</p>
+      <div id="agendSalaList" class="agend-sala-list"></div>
+    </div>
+
+    <!-- Vista: Calendario mensual -->
+    <div class="agend-view" data-view="calendario">
+      <div class="agend-cal-nav">
+        <button type="button" onclick="agendNavMonth(-1)">‹</button>
+        <div class="agend-cal-title" id="agendCalTitle">—</div>
+        <button type="button" onclick="agendNavMonth(1)">›</button>
+      </div>
+      <div class="agend-cal-weekdays"><div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div>D</div></div>
+      <div id="agendCalGrid" class="agend-cal-grid"></div>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5">
+        <span style="display:inline-block;width:10px;height:10px;background:#fef3c7;border-radius:3px;vertical-align:middle;margin:0 4px"></span>Pendientes
+        <span style="display:inline-block;width:10px;height:10px;background:#dcfce7;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Aprobadas
+        <span style="display:inline-block;width:10px;height:10px;background:#dbeafe;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Mixto
+      </div>
+    </div>
+
+    <!-- Vista: Día (slots) -->
+    <div class="agend-view" data-view="dia">
+      <div id="agendDayHead" class="agend-day-head"></div>
+      <div id="agendSlots" class="agend-slot-list"></div>
+    </div>
+
+    <!-- Vista: Form solicitud -->
+    <div class="agend-view" data-view="form">
+      <div id="agendFormHead" class="agend-day-head"></div>
+      <form id="agendForm" class="agend-form-block" onsubmit="agendSubmitSolicitud(event)">
+        <label>Nombre del paciente *</label>
+        <input type="text" id="afPaciente" required autocomplete="off" />
+        <div class="row2">
+          <div>
+            <label>Edad</label>
+            <input type="number" id="afEdad" min="0" max="120" />
+          </div>
+          <div>
+            <label>RUT</label>
+            <input type="text" id="afRut" placeholder="12.345.678-9" autocomplete="off" />
+          </div>
+        </div>
+        <label>Procedimiento solicitado *</label>
+        <input type="text" id="afProc" required placeholder="Ej: Colonoscopía + EDA, RM cerebral, Sedación dental..." />
+        <label>Indicación clínica / antecedentes relevantes</label>
+        <textarea id="afNotas" placeholder="Comorbilidades, alergias, medicamentos, ASA, ayuno, motivo del procedimiento..."></textarea>
+        <label>Prioridad</label>
+        <select id="afPrioridad">
+          <option value="electiva">Electiva</option>
+          <option value="preferente">Preferente</option>
+          <option value="urgente">Urgente</option>
+        </select>
+        <button type="submit" class="agend-btn-primary">Enviar solicitud</button>
+        <button type="button" class="agend-btn-secondary" onclick="agendBack()">Cancelar</button>
+      </form>
+    </div>
+
+    <!-- Vista: Detalle solicitud -->
+    <div class="agend-view" data-view="detalle">
+      <div id="agendDetalleHead" class="agend-day-head"></div>
+      <div id="agendDetalleBody"></div>
+    </div>
+
+    <!-- Vista: Admin overview (pendientes) -->
+    <div class="agend-view" data-view="overview">
+      <div class="agend-overview-tabs">
+        <button type="button" class="agend-overview-tab active" data-tab="pendiente" onclick="agendOverviewTab('pendiente')">Pendientes <span class="agend-overview-count" id="ovCountPend">0</span></button>
+        <button type="button" class="agend-overview-tab" data-tab="aprobada" onclick="agendOverviewTab('aprobada')">Aprobadas <span class="agend-overview-count" id="ovCountAprob">0</span></button>
+        <button type="button" class="agend-overview-tab" data-tab="rechazada" onclick="agendOverviewTab('rechazada')">Rechazadas <span class="agend-overview-count" id="ovCountRech">0</span></button>
+      </div>
+      <div id="agendOverviewList" class="agend-slot-list"></div>
     </div>
   </div>
 </div>
@@ -1267,6 +1536,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>
