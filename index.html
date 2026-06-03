@@ -806,7 +806,7 @@ canvas{max-width:100%}
   <div class="inst-picker-card">
     <div class="inst-picker-logo"><img src="icon-512.png?v=37" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
     <h1 class="inst-picker-title">Appnesthesia</h1>
-    <p class="inst-picker-sub">Seleccioná tu institución para continuar</p>
+    <p class="inst-picker-sub">Selecciona tu institución para continuar</p>
     <div id="institutionList" class="inst-list">
       <div class="inst-loading">Cargando instituciones...</div>
     </div>
@@ -826,7 +826,7 @@ canvas{max-width:100%}
     <div class="mod-card-logo"><img src="icon-512.png?v=37" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
     <div class="mod-inst-name" id="modulesInstName">—</div>
     <h2 class="mod-card-title">¿A dónde quieres entrar?</h2>
-    <p class="mod-card-sub">Elegí el módulo de la app</p>
+    <p class="mod-card-sub">Elige el módulo de la app</p>
     <div class="mod-list">
       <button type="button" class="mod-item" onclick="openStaffModule()">
         <div class="mod-item-ico">👥</div>
@@ -879,24 +879,6 @@ canvas{max-width:100%}
     <div id="gpSearchResults"></div>
     <div id="gpDefaultBlock">
       <div class="gp-hint">O abre directamente las tablas completas de las guías:</div>
-      <div class="gp-empty-actions">
-        <button type="button" class="gp-action-btn" onclick="toggleGuiasSection('gpAyuno')">
-          <div class="gp-action-ico">🍽️</div>
-          <div class="gp-action-body">
-            <div class="gp-action-name">Tabla de Ayuno y suspensión GLP-1</div>
-            <div class="gp-action-desc">Tiempos de ayuno (adultos y pediatría) + GLP-1</div>
-          </div>
-          <div class="gp-action-arrow">›</div>
-        </button>
-        <button type="button" class="gp-action-btn" onclick="toggleGuiasSection('gpSusp')">
-          <div class="gp-action-ico">💊</div>
-          <div class="gp-action-body">
-            <div class="gp-action-name">Tabla de suspensión de fármacos perioperatorios</div>
-            <div class="gp-action-desc">IECA/ARA-II, anticoagulantes, antiagregantes, hipoglicemiantes, etc.</div>
-          </div>
-          <div class="gp-action-arrow">›</div>
-        </button>
-      </div>
     </div>
 
     <!-- Tabla Ayuno + GLP-1 (despliegue) -->
@@ -942,14 +924,14 @@ canvas{max-width:100%}
     <div class="agend-view active" data-view="landing">
       <div id="agendLandingAdminBanner" class="agend-admin-banner" style="display:none">
         <div><b>🛡️ Estás en Modo Administrador</b> · <span id="agendAdminBannerName">—</span></div>
-        <div style="margin-top:4px;font-size:12px;opacity:.9">Tu sesión de Admin permanece activa mientras navegues por el módulo Agendamiento. Podés visar solicitudes desde la bandeja o entrar a las salas.</div>
+        <div style="margin-top:4px;font-size:12px;opacity:.9">Tu sesión de Admin permanece activa mientras navegues por el módulo Agendamiento. Puedes visar solicitudes desde la bandeja o entrar a las salas.</div>
         <div class="agend-admin-banner-actions">
           <button type="button" class="agend-admin-banner-btn" onclick="agendShowOverview('pendiente')">📋 Bandeja de solicitudes</button>
           <button type="button" class="agend-admin-banner-btn" onclick="agendShowSalasView()">🚪 Ver salas</button>
           <button type="button" class="agend-admin-banner-btn secondary" onclick="agendSalirAdminConfirm()">Salir del modo Admin</button>
         </div>
       </div>
-      <h2 class="agend-landing-h" id="agendLandingTitle">¿Qué querés hacer?</h2>
+      <h2 class="agend-landing-h" id="agendLandingTitle">¿Qué quieres hacer?</h2>
       <p class="agend-landing-sub" id="agendLandingSub">Las unidades clínicas pueden solicitar agendamiento de procedimientos con sedación. El Servicio de Anestesia visa las solicitudes.</p>
       <div class="agend-cta-list" id="agendLandingCtas">
         <button type="button" class="agend-cta" onclick="agendGoToUnidadLogin()">
@@ -974,7 +956,7 @@ canvas{max-width:100%}
     <!-- Vista: Login Unidad solicitante -->
     <div class="agend-view" data-view="unidadLogin">
       <h2 class="agend-landing-h">Identificá tu unidad</h2>
-      <p class="agend-landing-sub">Seleccioná la unidad solicitante e ingresá los datos del responsable.</p>
+      <p class="agend-landing-sub">Selecciona la unidad solicitante e ingresa los datos del responsable.</p>
       <div id="agendUnidadGrid" class="agend-unidad-grid"></div>
       <div id="agendUnidadFormBlock" class="agend-form-block hidden">
         <label>PIN de la unidad</label>
@@ -990,7 +972,7 @@ canvas{max-width:100%}
 
     <!-- Vista: Salas -->
     <div class="agend-view" data-view="salas">
-      <h2 class="agend-landing-h">Elegí la sala</h2>
+      <h2 class="agend-landing-h">Elige la sala</h2>
       <p class="agend-landing-sub" id="agendSalasSub">Cada sala tiene su propio calendario.</p>
       <div id="agendSalaList" class="agend-sala-list"></div>
     </div>
@@ -1083,13 +1065,13 @@ canvas{max-width:100%}
   <div class="user-picker-card">
     <div class="user-picker-inst" id="userPickerInst">—</div>
     <h2 class="user-picker-title">¿Quién está usando la app?</h2>
-    <p class="user-picker-sub">Seleccioná tu perfil para continuar</p>
+    <p class="user-picker-sub">Selecciona tu perfil para continuar</p>
     <div id="userGrid" class="user-grid"></div>
     <div class="user-picker-actions">
       <button class="btn sm secondary" onclick="backToModulesFromPicker()">‹ Volver</button>
     </div>
     <div class="user-picker-help">
-      ¿No te ves en la lista? Pedile al administrador que te agregue al staff.
+      ¿No te ves en la lista? Pídele al administrador que te agregue al staff.
     </div>
   </div>
 </div>
@@ -1252,7 +1234,7 @@ canvas{max-width:100%}
       <div id="horarioFrameWrap" style="position:relative;width:100%;height:70vh;min-height:480px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff">
         <iframe id="horarioFrame" src="" style="width:100%;height:100%;border:0" allowfullscreen onload="hideHorarioLoading()"></iframe>
       </div>
-      <div class="help" style="margin-top:8px">Si el horario no aparece, tu enlace de OneDrive puede necesitar permisos públicos. Mirá la guía o tocá "⚙️ Cambiar enlace".</div>
+      <div class="help" style="margin-top:8px">Si el horario no aparece, tu enlace de OneDrive puede necesitar permisos públicos. Mira la guía o toca "⚙️ Cambiar enlace".</div>
     </div>
   </div>
 </section>
@@ -1289,7 +1271,7 @@ canvas{max-width:100%}
   </div>
   <div class="section admin-only" style="display:none">
     <h3>🔧 Administración</h3>
-    <p class="help">Si el listado de anestesiólogos no coincide con el real, podés forzar la recarga.</p>
+    <p class="help">Si el listado de anestesiólogos no coincide con el real, puedes forzar la recarga.</p>
     <div class="btn-row">
       <button class="btn sm warn" onclick="resetStaffList()">↻ Restaurar listado oficial</button>
     </div>
@@ -1534,7 +1516,7 @@ canvas{max-width:100%}
   <div class="section">
     <h3>⏱️ Reloj Control <span class="badge" style="background:var(--warn)">BETA</span></h3>
     <div class="med-disclaimer" style="background:linear-gradient(135deg,#fff5df 0%,#ffe9b8 100%);border-color:#f0c977;color:#6b3a08">
-      <div><b>🔧 Estamos trabajando para un reloj con geolocalización.</b><br>Por ahora podés usar este cronómetro manual para registrar tu jornada o tiempos clínicos.</div>
+      <div><b>🔧 Estamos trabajando para un reloj con geolocalización.</b><br>Por ahora puedes usar este cronómetro manual para registrar tu jornada o tiempos clínicos.</div>
     </div>
 
     <div class="reloj-wrap">

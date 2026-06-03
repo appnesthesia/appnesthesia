@@ -385,7 +385,7 @@ function promptBackendToken(){
     <div class="alert ${effectiveUrl?'info':'warn'}" style="font-size:12px">
       ${effectiveUrl
         ? `Estado actual: <b>${_syncStatus}</b>. La URL viene de: <b>${source}</b>.`
-        : `<b>⚠️ No hay backend configurado.</b> Sin esto, los cambios solo viven en este dispositivo. Configurá la URL del Worker abajo.`}
+        : `<b>⚠️ No hay backend configurado.</b> Sin esto, los cambios solo viven en este dispositivo. Configura la URL del Worker abajo.`}
     </div>
     <div class="field">
       <label>URL del backend</label>
@@ -686,7 +686,7 @@ function openSourceModal(){
     </div>
     <div class="field">
       <label><input type="checkbox" id="src_replace" ${cur.replace!==false?'checked':''}> Reemplazar todos los turnos al sincronizar</label>
-      <div class="help">Si lo desmarcás, los turnos nuevos se agregan a los existentes.</div>
+      <div class="help">Si lo desmarcas, los turnos nuevos se agregan a los existentes.</div>
     </div>
     <div class="btn-row">
       <button class="btn accent" onclick="saveSource()">Guardar y sincronizar</button>
@@ -695,7 +695,7 @@ function openSourceModal(){
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
       <b>¿Cómo obtengo el enlace?</b><br>
-      <b>Google Sheets:</b> abrí tu hoja → Archivo → Compartir → Publicar en la web → Hoja específica → CSV → copiar enlace.<br>
+      <b>Google Sheets:</b> abre tu hoja → Archivo → Compartir → Publicar en la web → Hoja específica → CSV → copiar enlace.<br>
       <b>OneDrive:</b> click derecho en el archivo → Compartir → "Cualquiera con el enlace" → copiar.<br>
       Tu Excel debe tener las columnas: <b>Fecha, Anestesiólogo, Tipo</b> (y opcional Horario, Quirófano, Observaciones).
     </div>
@@ -1298,7 +1298,7 @@ function takeExch(id){
   e.updatedAt=new Date().toISOString();
   if(cu) e.takenById = cu.id;
   if(typeof logActivity==='function') logActivity('exchange_taken', 'Tomaste un turno · '+e.type+' · '+formatDate(e.date));
-  save(); renderExchanges(); toast('Turno tomado. Avisá al colega.');
+  save(); renderExchanges(); toast('Turno tomado. Avisa al colega.');
 }
 function proposeExch(id){
   const note = prompt('¿Qué turno ofrecés a cambio? (ej: viernes 23/5 mañana)');
@@ -1679,7 +1679,7 @@ function renderStats(){
 
 function hideChart(key){
   if(!state.isAdmin){ toast('Solo admin'); return; }
-  if(!confirm('¿Ocultar este gráfico? Podés restaurarlo con "Mostrar todos los gráficos".')) return;
+  if(!confirm('¿Ocultar este gráfico? Puedes restaurarlo con "Mostrar todos los gráficos".')) return;
   if(!state.stats.hidden) state.stats.hidden = {};
   state.stats.hidden[key] = true;
   save();
@@ -1699,7 +1699,7 @@ function openImportStatsModal(){
   if(!state.isAdmin){ toast('Solo admin'); return; }
   modal(`
     <h3>📂 Importar Excel de estadísticas</h3>
-    <p class="help" style="margin-bottom:10px">Subí tu archivo <b>.xlsx</b>. La app lee las hojas
+    <p class="help" style="margin-bottom:10px">Sube tu archivo <b>.xlsx</b>. La app lee las hojas
       <b>HRS DIA</b>, <b>LL1</b>, <b>LL2</b> y <b>SABADO</b>, y de cada una toma el listado de
       totales que está debajo de la tabla para armar un gráfico de barras.</p>
     <div class="field">
@@ -1715,7 +1715,7 @@ function openImportStatsModal(){
 
 function importStatsXLSX(){
   const inp = document.getElementById('statsFile');
-  if(!inp || !inp.files || !inp.files[0]){ toast('Seleccioná un archivo'); return; }
+  if(!inp || !inp.files || !inp.files[0]){ toast('Selecciona un archivo'); return; }
   const file = inp.files[0];
   if(typeof XLSX === 'undefined'){ toast('Librería XLSX no disponible'); return; }
   const reader = new FileReader();
@@ -1827,7 +1827,7 @@ function saveStaff(id, isNew){
   let birthday = '';
   if(bdInput){
     const m = bdInput.match(/^(\d{2})-(\d{2})$/);
-    if(!m){ toast('Cumpleaños inválido: usá MM-DD (ej: 03-21)'); return; }
+    if(!m){ toast('Cumpleaños inválido: usa MM-DD (ej: 03-21)'); return; }
     const mm = parseInt(m[1],10), dd = parseInt(m[2],10);
     if(mm<1 || mm>12 || dd<1 || dd>31){ toast('Cumpleaños fuera de rango'); return; }
     birthday = bdInput;
@@ -2037,9 +2037,9 @@ function openHorarioModal(){
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.5">
       <b>¿Cómo obtener el código embed de tu Excel en OneDrive?</b><br>
-      1. Abrí tu Excel en OneDrive (Excel para web).<br>
+      1. Abre tu Excel en OneDrive (Excel para web).<br>
       2. Menú <b>Archivo → Compartir → Insertar</b> (o "Embed").<br>
-      3. Configurá qué hoja/rango se muestra (podés mostrar la del mes actual).<br>
+      3. Configura qué hoja/rango se muestra (puedes mostrar la del mes actual).<br>
       4. Copiá el código que empieza con <code>&lt;iframe src="..."&gt;</code>.<br>
       5. Pegalo entero acá arriba. Se extrae el src automático.<br><br>
       <b>Alternativa (más simple):</b> Compartir → "Cualquiera con el enlace puede ver" → copiar enlace → pegar acá.
@@ -2920,7 +2920,7 @@ function calcFluids(p){
 function calcDrugsInd(p){
   const out = [];
   if(!p.hasW){
-    return '<div class="calc-empty">Ingresá el peso para calcular dosis</div>';
+    return '<div class="calc-empty">Ingresa el peso para calcular dosis</div>';
   }
   const w = p.w;
   const D = [
@@ -2955,7 +2955,7 @@ function calcDrugsInd(p){
 function calcDrugsRCP(p){
   const out = [];
   if(!p.hasW){
-    return '<div class="calc-empty">Ingresá el peso para calcular dosis</div>';
+    return '<div class="calc-empty">Ingresa el peso para calcular dosis</div>';
   }
   const w = p.w;
   // Adrenalina paro IV/IO
@@ -3669,7 +3669,7 @@ function renderGuiasSearchResults(query){
       <div class="gp-results-header">Resultados para «<strong>${_gpEsc(query)}</strong>» (0)</div>
       <div class="gp-no-results">
         <strong>Sin resultados</strong> para "${_gpEsc(query)}".<br>
-        Probá con el principio activo (ej: "rivaroxabán") o nombre comercial (ej: "Xarelto").
+        Prueba con el principio activo (ej: "rivaroxabán") o nombre comercial (ej: "Xarelto").
       </div>`;
     return;
   }
@@ -4193,12 +4193,12 @@ function agendSelectUnidad(code){
 }
 function agendUnidadDoLogin(){
   const code = AGEND_STATE._tempUnidadCode;
-  if(!code){ alert('Seleccioná una unidad primero.'); return; }
+  if(!code){ alert('Selecciona una unidad primero.'); return; }
   const pin = document.getElementById('agendUnidadPin').value.trim();
   const nom = document.getElementById('agendUnidadNombre').value.trim();
   const tel = document.getElementById('agendUnidadTel').value.trim();
   if(pin !== AGEND_DEFAULT_PIN){ alert('PIN incorrecto. (PIN inicial: 1234)'); return; }
-  if(!nom){ alert('Ingresá el nombre del solicitante.'); return; }
+  if(!nom){ alert('Ingresa el nombre del solicitante.'); return; }
   AGEND_STATE.mode = 'unidad';
   AGEND_STATE.unidadCode = code;
   AGEND_STATE.solicitanteNombre = nom;
@@ -4221,19 +4221,45 @@ function agendLogoutUnidad(){
 }
 
 // --- Acceso modo Admin ---
-function agendGoToAdmin(){
-  // En esta versión: el admin debe estar logueado como Staff. Si no, le pedimos hacerlo.
-  if(!state || !state.currentUserId){
-    alert('Para visar solicitudes necesitás iniciar sesión como Staff de Anestesia.\nVolvé a la pantalla principal → Staff → tu usuario y clave.');
+async function agendGoToAdmin(){
+  // Helper interno: entra a modo admin con el nombre indicado
+  const _entrar = (nombre) => {
+    AGEND_STATE.mode = 'admin';
+    AGEND_STATE.staffNombre = nombre || 'Administrador';
+    AGEND_STATE.navStack = [];
+    agendShowSalasView();
+  };
+
+  // 1) Si la sesión actual en la app principal YA es Administrador → entrar directo
+  const u = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+  if(u && state && state.currentUserId === ADMIN_USER_ID){
+    _entrar(u.displayName || u.name || 'Administrador');
     return;
   }
-  const u = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
-  const usr = u || (state.staff||[]).find(s => s.id === state.currentUserId);
-  AGEND_STATE.mode = 'admin';
-  AGEND_STATE.staffNombre = usr ? (usr.displayName || usr.name || usr.id) : 'Anestesia';
-  AGEND_STATE.navStack = [];
-  // Vamos a salas; agendShowSalasView empujará 'landing' al stack (porque estamos en admin)
-  agendShowSalasView();
+
+  // 2) Si NO hay PIN de admin configurado todavía → hay que configurarlo desde la app principal
+  if(typeof adminSetupNeeded === 'function' && adminSetupNeeded()){
+    alert('Aún no hay un PIN de Administrador configurado.\n\nEntra a la pantalla principal → Staff → Administrador para crearlo (4 dígitos). Después puedes volver a "Visar Solicitudes" y desbloquearlo desde aquí.');
+    return;
+  }
+
+  // 3) Pedir el PIN de Admin in-place, sin salir del módulo Agendamiento
+  let ok = false;
+  try {
+    ok = await promptVerifyAdminPin();
+  } catch(e){
+    console.warn('promptVerifyAdminPin falló', e);
+    ok = false;
+  }
+  if(!ok) return; // canceló o pulsó Atrás
+
+  // 4) Conceder modo admin. Si hay un staff logueado, usar su nombre para auditoría.
+  //    Si no, usar "Administrador".
+  let nombre = 'Administrador';
+  if(u){
+    nombre = u.displayName || u.name || nombre;
+  }
+  _entrar(nombre);
 }
 
 // --- Vista: Salas ---
@@ -4423,7 +4449,7 @@ function _agendFillTimeSelects(defaultStartMin, defaultEndMin){
 // Llamado al hacer click en un hueco libre del día (con rango sugerido)
 function agendOpenFormForRange(startHHMM, endHHMM){
   if(AGEND_STATE.mode !== 'unidad'){
-    alert('Para solicitar un agendamiento entrá como Unidad solicitante.\nVolvé al inicio del módulo Agendamiento → "Solicitar agendamiento".');
+    alert('Para solicitar un agendamiento entra como Unidad solicitante.\nVuelve al inicio del módulo Agendamiento → "Solicitar agendamiento".');
     return;
   }
   const startMin = _agendHHMMToMin(startHHMM) ?? AGEND_DAY_START_MIN;
@@ -4538,7 +4564,7 @@ function agendSubmitSolicitud(ev){
   // Verificar solapamiento contra estado actual del almacén
   const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin);
   if(overlap){
-    alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElegí otro horario.`);
+    alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElige otro horario.`);
     _agendUpdateRangoHint();
     return;
   }
@@ -5129,18 +5155,18 @@ async function promptSetAdminPin(){
     let firstPin = null;
     openPinPad({
       title:'🛡️ Configurar PIN de administrador',
-      sub:'Este PIN da acceso a modo admin. Anotalo en lugar seguro.',
+      sub:'Este PIN da acceso a modo admin. Anótalo en lugar seguro.',
       maxLen:4,
       onComplete: async(pin)=>{
         if(!firstPin){
           firstPin = pin;
           openPinPad({
-            title:'Confirmá el PIN',
-            sub:'Repetí los 4 dígitos.',
+            title:'Confirma el PIN',
+            sub:'Repite los 4 dígitos.',
             maxLen:4,
             onComplete: async(pin2)=>{
               if(pin2 !== firstPin){
-                pinError('No coinciden, volvé a empezar');
+                pinError('No coinciden, vuelve a empezar');
                 firstPin = null;
                 setTimeout(()=>res(promptSetAdminPin()), 500);
                 return;
@@ -5163,7 +5189,7 @@ async function promptVerifyAdminPin(){
   return new Promise(res=>{
     openPinPad({
       title:'🛡️ PIN de administrador',
-      sub:'Ingresá el PIN para activar modo admin.',
+      sub:'Ingresa el PIN para activar modo admin.',
       maxLen:4,
       onComplete: async(pin)=>{
         const h = await hashPIN(pin, '__admin__');
@@ -5196,10 +5222,10 @@ function renderUserPicker(){
     + '</button>';
 
   if(staff.length === 0){
-    html += '<div style="color:var(--muted);font-size:13px;padding:12px;text-align:center">Sin staff. Ingresá como Administrador para agregar miembros.</div>';
+    html += '<div style="color:var(--muted);font-size:13px;padding:12px;text-align:center">Sin staff. Ingresa como Administrador para agregar miembros.</div>';
   } else {
     // 2) Dropdown NATIVO (siempre funciona, no depende de modal)
-    var opts = '<option value="">— Seleccioná tu nombre —</option>';
+    var opts = '<option value="">— Selecciona tu nombre —</option>';
     for(var i=0; i<staff.length; i++){
       var s = staff[i];
       var lock = s.pinHash ? ' 🔒' : ' ✨';
@@ -5215,7 +5241,7 @@ function renderUserPicker(){
 
     // 3) Lista inline con buscador (alternativa visual, también funcional)
     html += '<div style="margin-top:14px">'
-      + '<input type="text" id="userInlineSearch" placeholder="🔎 O buscá por nombre…" autocomplete="off" oninput="renderInlineUserList()" '
+      + '<input type="text" id="userInlineSearch" placeholder="🔎 O busca por nombre…" autocomplete="off" oninput="renderInlineUserList()" '
       + 'style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;margin-bottom:8px" />'
       + '<div id="userInlineList" class="staff-picker-list"></div>'
       + '</div>';
@@ -5338,8 +5364,8 @@ async function promptSetupUserPin(user){
         if(!firstPin){
           firstPin = pin;
           openPinPad({
-            title:'Confirmá tu PIN',
-            sub:'Repetí los 4 dígitos.',
+            title:'Confirma tu PIN',
+            sub:'Repite los 4 dígitos.',
             maxLen:4,
             onComplete: async(pin2)=>{
               if(pin2 !== firstPin){
@@ -5367,14 +5393,14 @@ async function promptVerifyUserPin(user){
     let attempts = 0;
     openPinPad({
       title:user.name,
-      sub:'Ingresá tu PIN de 4 dígitos',
+      sub:'Ingresa tu PIN de 4 dígitos',
       maxLen:4,
       onComplete: async(pin)=>{
         const h = await hashPIN(pin, user.id);
         if(h === user.pinHash){ closePinPad(); res(true); }
         else {
           attempts++;
-          pinError(attempts>=3 ? 'Pedile al admin que te resetee el PIN' : 'PIN incorrecto');
+          pinError(attempts>=3 ? 'Pídele al admin que te resetee el PIN' : 'PIN incorrecto');
         }
       },
       onCancel: ()=>res(false)
@@ -5416,7 +5442,7 @@ async function changeUserPIN(){
           firstPin = pin;
           openPinPad({
             title:'Confirmar nuevo PIN',
-            sub:'Repetí los 4 dígitos.',
+            sub:'Repite los 4 dígitos.',
             maxLen:4,
             onComplete: async(pin2)=>{
               if(pin2 !== firstPin){ pinError('No coinciden'); firstPin = null; return; }
