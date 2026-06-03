@@ -3806,16 +3806,87 @@ const AGEND_UNIDADES = [
 ];
 const AGEND_DEFAULT_PIN = '1234';
 
+// AGEND_SALAS — cada sala tiene su propia agenda regular por día de la semana
+// (0=domingo, 1=lunes, ..., 6=sábado). Si un día no aparece en `schedule`,
+// está cerrado en la agenda regular (puede pedirse "Agendamiento Extra"
+// si `allowsExtra=true`).
+//
+// blockedByOtherSalas: ids de salas cuyos pedidos activos (pendiente/aprobada)
+// bloquean horarios para ESTA sala (sus turnos reservan la disponibilidad
+// del anestesiólogo). Ej.: Neuro y Onco no pueden topar con Endo ni Imagen.
+//
+// allowsExtra: muestra el botón "Agendamiento Extra" en el calendario.
+// allowsParallelExtra: cuando un Extra se agenda, se permiten paralelos
+//   en el mismo horario (solo Endoscopía).
 const AGEND_SALAS = [
-  { id:'endoscopia',   name:'Endoscopía',           ico:'🔬', color:'#0EA5E9', desc:'Endoscopías digestivas altas y bajas, colonoscopías, CPRE' },
-  { id:'imagenologia', name:'Imagenología',         ico:'🩻', color:'#A855F7', desc:'TAC, RM con sedación, intervencionismo radiológico' },
-  { id:'otros',        name:'Otros procedimientos', ico:'💉', color:'#F97316', desc:'Sedación dental, punción lumbar, QMT intratecal, acceso venoso central' }
+  {
+    id:'endoscopia', name:'Endoscopía', ico:'🔬', color:'#0EA5E9',
+    desc:'Endoscopías digestivas altas y bajas, colonoscopías, CPRE',
+    schedule: {
+      1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
+      3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
+      5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
+    },
+    blockedByOtherSalas: [],
+    allowsExtra: true,
+    allowsParallelExtra: true
+  },
+  {
+    id:'imagenologia', name:'Imagenología', ico:'🩻', color:'#A855F7',
+    desc:'TAC, RM con sedación, intervencionismo radiológico',
+    schedule: {
+      3:{start:'08:00', end:'14:00'}, 6:{start:'08:00', end:'14:00'}
+    },
+    blockedByOtherSalas: [],
+    allowsExtra: true,
+    allowsParallelExtra: false
+  },
+  {
+    id:'dental', name:'Dental', ico:'🦷', color:'#F59E0B',
+    desc:'Sedación dental',
+    schedule: { 6:{start:'08:00', end:'14:00'} },
+    blockedByOtherSalas: [],
+    allowsExtra: false,
+    allowsParallelExtra: false
+  },
+  {
+    id:'neurologia', name:'Neurología', ico:'🧠', color:'#7C3AED',
+    desc:'Procedimientos neurológicos electivos',
+    schedule: {
+      1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
+      3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
+      5:{start:'08:00', end:'20:00'}
+    },
+    blockedByOtherSalas: ['endoscopia','imagenologia'],
+    allowsExtra: false,
+    allowsParallelExtra: false
+  },
+  {
+    id:'oncohemato', name:'Oncología / Hematología', ico:'🎗️', color:'#DB2777',
+    desc:'QMT intratecal, accesos venosos, médula ósea',
+    schedule: {
+      1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
+      3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
+      5:{start:'08:00', end:'20:00'}
+    },
+    blockedByOtherSalas: ['endoscopia','imagenologia'],
+    allowsExtra: false,
+    allowsParallelExtra: false
+  },
+  {
+    id:'medcomp', name:'Medición Compartimental', ico:'📏', color:'#0891B2',
+    desc:'Medición de presión compartimental — jueves AM',
+    schedule: { 4:{start:'09:00', end:'11:00'} },
+    blockedByOtherSalas: ['endoscopia'],
+    allowsExtra: false,
+    allowsParallelExtra: false
+  }
 ];
 
-const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // 08:00..19:00 (legacy, sólo para visualizar la grilla horaria de fondo)
+const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // legacy
 const AGEND_SLOT_GRANULARITY_MIN = 30;   // granularidad para selectores de horario (30 min)
-const AGEND_DAY_START_MIN = 8 * 60;      // 08:00
-const AGEND_DAY_END_MIN   = 20 * 60;     // 20:00
+const AGEND_DAY_START_MIN = 8 * 60;      // 08:00 — límite global mínimo absoluto
+const AGEND_DAY_END_MIN   = 20 * 60;     // 20:00 — límite global máximo absoluto
 const AGEND_DATA_LS_KEY    = 'appx_agend_data_v1';
 const AGEND_SESSION_LS_KEY = 'appx_agend_sess_v1';
 
@@ -3992,14 +4063,77 @@ function _agendFindRequest(reqId){
 }
 // Devuelve la solicitud que solapa con el rango (excluye reqIdExcluir opcional).
 // Rechazadas no bloquean. Solapamiento estricto: a.start < b.end && a.end > b.start.
-function _agendFindOverlap(salaId, dateStr, startMin, endMin, reqIdExcluir){
+// SI la sala permite "paralelo en Extra" (Endoscopía) Y el pedido nuevo Y el
+// existente son ambos extras, NO se bloquean entre sí (paralelo permitido).
+function _agendFindOverlap(salaId, dateStr, startMin, endMin, reqIdExcluir, isExtraNuevo){
+  const sala = _agendGetSala(salaId);
+  const permiteParalelo = !!(sala && sala.allowsParallelExtra) && !!isExtraNuevo;
   const slots = _agendGetDaySlots(salaId, dateStr);
   for(const r of slots){
     if(reqIdExcluir && r.id === reqIdExcluir) continue;
     if(r.estado === 'rechazada') continue;
     if(startMin < r.endMin && endMin > r.startMin){
+      // Paralelo permitido sólo cuando ambos (nuevo + existente) son Extra y la sala lo permite
+      if(permiteParalelo && r.isExtra) continue;
       return r;
     }
+  }
+  return null;
+}
+
+// --- Schedule por sala / día -------------------------------------------------
+// Devuelve la entrada de schedule para una sala+fecha, o null si está cerrada.
+function _agendSalaHoursForDate(salaId, dateStr){
+  const sala = _agendGetSala(salaId);
+  if(!sala || !sala.schedule) return null;
+  const dt = _agendParseDateStr(dateStr);
+  const dow = dt.getDay(); // 0..6
+  const sched = sala.schedule[dow];
+  if(!sched) return null;
+  return {
+    startMin: _agendHHMMToMin(sched.start),
+    endMin:   _agendHHMMToMin(sched.end)
+  };
+}
+// Booleano: ¿la sala tiene agenda regular abierta ese día?
+function _agendIsDayOpenForSala(salaId, dateStr){
+  return _agendSalaHoursForDate(salaId, dateStr) !== null;
+}
+// Etiqueta humana de horario regular de la sala (multi-día agrupado para el calendario)
+function _agendSalaScheduleSummary(salaId){
+  const sala = _agendGetSala(salaId);
+  if(!sala || !sala.schedule) return '';
+  const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const parts = [];
+  Object.keys(sala.schedule).map(Number).sort().forEach(d => {
+    const s = sala.schedule[d];
+    parts.push(`${dias[d]} ${s.start}–${s.end}`);
+  });
+  return parts.join(' · ');
+}
+// Devuelve TODOS los pedidos activos de OTRAS salas que reservan tiempo
+// (según blockedByOtherSalas), para ese día. Cada item: {salaId, sala, ...req}.
+function _agendCrossBlocksForDay(salaId, dateStr){
+  const sala = _agendGetSala(salaId);
+  if(!sala || !sala.blockedByOtherSalas || !sala.blockedByOtherSalas.length) return [];
+  const out = [];
+  sala.blockedByOtherSalas.forEach(otherId => {
+    const otra = _agendGetSala(otherId);
+    if(!otra) return;
+    const slots = _agendGetDaySlots(otherId, dateStr);
+    slots.forEach(r => {
+      if(r.estado === 'rechazada') return;
+      out.push({ salaId: otherId, sala: otra, ...r });
+    });
+  });
+  out.sort((a,b) => (a.startMin||0) - (b.startMin||0));
+  return out;
+}
+// Busca solapamiento contra cross-blocks (otras salas que bloquean a esta).
+function _agendFindCrossBlock(salaId, dateStr, startMin, endMin){
+  const crossBlocks = _agendCrossBlocksForDay(salaId, dateStr);
+  for(const r of crossBlocks){
+    if(startMin < r.endMin && endMin > r.startMin) return r;
   }
   return null;
 }
@@ -4295,6 +4429,15 @@ function agendOpenSala(salaId){
   const s = _agendGetSala(salaId);
   _agendSetTitle(s ? s.name : 'Calendario', AGEND_STATE.mode === 'admin' ? 'Modo Admin' : (_agendGetUnidad(AGEND_STATE.unidadCode)||{}).name || '');
   _agendSetHeadAction(null);
+  // Pintar resumen de horario de la sala arriba del grid (si existe el contenedor)
+  const sumEl = document.getElementById('agendCalScheduleSummary');
+  if(sumEl){
+    const resumen = _agendSalaScheduleSummary(salaId);
+    sumEl.innerHTML = resumen
+      ? `<span class="agend-cal-sched-label">Horario habitual</span> <span class="agend-cal-sched-value">${resumen}</span>`
+      : '';
+    sumEl.style.display = resumen ? '' : 'none';
+  }
   agendRenderCalendario();
 }
 function agendNavMonth(delta){
@@ -4316,6 +4459,8 @@ function agendRenderCalendario(){
   const offset = (firstDow + 6) % 7; // L=0, M=1, ... D=6
   const daysInMonth = new Date(y, m+1, 0).getDate();
   const todayStr = _agendTodayStr();
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  const allowsExtra = !!(sala && sala.allowsExtra);
   let html = '';
   for(let i=0; i<offset; i++) html += `<div class="agend-cal-day empty"></div>`;
   for(let d=1; d<=daysInMonth; d++){
@@ -4323,6 +4468,7 @@ function agendRenderCalendario(){
     const counts = _agendCountDay(AGEND_STATE.salaId, ds);
     const isPast = (ds < todayStr);
     const isToday = (ds === todayStr);
+    const isOpen = _agendIsDayOpenForSala(AGEND_STATE.salaId, ds);
     let badge = '';
     if(counts.total > 0){
       let cls = 'bd-pend', txt = `${counts.total}`;
@@ -4333,10 +4479,45 @@ function agendRenderCalendario(){
     const cls = ['agend-cal-day'];
     if(isToday) cls.push('today');
     if(isPast) cls.push('past');
-    const handler = isPast ? '' : `onclick="agendOpenDia('${ds}')"`;
+    if(!isOpen) cls.push('closed');
+    // Lógica de click:
+    //   pasado → sin handler
+    //   abierto → agendOpenDia normal
+    //   cerrado y la sala permite Extra → ofrecer Agendamiento Extra
+    //   cerrado y la sala NO permite Extra → sin handler
+    let handler = '';
+    if(!isPast){
+      if(isOpen){
+        handler = `onclick="agendOpenDia('${ds}')"`;
+      } else if(allowsExtra && AGEND_STATE.mode === 'unidad'){
+        handler = `onclick="agendOfrecerExtraDesdeCal('${ds}')"`;
+        cls.push('extra-allowed');
+      } else if(allowsExtra && AGEND_STATE.mode === 'admin'){
+        // Admin puede igual entrar al día para revisar
+        handler = `onclick="agendOpenDia('${ds}')"`;
+      }
+    }
     html += `<button type="button" class="${cls.join(' ')}" ${handler}><div class="agend-cal-d">${d}</div>${badge}</button>`;
   }
   grid.innerHTML = html;
+}
+
+// Cuando una unidad hace click en un día cerrado de una sala que permite Extra
+function agendOfrecerExtraDesdeCal(dateStr){
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  if(!sala) return;
+  const dt = _agendParseDateStr(dateStr);
+  const dayName = _agendDiasES[dt.getDay()];
+  const fmt = `${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]}`;
+  const ok = confirm(
+    `${sala.name} no tiene agenda regular el ${fmt}.\n\n`+
+    `Puedes solicitar un Agendamiento EXTRA para ese día. `+
+    `Requerirá visado del administrador.\n\n`+
+    `¿Continuar con Agendamiento Extra?`
+  );
+  if(!ok) return;
+  AGEND_STATE.selectedDate = dateStr;
+  agendOpenFormExtra(dateStr);
 }
 
 // --- Vista: Día (slots) ---
@@ -4349,6 +4530,15 @@ function agendOpenDia(dateStr){
   const fmt = `${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} ${dt.getFullYear()}`;
   _agendSetTitle(fmt, sala ? sala.name : '');
   _agendSetHeadAction(null);
+  // Horario per-sala para este día (null si está cerrada y no es admin)
+  const salaHrs = _agendSalaHoursForDate(AGEND_STATE.salaId, dateStr);
+  let horarioTxt;
+  if(salaHrs){
+    horarioTxt = `Horario ${_agendFmtRange(salaHrs.startMin, salaHrs.endMin)}`;
+  } else {
+    horarioTxt = `Sala cerrada este día`;
+    if(sala && sala.allowsExtra) horarioTxt += ' · solo Agendamiento Extra';
+  }
   // Render header
   const head = document.getElementById('agendDayHead');
   if(head){
@@ -4356,7 +4546,7 @@ function agendOpenDia(dateStr){
       <div class="agend-day-head-ico" style="background:${sala?sala.color:'#16a34a'}">${sala?sala.ico:'📅'}</div>
       <div class="agend-day-head-body">
         <div class="agend-day-head-date">${fmt}</div>
-        <div class="agend-day-head-sala">${sala?sala.name:''} · Horario 08:00 a 20:00</div>
+        <div class="agend-day-head-sala">${sala?sala.name:''} · ${horarioTxt}</div>
       </div>`;
   }
   agendRenderSlots();
@@ -4364,18 +4554,78 @@ function agendOpenDia(dateStr){
 function agendRenderSlots(){
   const cont = document.getElementById('agendSlots');
   if(!cont) return;
-  // Solicitudes ocupando rangos (excluye rechazadas para la visualización del día,
-  // pero las mostramos al final como aviso).
-  const todas = _agendGetDaySlots(AGEND_STATE.salaId, AGEND_STATE.selectedDate);
+  const salaId = AGEND_STATE.salaId;
+  const dateStr = AGEND_STATE.selectedDate;
+  const sala = _agendGetSala(salaId);
+
+  // Horas hábiles per-sala para este día. Si está cerrado:
+  //   - admin: usamos jornada por defecto (08-20) para poder visar Extras
+  //   - unidad: solo se llega acá si es Extra (caso especial), o no debería
+  const salaHrs = _agendSalaHoursForDate(salaId, dateStr);
+  const dayStart = salaHrs ? salaHrs.startMin : AGEND_DAY_START_MIN;
+  const dayEnd   = salaHrs ? salaHrs.endMin   : AGEND_DAY_END_MIN;
+
+  // Solicitudes propias de la sala
+  const todas = _agendGetDaySlots(salaId, dateStr);
   const activas   = todas.filter(r => r.estado !== 'rechazada')
                          .sort((a,b) => a.startMin - b.startMin);
   const rechazadas = todas.filter(r => r.estado === 'rechazada')
                          .sort((a,b) => a.startMin - b.startMin);
 
+  // Cross-blocks: pedidos activos de otras salas que reservan estos minutos
+  // (ej: Endo/Imagenología reservan a Neurología/Oncología/MedComp)
+  const crossBlocks = _agendCrossBlocksForDay(salaId, dateStr);
+
   let html = '';
 
-  // Render entrelazado: hueco libre, ocupado, hueco libre, ...
-  let cursor = AGEND_DAY_START_MIN;
+  // Aviso de cierre + ofrecer Extra
+  if(!salaHrs){
+    if(sala && sala.allowsExtra){
+      html += `
+        <div class="agend-day-section">Sala cerrada este día</div>
+        <div class="agend-day-closed-note">
+          ${sala.name} no tiene agenda regular este día. Puedes solicitar un
+          <b>Agendamiento Extra</b> (requiere visado del administrador).
+        </div>
+        <button type="button" class="agend-slot extra-cta" onclick="agendOpenFormExtra('${dateStr}')">
+          <div class="agend-slot-body">
+            <div class="agend-slot-name">+ Agendamiento Extra</div>
+            <div class="agend-slot-proc">Elige hora y duración libremente</div>
+          </div>
+        </button>`;
+    } else {
+      html += `
+        <div class="agend-day-section">Sala cerrada este día</div>
+        <div class="agend-day-closed-note">
+          ${sala?sala.name:'Esta sala'} no atiende este día. Elige otro día del calendario.
+        </div>`;
+    }
+    cont.innerHTML = html;
+    return;
+  }
+
+  // Render entrelazado: hueco libre, ocupado/bloqueado, hueco libre, ...
+  // Fusionamos pedidos propios + cross-blocks en una sola lista ordenada por start.
+  const allowsParallelExtra = !!(sala && sala.allowsParallelExtra);
+  const ocupados = [];
+  for(const r of activas){
+    ocupados.push({
+      kind: 'own',
+      startMin: r.startMin,
+      endMin: r.endMin,
+      req: r
+    });
+  }
+  for(const cb of crossBlocks){
+    ocupados.push({
+      kind: 'cross',
+      startMin: cb.startMin,
+      endMin: cb.endMin,
+      cross: cb
+    });
+  }
+  ocupados.sort((a,b) => (a.startMin||0) - (b.startMin||0));
+
   const renderLibre = (startMin, endMin) => {
     if(endMin <= startMin) return '';
     const dur = endMin - startMin;
@@ -4395,29 +4645,63 @@ function agendRenderSlots(){
   const renderOcup = (r) => {
     const est = r.estado || 'pendiente';
     const unidad = _agendGetUnidad(r.unidadCode);
+    const extraBadge = r.isExtra ? `<span class="agend-extra-pill">EXTRA</span>` : '';
     return `
       <button type="button" class="agend-slot ${est}" onclick="agendOpenDetalle('${r.id}')">
         <div class="agend-slot-hour">${_agendMinToHHMM(r.startMin)}</div>
         <div class="agend-slot-body">
-          <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''}</div>
+          <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''} ${extraBadge}</div>
           <div class="agend-slot-proc">${_gpEsc(r.procedimiento)}</div>
           <div class="agend-slot-meta">⏱ ${_agendFmtRange(r.startMin, r.endMin)} · ${unidad?unidad.ico+' '+_gpEsc(unidad.name):''} · ${_gpEsc(r.solicitanteNombre||'')}</div>
         </div>
         <div class="agend-slot-status ${est}">${est}</div>
       </button>`;
   };
+  const renderCross = (cb) => {
+    const otraSala = cb.sala;
+    return `
+      <div class="agend-slot crossblock">
+        <div class="agend-slot-hour">${_agendMinToHHMM(cb.startMin)}</div>
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">⛔ Reservado por ${otraSala?otraSala.name:'otra sala'}</div>
+          <div class="agend-slot-proc">${_gpEsc(cb.procedimiento||'')}</div>
+          <div class="agend-slot-meta">⏱ ${_agendFmtRange(cb.startMin, cb.endMin)} · Bloquea esta sala</div>
+        </div>
+        <div class="agend-slot-status crossblock">bloqueado</div>
+      </div>`;
+  };
 
-  for(const r of activas){
-    const start = Math.max(r.startMin, AGEND_DAY_START_MIN);
-    const end   = Math.min(r.endMin,   AGEND_DAY_END_MIN);
+  let cursor = dayStart;
+  for(const o of ocupados){
+    const start = Math.max(o.startMin, dayStart);
+    const end   = Math.min(o.endMin,   dayEnd);
     if(start > cursor){
       html += renderLibre(cursor, start);
     }
-    html += renderOcup(r);
+    if(o.kind === 'own'){
+      html += renderOcup(o.req);
+    } else {
+      html += renderCross(o.cross);
+    }
     if(end > cursor) cursor = end;
   }
-  if(cursor < AGEND_DAY_END_MIN){
-    html += renderLibre(cursor, AGEND_DAY_END_MIN);
+  if(cursor < dayEnd){
+    html += renderLibre(cursor, dayEnd);
+  }
+
+  // Botón de Agendamiento Extra para esta sala (si lo permite y modo unidad)
+  if(sala && sala.allowsExtra && AGEND_STATE.mode === 'unidad'){
+    const hint = allowsParallelExtra
+      ? 'Agendar en paralelo a otros pedidos (requiere visado)'
+      : 'Agendar fuera del horario o sumando capacidad (requiere visado)';
+    html += `
+      <div class="agend-day-section">Agendamiento Extra</div>
+      <button type="button" class="agend-slot extra-cta" onclick="agendOpenFormExtra('${dateStr}')">
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">+ Solicitar Agendamiento Extra</div>
+          <div class="agend-slot-proc">${hint}</div>
+        </div>
+      </button>`;
   }
 
   // Rechazadas al final (informativas, no bloquean)
@@ -4431,19 +4715,42 @@ function agendRenderSlots(){
 
 // --- Vista: Form solicitud ---
 // Helper interno: rellena ambos selectores y elige defaults razonables.
-function _agendFillTimeSelects(defaultStartMin, defaultEndMin){
+// Si es Extra (rangeMin/rangeMax dados) → usa rango completo 08:00–20:00 con paso de 30 min.
+// Si es regular → usa el horario per-sala para el día seleccionado.
+function _agendFillTimeSelects(defaultStartMin, defaultEndMin, opts){
+  opts = opts || {};
   const selStart = document.getElementById('afHoraInicio');
   const selEnd   = document.getElementById('afHoraFin');
   if(!selStart || !selEnd) return;
-  const opts = _agendTimeOptions();
-  // Start: todas menos la última (no puede empezar a 20:00)
-  selStart.innerHTML = opts.slice(0, -1)
-    .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-  // End: todas menos la primera (no puede terminar a 08:00)
-  selEnd.innerHTML = opts.slice(1)
-    .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-  selStart.value = _agendMinToHHMM(defaultStartMin);
-  selEnd.value   = _agendMinToHHMM(defaultEndMin);
+  let rangeStart = AGEND_DAY_START_MIN, rangeEnd = AGEND_DAY_END_MIN;
+  if(opts.useFullDay){
+    // Extra: rango completo 08:00–20:00
+    rangeStart = AGEND_DAY_START_MIN;
+    rangeEnd   = AGEND_DAY_END_MIN;
+  } else {
+    // Regular: tomar horas de la sala para esta fecha
+    const hrs = _agendSalaHoursForDate(AGEND_STATE.salaId, AGEND_STATE.selectedDate);
+    if(hrs){ rangeStart = hrs.startMin; rangeEnd = hrs.endMin; }
+  }
+  const all = _agendTimeOptions(); // 08:00–20:00 paso 30
+  const opcs = all.filter(o => {
+    const m = _agendHHMMToMin(o.value);
+    return m >= rangeStart && m <= rangeEnd;
+  });
+  if(opcs.length < 2){
+    // Fallback: usar todo el día si por error el rango quedó muy chico
+    selStart.innerHTML = all.slice(0, -1).map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    selEnd.innerHTML   = all.slice(1).map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  } else {
+    selStart.innerHTML = opcs.slice(0, -1).map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    selEnd.innerHTML   = opcs.slice(1).map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  }
+  // Clamp defaults al rango disponible
+  let ds = Math.max(defaultStartMin, rangeStart);
+  let de = Math.min(defaultEndMin, rangeEnd);
+  if(de <= ds) de = Math.min(ds + AGEND_SLOT_GRANULARITY_MIN, rangeEnd);
+  selStart.value = _agendMinToHHMM(ds);
+  selEnd.value   = _agendMinToHHMM(de);
 }
 
 // Llamado al hacer click en un hueco libre del día (con rango sugerido)
@@ -4459,6 +4766,7 @@ function agendOpenFormForRange(startHHMM, endHHMM){
   if(endMin <= startMin) endMin = Math.min(startMin + AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_END_MIN);
   AGEND_STATE.formStartMin = startMin;
   AGEND_STATE.formEndMin   = endMin;
+  AGEND_STATE.formIsExtra  = false;
   _agendShowView('form', true);
   const sala = _agendGetSala(AGEND_STATE.salaId);
   const dt = _agendParseDateStr(AGEND_STATE.selectedDate);
@@ -4527,13 +4835,26 @@ function _agendUpdateRangoHint(){
   const dur = endMin - startMin;
   const horas = Math.floor(dur/60), mins = dur%60;
   const durStr = horas>0 ? (mins>0 ? `${horas} h ${mins} min` : `${horas} h`) : `${mins} min`;
-  // Chequeo de solapamiento
-  const overlap = _agendFindOverlap(AGEND_STATE.salaId, AGEND_STATE.selectedDate, startMin, endMin);
+  const isExtra = !!AGEND_STATE.formIsExtra;
+  // 1) Solapamiento contra propias de la sala (respetando paralelo-extra)
+  const overlap = _agendFindOverlap(AGEND_STATE.salaId, AGEND_STATE.selectedDate, startMin, endMin, null, isExtra);
   if(overlap){
     hint.innerHTML = `<span style="color:#dc2626">⚠ Choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} · ${_gpEsc(overlap.paciente||'')} (${overlap.estado}).</span>`;
-  } else {
-    hint.innerHTML = `<span style="color:#16a34a">✓ Horario disponible · Duración ${durStr}</span>`;
+    return;
   }
+  // 2) Cross-block: otras salas reservan estos minutos
+  const cross = _agendFindCrossBlock(AGEND_STATE.salaId, AGEND_STATE.selectedDate, startMin, endMin);
+  if(cross){
+    const otra = cross.sala ? cross.sala.name : 'otra sala';
+    hint.innerHTML = `<span style="color:#dc2626">⚠ ${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)} — esa franja queda bloqueada.</span>`;
+    return;
+  }
+  // 3) Si es Extra y no choca → aviso especial
+  if(isExtra){
+    hint.innerHTML = `<span style="color:#b45309">⚠ Agendamiento EXTRA · Duración ${durStr} · Requiere visado del administrador.</span>`;
+    return;
+  }
+  hint.innerHTML = `<span style="color:#16a34a">✓ Horario disponible · Duración ${durStr}</span>`;
 }
 
 function agendSubmitSolicitud(ev){
@@ -4561,10 +4882,32 @@ function agendSubmitSolicitud(ev){
   }
   const salaId = AGEND_STATE.salaId;
   const dateStr = AGEND_STATE.selectedDate;
-  // Verificar solapamiento contra estado actual del almacén
-  const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin);
+  const isExtra = !!AGEND_STATE.formIsExtra;
+  const sala = _agendGetSala(salaId);
+  // Validación: si NO es Extra, debe respetar el horario regular de la sala
+  if(!isExtra){
+    const hrs = _agendSalaHoursForDate(salaId, dateStr);
+    if(!hrs){
+      alert(`${sala?sala.name:'Esta sala'} no tiene agenda regular este día.\nUsa "Agendamiento Extra" si necesitas atender igualmente (requiere visado).`);
+      return;
+    }
+    if(startMin < hrs.startMin || endMin > hrs.endMin){
+      alert(`Horario fuera del rango habitual de ${sala?sala.name:'la sala'} (${_agendFmtRange(hrs.startMin, hrs.endMin)}).`);
+      return;
+    }
+  }
+  // 1) Solapamiento contra propias de la sala (paralelo permitido solo si Extra y sala lo permite)
+  const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin, null, isExtra);
   if(overlap){
     alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElige otro horario.`);
+    _agendUpdateRangoHint();
+    return;
+  }
+  // 2) Cross-block contra otras salas (Endo/Imagenología reservan a Neuro/Onco/MedComp)
+  const cross = _agendFindCrossBlock(salaId, dateStr, startMin, endMin);
+  if(cross){
+    const otra = cross.sala ? cross.sala.name : 'otra sala';
+    alert(`${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)}. Esa franja queda bloqueada para ${sala?sala.name:'esta sala'}.\nElige otro horario.`);
     _agendUpdateRangoHint();
     return;
   }
@@ -4577,6 +4920,7 @@ function agendSubmitSolicitud(ev){
     id: _agendGenId(),
     paciente, edad, rut, procedimiento: proc, notas, prioridad: prio,
     startMin, endMin,
+    isExtra: isExtra,
     unidadCode: AGEND_STATE.unidadCode,
     solicitanteNombre: AGEND_STATE.solicitanteNombre,
     solicitanteTel: AGEND_STATE.solicitanteTel,
@@ -4587,8 +4931,61 @@ function agendSubmitSolicitud(ev){
   data[salaId][dateStr].push(req);
   data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
-  alert('Solicitud enviada. El Servicio de Anestesia será notificado.');
+  // Limpiar flag Extra
+  AGEND_STATE.formIsExtra = false;
+  alert(isExtra
+    ? 'Solicitud EXTRA enviada. Requiere visado del administrador.'
+    : 'Solicitud enviada. El Servicio de Anestesia será notificado.');
   agendOpenDia(dateStr);
+}
+
+// Vista: Form solicitud EXTRA (libre, fuera de horario o paralelo)
+function agendOpenFormExtra(dateStr){
+  if(AGEND_STATE.mode !== 'unidad'){
+    alert('Para solicitar un Agendamiento Extra entra como Unidad solicitante.');
+    return;
+  }
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  if(!sala || !sala.allowsExtra){
+    alert('Esta sala no permite Agendamiento Extra.');
+    return;
+  }
+  AGEND_STATE.selectedDate = dateStr;
+  AGEND_STATE.formIsExtra = true;
+  // Default: 09:00–10:00 (o el rango regular si lo hay)
+  let startMin = 9*60, endMin = 10*60;
+  const hrs = _agendSalaHoursForDate(AGEND_STATE.salaId, dateStr);
+  if(hrs){
+    startMin = hrs.startMin;
+    endMin = Math.min(hrs.startMin + 60, hrs.endMin);
+  }
+  AGEND_STATE.formStartMin = startMin;
+  AGEND_STATE.formEndMin   = endMin;
+  _agendShowView('form', true);
+  const dt = _agendParseDateStr(dateStr);
+  const fmt = `EXTRA · ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${_agendFmtRange(startMin, endMin)}`;
+  _agendSetTitle('Nueva solicitud EXTRA', fmt);
+  _agendSetHeadAction(null);
+  const head = document.getElementById('agendFormHead');
+  if(head){
+    head.innerHTML = `
+      <div class="agend-day-head-ico" style="background:#b45309">⚡</div>
+      <div class="agend-day-head-body">
+        <div class="agend-day-head-date">Agendamiento EXTRA</div>
+        <div class="agend-day-head-sala">${sala.name} · ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · Requiere visado</div>
+      </div>`;
+  }
+  // Reset campos
+  document.getElementById('afPaciente').value = '';
+  document.getElementById('afEdad').value = '';
+  document.getElementById('afRut').value = '';
+  document.getElementById('afProc').value = '';
+  document.getElementById('afNotas').value = '';
+  document.getElementById('afPrioridad').value = 'electiva';
+  // En Extra: usar rango completo 08–20 (jornada amplia)
+  _agendFillTimeSelects(startMin, endMin, { useFullDay: true });
+  _agendUpdateRangoHint();
+  setTimeout(() => document.getElementById('afPaciente').focus(), 80);
 }
 
 // --- Vista: Detalle solicitud ---
@@ -4634,9 +5031,10 @@ function agendOpenDetalle(reqId){
         <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:#fff;color:var(--muted)">Revertir a pendiente</button>
       </div>`;
   }
+  const extraBadge = req.isExtra ? ` <span class="agend-extra-pill">EXTRA</span>` : '';
   body.innerHTML = `
     <div class="agend-detalle-card">
-      <div class="agend-detalle-row"><div class="agend-detalle-k">Estado</div><div class="agend-detalle-v"><span class="agend-slot-status ${req.estado}">${req.estado}</span></div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Estado</div><div class="agend-detalle-v"><span class="agend-slot-status ${req.estado}">${req.estado}</span>${extraBadge}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Paciente</div><div class="agend-detalle-v">${_gpEsc(req.paciente)}${req.edad?` · ${_gpEsc(String(req.edad))} años`:''}${req.rut?` · ${_gpEsc(req.rut)}`:''}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Procedimiento</div><div class="agend-detalle-v">${_gpEsc(req.procedimiento)}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Prioridad</div><div class="agend-detalle-v">${_gpEsc(req.prioridad||'electiva')}</div></div>
@@ -4666,12 +5064,18 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   const idx = arr.findIndex(r => r && r.id === reqId);
   if(idx < 0) return;
   const slot = arr[idx];
-  // Si vamos a revertir a pendiente o aprobar y antes estaba rechazada, validar overlap
+  // Si vamos a revertir a pendiente o aprobar y antes estaba rechazada, validar overlap + cross-block
   if(nuevoEstado !== 'rechazada'){
-    const overlap = _agendFindOverlap(found.salaId, found.dateStr, slot.startMin, slot.endMin, reqId);
+    const overlap = _agendFindOverlap(found.salaId, found.dateStr, slot.startMin, slot.endMin, reqId, !!slot.isExtra);
     if(overlap){
       alert(`No se puede ${nuevoEstado === 'aprobada' ? 'aprobar' : 'revertir'}: choca con otra solicitud activa (${_agendFmtRange(overlap.startMin, overlap.endMin)}).`);
       return;
+    }
+    const cross = _agendFindCrossBlock(found.salaId, found.dateStr, slot.startMin, slot.endMin);
+    if(cross){
+      const otra = cross.sala ? cross.sala.name : 'otra sala';
+      const ok = confirm(`Atención: ${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)}, lo que normalmente bloquea esta sala.\n\n¿Quieres ${nuevoEstado === 'aprobada' ? 'aprobar' : 'revertir'} de todas formas?`);
+      if(!ok) return;
     }
   }
   slot.estado = nuevoEstado;
@@ -5224,25 +5628,11 @@ function renderUserPicker(){
   if(staff.length === 0){
     html += '<div style="color:var(--muted);font-size:13px;padding:12px;text-align:center">Sin staff. Ingresa como Administrador para agregar miembros.</div>';
   } else {
-    // 2) Dropdown NATIVO (siempre funciona, no depende de modal)
-    var opts = '<option value="">— Selecciona tu nombre —</option>';
-    for(var i=0; i<staff.length; i++){
-      var s = staff[i];
-      var lock = s.pinHash ? ' 🔒' : ' ✨';
-      var role = s.role ? ' · '+s.role : '';
-      opts += '<option value="'+s.id+'">'+s.name+role+lock+'</option>';
-    }
-    html += '<div style="margin-top:6px">'
-      + '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600">Tu nombre ('+staff.length+' anestesiólogos)</label>'
-      + '<select id="userSelectDropdown" onchange="onUserSelectChange(this.value)" '
-      + 'style="width:100%;padding:14px;font-size:15px;border:1.5px solid var(--border);border-radius:12px;background:#fff;font-family:inherit;cursor:pointer;-webkit-appearance:menulist;appearance:menulist">'
-      + opts + '</select>'
-      + '</div>';
-
-    // 3) Lista inline con buscador (alternativa visual, también funcional)
+    // Solo buscador grande — sin lista completa ni dropdown (se ve más limpio)
     html += '<div style="margin-top:14px">'
-      + '<input type="text" id="userInlineSearch" placeholder="🔎 O busca por nombre…" autocomplete="off" oninput="renderInlineUserList()" '
-      + 'style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;margin-bottom:8px" />'
+      + '<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600">Tu nombre ('+staff.length+' anestesiólogos)</label>'
+      + '<input type="text" id="userInlineSearch" placeholder="🔎 Escribe tu nombre…" autocomplete="off" oninput="renderInlineUserList()" '
+      + 'style="width:100%;padding:14px 14px;font-size:15px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;margin-bottom:10px" />'
       + '<div id="userInlineList" class="staff-picker-list"></div>'
       + '</div>';
   }
@@ -5257,18 +5647,24 @@ function onUserSelectChange(userId){
   try{ selectUser(userId); }catch(e){ console.error('selectUser error:', e); alert('Error al seleccionar usuario: '+e.message); }
 }
 
-// Lista inline con buscador (NO usa modal)
+// Lista inline con buscador (NO usa modal).
+// Por defecto la lista está vacía: solo aparecen resultados al escribir.
+// (Vista más limpia: no se muestra el listado completo de anestesiólogos.)
 function renderInlineUserList(){
   var list = document.getElementById('userInlineList');
   if(!list) return;
   var searchEl = document.getElementById('userInlineSearch');
-  var q = (searchEl && searchEl.value ? searchEl.value : '').trim().toLowerCase();
+  var q = (searchEl && searchEl.value ? searchEl.value : '').trim();
+  if(!q){
+    list.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center;font-size:13px">Empieza a escribir tu nombre para buscar…</div>';
+    return;
+  }
   var norm = function(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
   var nq = norm(q);
   var staff = (state.staff||[]).slice().sort(function(a,b){return String(a.name).localeCompare(String(b.name),'es');});
-  var filtered = nq ? staff.filter(function(s){ return norm(s.name).includes(nq) || norm(s.role||'').includes(nq); }) : staff;
+  var filtered = staff.filter(function(s){ return norm(s.name).includes(nq) || norm(s.role||'').includes(nq); });
   if(filtered.length === 0){
-    list.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center;font-size:13px">Sin resultados</div>';
+    list.innerHTML = '<div style="padding:14px;color:var(--muted);text-align:center;font-size:13px">Sin resultados para "'+q.replace(/</g,'&lt;')+'"</div>';
     return;
   }
   var html = '';
