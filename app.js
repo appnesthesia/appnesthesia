@@ -210,9 +210,50 @@ function _renderSyncIndicator(){
 }
 function _setSyncStatus(s){ _syncStatus = s; _renderSyncIndicator(); }
 
+// Campos PRIVADOS por dispositivo de cada staff que NUNCA suben a la nube
+// (pinHash = clave personal del dispositivo; preferences/activityLog = privados)
+const STAFF_DEVICE_PRIVATE_KEYS = ['pinHash', 'preferences', 'activityLog'];
+
+function _stripDevicePrivateStaff(staffArr){
+  if(!Array.isArray(staffArr)) return staffArr;
+  return staffArr.map(s=>{
+    if(!s || typeof s !== 'object') return s;
+    const copy = {...s};
+    STAFF_DEVICE_PRIVATE_KEYS.forEach(k => { delete copy[k]; });
+    return copy;
+  });
+}
+
+// Toma un array remoto de staff (sin datos privados) y, para cada uno,
+// pega encima el pinHash/preferences/activityLog que estén GUARDADOS LOCAL
+// para ese mismo id. Así las cuentas del dispositivo (PIN, preferencias)
+// no se pierden cuando jalamos el estado compartido.
+function _mergeStaffPreservingDeviceLocal(remoteStaff, localStaff){
+  const localById = {};
+  (localStaff||[]).forEach(s=>{ if(s && s.id) localById[s.id] = s; });
+  return (remoteStaff||[]).map(rs=>{
+    if(!rs || !rs.id) return rs;
+    const ls = localById[rs.id];
+    if(!ls) return rs;
+    const merged = {...rs};
+    STAFF_DEVICE_PRIVATE_KEYS.forEach(k => {
+      if(ls[k] !== undefined) merged[k] = ls[k];
+    });
+    return merged;
+  });
+}
+
 function _extractSharedState(){
   const out = {};
   Object.keys(state).forEach(k=>{ if(!LOCAL_ONLY_KEYS.has(k)) out[k] = state[k]; });
+  // Quitar SIEMPRE los campos privados por dispositivo del staff
+  if(Array.isArray(out.staff)) out.staff = _stripDevicePrivateStaff(out.staff);
+  // El adminUser también tiene preferences/activityLog locales — strippeamos
+  if(out.adminUser && typeof out.adminUser === 'object'){
+    const a = {...out.adminUser};
+    STAFF_DEVICE_PRIVATE_KEYS.forEach(k => { delete a[k]; });
+    out.adminUser = a;
+  }
   return out;
 }
 function _applyRemoteState(remote){
@@ -222,6 +263,21 @@ function _applyRemoteState(remote){
     Object.keys(remote).forEach(k=>{
       if(LOCAL_ONLY_KEYS.has(k)) return;
       if(k.startsWith('_')) return;
+      // Caso especial: para 'staff' fusionamos preservando pinHash/preferences/activityLog locales
+      if(k === 'staff' && Array.isArray(remote[k])){
+        state[k] = _mergeStaffPreservingDeviceLocal(remote[k], state[k]||[]);
+        return;
+      }
+      // Caso especial: adminUser tiene preferences/activityLog que son del dispositivo
+      if(k === 'adminUser' && remote[k] && typeof remote[k] === 'object'){
+        const local = state.adminUser || {};
+        const merged = {...remote[k]};
+        STAFF_DEVICE_PRIVATE_KEYS.forEach(kk => {
+          if(local[kk] !== undefined) merged[kk] = local[kk];
+        });
+        state[k] = merged;
+        return;
+      }
       state[k] = remote[k];
     });
     if(remote._updatedAt) _lastRemoteUpdatedAt = remote._updatedAt;
@@ -313,6 +369,15 @@ async function pushRemoteState(){
       // Solo superpone SUS colecciones: vacaciones e intercambios.
       payload.vacations = _mergeById(remote.vacations, state.vacations);
       payload.exchanges = _mergeById(remote.exchanges, state.exchanges);
+    }
+
+    // Defensa extra: asegurar que NUNCA se suben campos privados por dispositivo
+    // del staff (pinHash, preferences, activityLog) — quedan solo en cada teléfono.
+    if(Array.isArray(payload.staff)) payload.staff = _stripDevicePrivateStaff(payload.staff);
+    if(payload.adminUser && typeof payload.adminUser === 'object'){
+      const a = {...payload.adminUser};
+      STAFF_DEVICE_PRIVATE_KEYS.forEach(k => { delete a[k]; });
+      payload.adminUser = a;
     }
 
     // 3) Guardar en la nube.
