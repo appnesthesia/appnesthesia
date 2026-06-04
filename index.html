@@ -512,7 +512,8 @@ canvas{max-width:100%}
 .guias-head .logo img{width:100%;height:100%;object-fit:cover}
 .agend-head .logo{width:34px;height:34px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.2);flex-shrink:0}
 .agend-head .logo img{width:100%;height:100%;object-fit:cover;display:block}
-.guias-head h1{font-size:16px;font-weight:600;margin:0;flex:1}
+.guias-head h1{font-size:16px;font-weight:600;margin:0;line-height:1.15}
+.guias-sub{font-size:12px;opacity:.85;margin-top:1px;font-weight:500;letter-spacing:.2px}
 .guias-body{flex:1;overflow-y:auto;padding:18px;padding-bottom:max(20px,env(safe-area-inset-bottom));max-width:760px;margin:0 auto;width:100%}
 .gp-intro{margin-bottom:14px}
 .gp-intro h2{font-family:'Manrope','Inter',sans-serif;font-size:20px;font-weight:800;margin:0 0 4px;color:var(--primary-dark)}
@@ -576,11 +577,69 @@ canvas{max-width:100%}
 .gp-table td.group-cell{font-weight:700;color:var(--primary-dark);background:#f0fdf4!important;font-size:12px}
 .gp-table .col-time{font-weight:600;color:var(--primary-dark);white-space:nowrap}
 .gp-foot-note{font-size:11.5px;color:var(--muted);margin-top:14px;padding:10px 12px;border-radius:10px;background:#fef3c7;border:1px solid #fde68a;line-height:1.5}
+
+/* ===== Portal Preanestésico · componentes nuevos ===== */
+.gp-h3{font-size:13px;font-weight:700;color:var(--primary-dark);margin:18px 0 8px;font-family:'Manrope','Inter',sans-serif;letter-spacing:.2px}
+.gp-h3:first-child{margin-top:0}
+.gp-intro{font-size:13px;color:var(--text);line-height:1.55;margin-bottom:10px}
+.gp-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:6px 0 4px;border-radius:10px}
+.gp-table-scroll .gp-table{min-width:520px}
+
+/* Agenda de consultas */
+.gp-agenda-list{display:flex;flex-direction:column;gap:10px;margin:6px 0 14px}
+.gp-agenda-card{display:flex;align-items:center;gap:12px;padding:12px 13px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:12px}
+.gp-agenda-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;letter-spacing:.5px}
+.gp-agenda-body{flex:1;min-width:0}
+.gp-agenda-medico{font-weight:700;font-size:13.5px;color:var(--primary-dark);line-height:1.25}
+.gp-agenda-horario{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gp-agenda-pill{display:inline-block;background:var(--green-forest);color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.3px}
+
+/* Sobrecupo CTA */
+.gp-sobrecupo-block{margin-top:14px;padding:14px;border-radius:13px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a}
+.gp-sobrecupo-title{font-weight:800;font-size:13.5px;color:#78350f;margin-bottom:4px;display:flex;align-items:center;gap:7px}
+.gp-sobrecupo-desc{font-size:12.5px;color:#92400e;line-height:1.5;margin-bottom:10px}
+.gp-sobrecupo-btn{display:block;width:100%;padding:11px 14px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border:none;border-radius:11px;font-weight:700;font-size:13.5px;font-family:inherit;cursor:pointer;letter-spacing:.2px;box-shadow:0 2px 6px rgba(180,83,9,.25)}
+.gp-sobrecupo-btn:hover{filter:brightness(1.05)}
+.gp-sobrecupo-btn:active{transform:translateY(1px)}
+.gp-sobrecupo-foot{font-size:11px;color:#92400e;margin-top:8px;line-height:1.45;opacity:.85}
+
+/* Callouts */
+.gp-callout{margin:10px 0;padding:10px 12px;border-radius:10px;font-size:12.5px;line-height:1.5;border-left:4px solid var(--green-forest);background:#f0fdf4;color:#14532d}
+.gp-callout strong{font-weight:700}
+.gp-callout.danger{background:#fef2f2;border-left-color:#dc2626;color:#7f1d1d}
+.gp-callout.warning{background:#fffbeb;border-left-color:#d97706;color:#78350f}
+.gp-callout.info{background:#eff6ff;border-left-color:#2563eb;color:#1e3a8a}
+
+/* Algoritmo AHA/ACC */
+.gp-algoritmo{counter-reset:step;list-style:none;padding:0;margin:8px 0 12px;display:flex;flex-direction:column;gap:8px}
+.gp-algoritmo li{position:relative;padding:10px 12px 10px 42px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;font-size:12.5px;line-height:1.5;color:var(--text)}
+.gp-algoritmo li::before{counter-increment:step;content:counter(step);position:absolute;left:10px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.gp-algoritmo li strong{color:var(--primary-dark);font-weight:700}
+
+/* RCRI list */
+.gp-rcri-list{list-style:none;padding:0;margin:6px 0 10px;display:flex;flex-direction:column;gap:6px}
+.gp-rcri-list li{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:#fafffd;border:1px solid var(--border);border-radius:9px;font-size:12.5px;line-height:1.45;color:var(--text)}
+.gp-rcri-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:#0d9488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+
+/* METs reference */
+.gp-mets-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:6px 0 10px;font-size:12.5px}
+.gp-mets-grid .mets-val{font-weight:700;color:var(--primary-dark);text-align:right;padding:6px 8px;background:#f0fdf4;border-radius:7px;white-space:nowrap}
+.gp-mets-grid .mets-desc{padding:6px 8px;color:var(--text);line-height:1.4}
+
+/* Comorbidity chips */
+.gp-comorb-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 10px}
+.gp-comorb-item{padding:9px 11px;background:#fafffd;border:1px solid var(--border);border-radius:10px;font-size:12.5px;line-height:1.45}
+.gp-comorb-item .comorb-name{font-weight:700;color:var(--primary-dark);display:block;margin-bottom:2px}
+
 @media (max-width:540px){
   .gp-row{flex-direction:column;gap:2px}
   .gp-row-k{width:auto;padding-top:0}
   .gp-table{font-size:11.5px}
   .gp-table th,.gp-table td{padding:7px 7px}
+  .gp-agenda-avatar{width:38px;height:38px;font-size:12px}
+  .gp-agenda-medico{font-size:13px}
+  .gp-mets-grid{grid-template-columns:1fr;gap:4px}
+  .gp-mets-grid .mets-val{text-align:left}
 }
 
 /* ============ AGENDAMIENTO DE PROCEDIMIENTOS (full-screen overlay) ============ */
@@ -868,10 +927,10 @@ canvas{max-width:100%}
         <div class="mod-item-arrow">›</div>
       </button>
       <button type="button" class="mod-item" onclick="openGuiasModule()">
-        <div class="mod-item-ico">📘</div>
+        <div class="mod-item-ico">🩺</div>
         <div class="mod-item-body">
-          <div class="mod-item-name">Guías Perioperatorias</div>
-          <div class="mod-item-desc">Ayuno, GLP-1 y suspensión de fármacos preoperatorios</div>
+          <div class="mod-item-name">Portal Preanestésico</div>
+          <div class="mod-item-desc">Prepara a tu paciente: consulta, fármacos, ayuno, exámenes, riesgo CV</div>
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
@@ -882,17 +941,20 @@ canvas{max-width:100%}
   </div>
 </div>
 
-<!-- GUÍAS PERIOPERATORIAS (oculto hasta que se abra desde el selector de módulo) -->
+<!-- PORTAL PREANESTÉSICO (oculto hasta que se abra desde el selector de módulo) -->
 <div id="guiasScreen" class="guias-screen hidden">
   <div class="guias-head">
     <button type="button" class="back-btn" onclick="backToModulesFromGuias()">‹ Volver</button>
     <div class="logo"><img src="icon-192.png?v=37" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
-    <h1>Guías Perioperatorias</h1>
+    <div style="flex:1;min-width:0">
+      <h1>Portal Preanestésico</h1>
+      <div class="guias-sub">Prepara a tu paciente</div>
+    </div>
   </div>
   <div class="guias-body">
     <div class="gp-intro">
-      <h2>Buscador de fármacos</h2>
-      <p>Escribe el nombre de un fármaco o nombre comercial (Ej.: <i>aspirina</i>, <i>ozempic</i>, <i>plavix</i>, <i>jardiance</i>) y verás la recomendación de suspensión preoperatoria.</p>
+      <h2>Buscador rápido de fármacos</h2>
+      <p>Escribe el nombre genérico o comercial (Ej.: <i>aspirina</i>, <i>ozempic</i>, <i>plavix</i>, <i>jardiance</i>) para ver la recomendación perioperatoria.</p>
     </div>
     <div class="gp-search-wrap">
       <span class="gp-search-ico">🔎</span>
@@ -901,31 +963,71 @@ canvas{max-width:100%}
     </div>
     <div id="gpSearchResults"></div>
     <div id="gpDefaultBlock">
-      <div class="gp-hint">O abre directamente las tablas completas de las guías:</div>
+      <div class="gp-hint">O explora las secciones del Portal:</div>
     </div>
 
-    <!-- Tabla Ayuno + GLP-1 (despliegue) -->
+    <!-- 1) Consulta Preanestésica -->
+    <div id="gpConsulta" class="gp-section">
+      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpConsulta')">
+        <div class="gp-section-ico">📅</div>
+        <div class="gp-section-title">Consulta Preanestésica · Agenda y sobrecupos</div>
+        <div class="gp-section-chevron">›</div>
+      </button>
+      <div class="gp-section-body" id="gpConsultaBody"></div>
+    </div>
+
+    <!-- 2) Ayuno + GLP-1 -->
     <div id="gpAyuno" class="gp-section">
       <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpAyuno')">
         <div class="gp-section-ico">🍽️</div>
-        <div class="gp-section-title">Tabla 1 — Tiempos de ayuno y suspensión GLP-1</div>
+        <div class="gp-section-title">Ayuno Preoperatorio · Tiempos y GLP-1</div>
         <div class="gp-section-chevron">›</div>
       </button>
       <div class="gp-section-body" id="gpAyunoBody"></div>
     </div>
 
-    <!-- Tabla Suspensión Fármacos (despliegue) -->
+    <!-- 3) Suspensión Fármacos -->
     <div id="gpSusp" class="gp-section">
       <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpSusp')">
         <div class="gp-section-ico">💊</div>
-        <div class="gp-section-title">Tabla 2 — Suspensión de fármacos perioperatorios</div>
+        <div class="gp-section-title">Fármacos a Suspender en el Preoperatorio</div>
         <div class="gp-section-chevron">›</div>
       </button>
       <div class="gp-section-body" id="gpSuspBody"></div>
     </div>
 
+    <!-- 4) Exámenes Preoperatorios -->
+    <div id="gpExam" class="gp-section">
+      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpExam')">
+        <div class="gp-section-ico">🧪</div>
+        <div class="gp-section-title">Exámenes Preoperatorios · Qué pedir y cuándo</div>
+        <div class="gp-section-chevron">›</div>
+      </button>
+      <div class="gp-section-body" id="gpExamBody"></div>
+    </div>
+
+    <!-- 5) Anticoagulantes / Antiagregantes -->
+    <div id="gpAnticoag" class="gp-section">
+      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpAnticoag')">
+        <div class="gp-section-ico">🩸</div>
+        <div class="gp-section-title">Anticoagulantes y Antiagregantes · Manejo periop</div>
+        <div class="gp-section-chevron">›</div>
+      </button>
+      <div class="gp-section-body" id="gpAnticoagBody"></div>
+    </div>
+
+    <!-- 6) Riesgo Cardiovascular -->
+    <div id="gpRiesgoCv" class="gp-section">
+      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpRiesgoCv')">
+        <div class="gp-section-ico">❤️</div>
+        <div class="gp-section-title">Riesgo Cardiovascular y Derivación a Cardiología</div>
+        <div class="gp-section-chevron">›</div>
+      </button>
+      <div class="gp-section-body" id="gpRiesgoCvBody"></div>
+    </div>
+
     <div class="gp-foot-note">
-      <b>⚠ Nota clínica.</b> Esta guía sintetiza las recomendaciones de los protocolos institucionales de la Clínica Universidad de los Andes. La decisión final debe individualizarse considerando comorbilidades, tipo de cirugía, técnica anestésica y riesgo trombótico/hemorrágico del paciente. Ante dudas, coordinar con Cardiología, Endocrinología o el médico tratante según corresponda.
+      <b>⚠ Nota clínica.</b> Las recomendaciones de este Portal son orientativas y sintetizan los protocolos institucionales de la Clínica Universidad de los Andes y las guías ACC/AHA 2014 para cirugía no cardíaca. La decisión final debe individualizarse considerando comorbilidades, tipo de cirugía, técnica anestésica y riesgo trombótico/hemorrágico del paciente. Ante dudas, coordinar con Cardiología, Endocrinología o el Servicio de Anestesia.
     </div>
   </div>
 </div>
@@ -1640,6 +1742,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>

@@ -3640,6 +3640,82 @@ const SUSP_TABLE_DATA = [
   { grupo:'Psiquiatría', farmaco:'IMAO', accion:'Individualizar', tiempo:'2 semanas antes (coordinar con psiquiatría)' }
 ];
 
+// --- Consulta Preanestésica: agenda + sobrecupo ---
+const CONSULTA_PREANESTESICA = {
+  agenda: [
+    { dia:'Martes',    bloque:'AM', medico:'Dr. Rodríguez',     iniciales:'JR' },
+    { dia:'Miércoles', bloque:'AM', medico:'Dra. Santa María',  iniciales:'SM' },
+    { dia:'Viernes',   bloque:'AM', medico:'Dr. Fierro',        iniciales:'DF' }
+  ],
+  sobrecupoEmail: 'jprodriguez@clinicauandes.cl',
+  sobrecupoCC: '',
+  contacto: 'Coordinación Servicio de Anestesia'
+};
+
+// --- Exámenes Preoperatorios: matriz por edad / ASA / cirugía ---
+const EXAM_PREOP_MATRIX = [
+  { edad:'< 40 años',  asa12_menor:'No requiere de rutina',
+    asa12_mayor:'Hemograma · Glicemia',
+    asa3p:'Hemograma · BUN/Creat · ELP · Glicemia · ECG · RxTx · Coagulación' },
+  { edad:'40 – 65 años', asa12_menor:'No requiere (si EF y anamnesis normales)',
+    asa12_mayor:'Hemograma · Glicemia · BUN/Creat · ECG (>50 a o ≥1 FRCV)',
+    asa3p:'Hemograma · BUN/Creat · ELP · Glicemia · ECG · RxTx · Coagulación · Perfil hepático' },
+  { edad:'> 65 años',  asa12_menor:'Hemograma · Glicemia · ECG',
+    asa12_mayor:'Hemograma · Glicemia · BUN/Creat · ELP · ECG',
+    asa3p:'Lo anterior + Pruebas hepáticas · Coagulación · Considerar ecocardiograma según RCRI' }
+];
+const EXAM_PREOP_ESPECIFICOS = [
+  { cond:'Diabetes mellitus',     pedir:'HbA1c (vigente <3 meses) + glicemia ayunas día de cirugía' },
+  { cond:'ERC / IRC',             pedir:'BUN · Creatinina · ELP · cálculo VFG · ECG · considerar perfil bioquímico' },
+  { cond:'ICC / Cardiopatía conocida', pedir:'ECG · Ecocardiograma reciente (<12 meses si estable, antes si descompensación) · proBNP si dudoso' },
+  { cond:'Hepatopatía / Cirrosis', pedir:'Perfil hepático · INR · Albúmina · Plaquetas · Clasificación Child-Pugh' },
+  { cond:'TACO / NOACs',          pedir:'INR día previo (TACO) · Plaquetas · Función renal (NOACs)' },
+  { cond:'Embarazo posible',      pedir:'β-HCG <72 h en mujeres en edad fértil' },
+  { cond:'EPOC / Asma severos',   pedir:'Espirometría reciente · RxTx · GSA si insuficiencia respiratoria' },
+  { cond:'SAOS / Sospecha SAOS',  pedir:'STOP-BANG · considerar polisomnografía y oximetría nocturna' },
+  { cond:'Inmunosupresión / VIH', pedir:'Hemograma · LDH · perfil bioquímico · función renal · evaluar serología según caso' }
+];
+
+// --- Anticoagulantes / Antiagregantes: manejo periop ---
+const ANTICOAG_TABLE = [
+  { grupo:'Antiagregantes', farmaco:'AAS 75–100 mg', suspender:'Mantener en general. Suspender 7 d en neuroQx, prostatectomía radical, catarata intraocular o sangrado activo.', reiniciar:'12–24 h postop si hemostasia ok.' },
+  { grupo:'Antiagregantes', farmaco:'AAS ≥ 300 mg', suspender:'Suspender 7 días', reiniciar:'24 h postop' },
+  { grupo:'Antiagregantes', farmaco:'Clopidogrel (Plavix)', suspender:'Suspender 5–7 días', reiniciar:'24 h postop si hemostasia ok' },
+  { grupo:'Antiagregantes', farmaco:'Prasugrel (Effient)', suspender:'Suspender 7 días', reiniciar:'24 h postop' },
+  { grupo:'Antiagregantes', farmaco:'Ticagrelor (Brilinta)', suspender:'Suspender 5 días', reiniciar:'24 h postop' },
+  { grupo:'AVK (cumarínicos)', farmaco:'Warfarina (Coumadin)', suspender:'Suspender 5 d antes. Controlar INR día previo (objetivo <1.5). Considerar bridging con HBPM en alto riesgo trombótico.', reiniciar:'12–24 h postop si hemostasia ok. INR objetivo 2–3 (3–4 si válvula mecánica mitral).' },
+  { grupo:'AVK (cumarínicos)', farmaco:'Acenocumarol (Neosintrón)', suspender:'Suspender 3 d antes. Controlar INR día previo.', reiniciar:'12–24 h postop si hemostasia ok' },
+  { grupo:'NOAC / DOAC', farmaco:'Apixabán (Eliquis)', suspender:'ClCr ≥50: 24 h (bajo riesgo Hg), 48 h (alto). ClCr <50: 48–72 h.', reiniciar:'24 h postop bajo riesgo, 48–72 h alto riesgo' },
+  { grupo:'NOAC / DOAC', farmaco:'Rivaroxabán (Xarelto)', suspender:'Igual a apixabán', reiniciar:'24 h bajo riesgo, 48–72 h alto riesgo' },
+  { grupo:'NOAC / DOAC', farmaco:'Edoxabán (Lixiana)', suspender:'24–48 h según ClCr', reiniciar:'24 h postop' },
+  { grupo:'NOAC / DOAC', farmaco:'Dabigatrán (Pradaxa)', suspender:'ClCr ≥80: 24 h · 50–80: 36 h · 30–50: 48 h · <30: 72–96 h', reiniciar:'24 h bajo riesgo, 48–72 h alto. Antídoto: idarucizumab.' },
+  { grupo:'Heparinas', farmaco:'HBPM dosis profiláctica (enoxaparina 40 mg/d)', suspender:'12 h antes', reiniciar:'6–12 h postop si hemostasia' },
+  { grupo:'Heparinas', farmaco:'HBPM dosis terapéutica (1 mg/kg c/12 h)', suspender:'24 h antes', reiniciar:'24 h postop' },
+  { grupo:'Heparinas', farmaco:'HNF EV', suspender:'Suspender 4–6 h antes (controlar TTPa)', reiniciar:'4 h postop sin bolo' }
+];
+
+// --- Riesgo CV: METs y RCRI ---
+const METS_TABLE = [
+  { mets:'1 MET',       actividad:'Comer · vestirse · usar el baño · caminar dentro de la casa' },
+  { mets:'4 METs',      actividad:'Subir 1 piso de escalera · caminar rápido en plano (6 km/h) · trabajos livianos del hogar' },
+  { mets:'4–10 METs',   actividad:'Trotar suave · ejercicio recreativo · ciclismo recreativo · golf · baile' },
+  { mets:'> 10 METs',   actividad:'Deportes vigorosos: natación intensa · tenis competitivo · fútbol · esquí' }
+];
+const RCRI_FACTORES = [
+  'Cirugía de alto riesgo (intraperitoneal, intratorácica, vascular suprainguinal)',
+  'Cardiopatía isquémica (IAM previo, angina, prueba de esfuerzo +, uso de nitratos, Q patológicas en ECG)',
+  'Insuficiencia cardíaca congestiva',
+  'ACV o AIT previo',
+  'Diabetes mellitus en tratamiento con insulina',
+  'Creatinina sérica > 2 mg/dL'
+];
+const RCRI_RIESGO = [
+  { n:'0 factores', riesgo:'0,4 % de evento cardíaco mayor' },
+  { n:'1 factor',   riesgo:'0,9 %' },
+  { n:'2 factores', riesgo:'6,6 %' },
+  { n:'≥ 3 factores', riesgo:'≥ 11 %' }
+];
+
 // Normalización (lowercase + sin acentos) para búsqueda tolerante.
 function _gpNorm(s){
   return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -3686,6 +3762,9 @@ function openGuiasModule(){
   if(res) res.innerHTML = '';
   // Cerrar tablas: el CSS usa la clase 'open' en .gp-section para mostrar el body.
   document.querySelectorAll('#guiasScreen .gp-section').forEach(s => s.classList.remove('open'));
+  // Scroll del body al tope
+  const body = document.querySelector('#guiasScreen .guias-body');
+  if(body) body.scrollTop = 0;
 }
 
 // Volver desde Guías al selector de módulos.
@@ -3791,19 +3870,24 @@ function renderGuiasSearchResults(query){
 
 // Mostrar/ocultar tablas completas.
 // El CSS controla visibilidad del body con la clase 'open' en .gp-section.
+const _GP_SECTIONS = ['gpConsulta','gpAyuno','gpSusp','gpExam','gpAnticoag','gpRiesgoCv'];
 function toggleGuiasSection(id){
   const el = document.getElementById(id);
   if(!el) return;
   const wasOpen = el.classList.contains('open');
   // Cerrar todas las secciones
-  ['gpAyuno','gpSusp'].forEach(x => {
+  _GP_SECTIONS.forEach(x => {
     const e = document.getElementById(x);
     if(e) e.classList.remove('open');
   });
   if(!wasOpen){
     el.classList.add('open');
+    if(id === 'gpConsulta') renderGuiasConsultaPreanestesica();
     if(id === 'gpAyuno') renderGuiasAyunoTable();
     if(id === 'gpSusp') renderGuiasSuspTable();
+    if(id === 'gpExam') renderGuiasExamenes();
+    if(id === 'gpAnticoag') renderGuiasAnticoag();
+    if(id === 'gpRiesgoCv') renderGuiasRiesgoCv();
     // Scroll suave al elemento abierto
     setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 80);
   }
@@ -3848,6 +3932,247 @@ function renderGuiasSuspTable(){
   }
   html += '</tbody></table>';
   html += '<p class="gp-foot-note">Referencia: Guía de Suspensión de Fármacos Perioperatorios — Clínica Universidad de los Andes. Las recomendaciones son orientativas; cada paciente debe evaluarse individualmente.</p>';
+  cont.innerHTML = html;
+}
+
+// ============================================================
+// SECCIÓN: Consulta Preanestésica (agenda fija + mailto sobrecupo)
+// ============================================================
+function renderGuiasConsultaPreanestesica(){
+  const cont = document.getElementById('gpConsultaBody');
+  if(!cont) return;
+  const agenda = CONSULTA_PREANESTESICA.agenda;
+  let cards = '';
+  for(const a of agenda){
+    cards += `
+      <div class="gp-agenda-card">
+        <div class="gp-agenda-avatar">${_gpEsc(a.iniciales)}</div>
+        <div class="gp-agenda-body">
+          <div class="gp-agenda-medico">${_gpEsc(a.medico)}</div>
+          <div class="gp-agenda-horario">${_gpEsc(a.dia)} · ${_gpEsc(a.bloque)}</div>
+        </div>
+        <div class="gp-agenda-pill">${_gpEsc(a.bloque)}</div>
+      </div>`;
+  }
+  const html = `
+    <div class="gp-callout" style="margin-bottom:14px">
+      <strong>📅 Consulta Preanestésica programada</strong><br>
+      Estos son los horarios fijos para evaluación preanestésica con cada profesional. Coordina con la secretaria del Servicio de Anestesia para agendar a tu paciente.
+    </div>
+    <div class="gp-agenda-list">${cards}</div>
+    <div class="gp-sobrecupo-block">
+      <div class="gp-sobrecupo-title">¿No hay hora disponible?</div>
+      <div class="gp-sobrecupo-desc">Solicita un <strong>sobrecupo</strong> o evaluación preanestésica adicional escribiendo directamente a ${_gpEsc(CONSULTA_PREANESTESICA.contacto)}.</div>
+      <button type="button" class="gp-sobrecupo-btn" onclick="abrirMailtoSobrecupo()">
+        ✉️ Solicitar sobrecupo por correo
+      </button>
+      <div class="gp-sobrecupo-foot">Se abrirá tu cliente de correo con el mensaje pre-llenado a <strong>${_gpEsc(CONSULTA_PREANESTESICA.sobrecupoEmail)}</strong>. Solo completa los datos del paciente y envía.</div>
+    </div>
+    <p class="gp-foot-note">La consulta preanestésica busca evaluar comorbilidades, riesgo perioperatorio, ajustar fármacos, indicar ayuno, y planificar la técnica anestésica con el paciente.</p>
+  `;
+  cont.innerHTML = html;
+}
+
+// Abre el cliente de correo con el mensaje de sobrecupo pre-llenado.
+function abrirMailtoSobrecupo(){
+  const to = CONSULTA_PREANESTESICA.sobrecupoEmail;
+  const cc = CONSULTA_PREANESTESICA.sobrecupoCC || '';
+  const hoy = new Date();
+  const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+  const subject = `Solicitud de sobrecupo · Consulta Preanestésica`;
+  const lineas = [
+    'Estimado/a:',
+    '',
+    'Te escribo para solicitar un sobrecupo o evaluación preanestésica adicional para el siguiente paciente:',
+    '',
+    '• Nombre del paciente: ',
+    '• Edad: ',
+    '• RUT: ',
+    '• Diagnóstico / Motivo de cirugía: ',
+    '• Cirugía programada: ',
+    '• Fecha tentativa de pabellón: ',
+    '• Urgencia (electiva / preferente / urgente): ',
+    '• Comorbilidades relevantes: ',
+    '• Fármacos actuales (con énfasis en anticoagulantes / antiagregantes / GLP-1): ',
+    '• Última evaluación cardiológica (si aplica): ',
+    '',
+    'Médico tratante: ',
+    'Especialidad: ',
+    'Teléfono / contacto: ',
+    `Fecha de solicitud: ${fechaHoy}`,
+    '',
+    'Agradezco coordinar disponibilidad.',
+    '',
+    'Saludos cordiales.'
+  ];
+  const body = lineas.join('\n');
+  let url = `mailto:${encodeURIComponent(to)}`;
+  const params = [];
+  if(cc) params.push(`cc=${encodeURIComponent(cc)}`);
+  params.push(`subject=${encodeURIComponent(subject)}`);
+  params.push(`body=${encodeURIComponent(body)}`);
+  url += '?' + params.join('&');
+  try { window.location.href = url; }
+  catch(e){ try { window.open(url, '_self'); } catch(e2){} }
+}
+
+// ============================================================
+// SECCIÓN: Exámenes Preoperatorios
+// ============================================================
+function renderGuiasExamenes(){
+  const cont = document.getElementById('gpExamBody');
+  if(!cont) return;
+  let html = '';
+  html += `
+    <div class="gp-callout" style="margin-bottom:14px">
+      <strong>🧪 Criterio general:</strong> los exámenes preoperatorios deben pedirse <em>dirigidos</em>, según edad, comorbilidades (ASA) y magnitud de la cirugía. Los exámenes "de rutina" indiscriminados no mejoran el outcome y aumentan costos y demoras.
+    </div>
+  `;
+  // Matriz edad x ASA/cirugía
+  html += '<h3 class="gp-h3">Por edad y magnitud de cirugía</h3>';
+  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Edad</th><th>Cirugía menor · ASA I-II</th><th>Cirugía mayor electiva · ASA I-II</th><th>ASA III-IV o cirugía mayor/vascular</th></tr></thead><tbody>';
+  for(const r of EXAM_PREOP_MATRIX){
+    html += `<tr><td><strong>${_gpEsc(r.edad)}</strong></td><td>${_gpEsc(r.asa12_menor)}</td><td>${_gpEsc(r.asa12_mayor)}</td><td>${_gpEsc(r.asa3p)}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+
+  // Específicos por comorbilidad
+  html += '<h3 class="gp-h3" style="margin-top:18px">Exámenes específicos según comorbilidad</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Condición</th><th>Exámenes a solicitar</th></tr></thead><tbody>';
+  for(const r of EXAM_PREOP_ESPECIFICOS){
+    html += `<tr><td><strong>${_gpEsc(r.cond)}</strong></td><td>${_gpEsc(r.pedir)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+
+  html += `
+    <div class="gp-callout" style="margin-top:16px">
+      <strong>💡 Vigencia:</strong> en pacientes estables, los exámenes preoperatorios son útiles si fueron tomados en los últimos <strong>6 meses</strong>. En pacientes con condiciones dinámicas (DM mal controlada, ERC progresiva, ICC, hepatopatía), considerar <strong>vigencia &lt; 1 mes</strong> o solicitar nuevos.
+    </div>
+  `;
+  html += '<p class="gp-foot-note">Referencia: Recomendaciones institucionales Clínica Universidad de los Andes · ASA Practice Advisory on Preanesthesia Evaluation.</p>';
+  cont.innerHTML = html;
+}
+
+// ============================================================
+// SECCIÓN: Anticoagulantes y Antiagregantes
+// ============================================================
+function renderGuiasAnticoag(){
+  const cont = document.getElementById('gpAnticoagBody');
+  if(!cont) return;
+  let html = '';
+  html += `
+    <div class="gp-callout" style="margin-bottom:14px">
+      <strong>🩸 Antes de suspender:</strong> evalúa siempre <em>riesgo trombótico vs. hemorrágico</em>. En stents coronarios recientes, válvulas mecánicas o ETV reciente, la suspensión sin coordinación con cardiología/hematología puede ser de alto riesgo.
+    </div>
+  `;
+  // Tabla principal
+  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Suspender antes de cirugía</th><th>Reiniciar postop</th></tr></thead><tbody>';
+  let lastGrupo = '';
+  for(const r of ANTICOAG_TABLE){
+    const grupoCell = (r.grupo !== lastGrupo) ? `<td class="group-cell"><strong>${_gpEsc(r.grupo)}</strong></td>` : '<td></td>';
+    lastGrupo = r.grupo;
+    html += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td>${_gpEsc(r.suspender)}</td><td>${_gpEsc(r.reiniciar)}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+
+  // Calls-out críticos
+  html += `
+    <h3 class="gp-h3" style="margin-top:18px">Situaciones que requieren coordinación</h3>
+    <div class="gp-callout danger">
+      <strong>⛔ Stent coronario reciente:</strong> NO suspender la doble antiagregación (DAPT) si stent farmacoactivo (DES) &lt;6 meses o stent metálico (BMS) &lt;30 días, salvo cirugía emergente. Coordinar con cardiología siempre.
+    </div>
+    <div class="gp-callout warning" style="margin-top:10px">
+      <strong>⚠ Alto riesgo trombótico → considerar bridging con HBPM:</strong>
+      <ul style="margin:6px 0 0 18px;padding:0">
+        <li>FA con CHA₂DS₂-VASc ≥ 4 o ACV/AIT reciente</li>
+        <li>Válvula mecánica mitral o aórtica antigua (jaula de bolas/disco)</li>
+        <li>ETV o TEP &lt; 3 meses</li>
+        <li>Trombofilia conocida con ETV recurrente</li>
+      </ul>
+    </div>
+    <div class="gp-callout" style="margin-top:10px">
+      <strong>🚨 Reversión urgente:</strong>
+      <ul style="margin:6px 0 0 18px;padding:0">
+        <li><strong>TACO</strong> → CCP de 4 factores (Beriplex / Octaplex) + Vit K EV</li>
+        <li><strong>Dabigatrán</strong> → idarucizumab (Praxbind)</li>
+        <li><strong>Anti-Xa (apix/rivaro/edoxa)</strong> → andexanet alfa (si disponible) o CCP de 4 factores</li>
+        <li><strong>HBPM</strong> → protamina (reversión parcial ~60-70%)</li>
+      </ul>
+    </div>
+  `;
+  html += '<p class="gp-foot-note">Referencia: ACC/AHA Periprocedural Management of Antithrombotic Therapy · ESC Guidelines 2022 · Protocolo institucional Clínica Universidad de los Andes.</p>';
+  cont.innerHTML = html;
+}
+
+// ============================================================
+// SECCIÓN: Riesgo Cardiovascular y Derivación a Cardiología
+// ============================================================
+function renderGuiasRiesgoCv(){
+  const cont = document.getElementById('gpRiesgoCvBody');
+  if(!cont) return;
+  let html = '';
+  html += `
+    <div class="gp-callout" style="margin-bottom:14px">
+      <strong>❤️ Objetivo:</strong> identificar pacientes que requieren <strong>optimización médica</strong> o <strong>evaluación cardiológica</strong> antes de cirugía no cardíaca. Basado en <em>ACC/AHA 2014 Guideline on Perioperative Cardiovascular Evaluation for Noncardiac Surgery (Fleisher et al)</em>.
+    </div>
+  `;
+
+  // Algoritmo
+  html += '<h3 class="gp-h3">Algoritmo simplificado AHA/ACC</h3>';
+  html += `
+    <ol class="gp-algoritmo">
+      <li><strong>¿Cirugía emergente?</strong> → ir a pabellón, manejar el riesgo en el perioperatorio. <em>Sin evaluación adicional</em>.</li>
+      <li><strong>¿Condición cardíaca activa?</strong> (SCA, ICC descompensada, arritmia significativa, valvulopatía severa sintomática) → <strong>diferir y derivar a Cardiología</strong>.</li>
+      <li><strong>¿Cirugía de bajo riesgo cardiovascular (&lt;1%)?</strong> → seguir con la cirugía. <em>Sin más estudios</em>.</li>
+      <li><strong>Si riesgo CV elevado (≥1%) → evalúa la capacidad funcional</strong>:
+        <ul>
+          <li><strong>≥ 4 METs sin síntomas</strong> → seguir.</li>
+          <li><strong>&lt; 4 METs o no evaluable</strong> → considerar test no invasivo (ecocardiograma estrés, perfusión miocárdica) <em>solo si el resultado va a cambiar la conducta</em>.</li>
+        </ul>
+      </li>
+    </ol>
+  `;
+
+  // METs
+  html += '<h3 class="gp-h3" style="margin-top:18px">Capacidad funcional — escala METs</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Carga</th><th>Equivalencia funcional</th></tr></thead><tbody>';
+  for(const r of METS_TABLE){
+    html += `<tr><td><strong>${_gpEsc(r.mets)}</strong></td><td>${_gpEsc(r.actividad)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += `<div class="gp-callout" style="margin-top:8px"><strong>👉 Umbral clave: 4 METs.</strong> El paciente debe ser capaz de subir un piso de escalera o caminar 6 km/h en plano sin síntomas. Si no puede o no se sabe, sube el rendimiento del test no invasivo.</div>`;
+
+  // RCRI
+  html += '<h3 class="gp-h3" style="margin-top:18px">Revised Cardiac Risk Index (Lee, RCRI)</h3>';
+  html += '<ul class="gp-rcri-list">';
+  RCRI_FACTORES.forEach((f,i) => { html += `<li><span class="gp-rcri-num">${i+1}</span> ${_gpEsc(f)}</li>`; });
+  html += '</ul>';
+  html += '<table class="gp-table" style="margin-top:8px"><thead><tr><th>Score</th><th>Riesgo de evento CV mayor (IAM, paro, BAV completo)</th></tr></thead><tbody>';
+  for(const r of RCRI_RIESGO){
+    html += `<tr><td><strong>${_gpEsc(r.n)}</strong></td><td>${_gpEsc(r.riesgo)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+
+  // Derivación a Cardiología
+  html += '<h3 class="gp-h3" style="margin-top:18px">¿Cuándo derivar a Cardiología?</h3>';
+  html += `
+    <div class="gp-callout warning">
+      <ul style="margin:0;padding-left:18px">
+        <li>Riesgo CV elevado <strong>+</strong> capacidad funcional &lt; 4 METs o no evaluable.</li>
+        <li>Síndrome coronario agudo, angina inestable o IAM reciente (&lt; 60 días).</li>
+        <li>ICC nueva, descompensada o con FE &lt; 30%.</li>
+        <li>Arritmias sintomáticas, BAV de alto grado, taquiarritmias no controladas.</li>
+        <li>Valvulopatía severa sintomática (estenosis aórtica severa, IM/IA severa con síntomas).</li>
+        <li>Marcapasos / DAI — coordinar manejo periop (modo asincrónico, desactivación de DAI).</li>
+        <li>Stent coronario reciente: DES &lt; 6 meses, BMS &lt; 30 días.</li>
+        <li>Hipertensión pulmonar moderada-severa.</li>
+        <li>Cardiopatía congénita adulta compleja.</li>
+      </ul>
+    </div>
+  `;
+
+  html += `<p class="gp-foot-note">Referencia: Fleisher LA et al. <em>2014 ACC/AHA Guideline on Perioperative Cardiovascular Evaluation and Management of Patients Undergoing Noncardiac Surgery</em>. J Am Coll Cardiol. 2014;64(22):e77-e137. · Lee TH et al. <em>Revised Cardiac Risk Index</em>. Circulation 1999;100:1043-9.</p>`;
+
   cont.innerHTML = html;
 }
 
