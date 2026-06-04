@@ -3862,11 +3862,11 @@ function renderGuiasSuspTable(){
 const AGEND_UNIDADES = [
   { code:'endo_dig',  name:'Endoscopía Digestiva', ico:'🔬' },
   { code:'radio',     name:'Imagenología',         ico:'🩻' },
+  { code:'accesos',   name:'Accesos Vasculares',   ico:'💉' },
   { code:'odonto',    name:'Odontología',          ico:'🦷' },
   { code:'neuro',     name:'Neurología',           ico:'🧠' },
   { code:'onco',      name:'Oncología / Hemato',   ico:'🎗️' },
   { code:'pedia',     name:'Pediatría',            ico:'🧒' },
-  { code:'urolo',     name:'Urología',             ico:'🩺' },
   { code:'otra',      name:'Otra unidad',          ico:'➕' }
 ];
 const AGEND_DEFAULT_PIN = '1234';
@@ -3883,6 +3883,16 @@ const AGEND_DEFAULT_PIN = '1234';
 // allowsExtra: muestra el botón "Agendamiento Extra" en el calendario.
 // allowsParallelExtra: cuando un Extra se agenda, se permiten paralelos
 //   en el mismo horario (solo Endoscopía).
+//
+// usesAmPmOnly: la sala no usa horarios precisos sino bloques AM/PM.
+//   En este modo el formulario muestra un selector AM/PM, no selectores de
+//   hora; en el storage el slot se guarda con startMin/endMin que cubren
+//   el bloque completo (AM = 08:00–13:00, PM = 13:00–20:00). Estas salas
+//   NO bloquean a otras (no toman al anestesiólogo en un horario preciso)
+//   y NO son bloqueadas por cross-blocks (su disponibilidad es flexible).
+//
+// procedimientosCatalogo: lista de procedimientos que puede seleccionar la
+//   unidad solicitante al pedir hora (reemplaza el campo libre).
 const AGEND_SALAS = [
   {
     id:'endoscopia', name:'Endoscopía', ico:'🔬', color:'#0EA5E9',
@@ -3907,6 +3917,31 @@ const AGEND_SALAS = [
     allowsParallelExtra: false
   },
   {
+    id:'accesos_vasculares', name:'Accesos Vasculares', ico:'💉', color:'#0D9488',
+    desc:'PICC, MidLine, CVC, catéter de diálisis transitorio, vía venosa periférica',
+    // Disponible de lunes a sábado, ambos bloques AM y PM
+    schedule: {
+      1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
+      3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
+      5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
+    },
+    blockedByOtherSalas: [],
+    allowsExtra: false,
+    allowsParallelExtra: false,
+    usesAmPmOnly: true,
+    procedimientosCatalogo: [
+      'Vía Venosa Periférica',
+      'PICC Line',
+      'MidLine',
+      'Catéter Venoso Central (CVC)',
+      'Catéter de Diálisis Transitorio',
+      'Port-a-cath',
+      'Retiro de catéter',
+      'Recambio de catéter',
+      'Otro acceso vascular'
+    ]
+  },
+  {
     id:'dental', name:'Dental', ico:'🦷', color:'#F59E0B',
     desc:'Sedación dental',
     schedule: { 6:{start:'08:00', end:'14:00'} },
@@ -3928,7 +3963,7 @@ const AGEND_SALAS = [
   },
   {
     id:'oncohemato', name:'Oncología / Hematología', ico:'🎗️', color:'#DB2777',
-    desc:'QMT intratecal, accesos venosos, médula ósea',
+    desc:'QMT intratecal, médula ósea',
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
@@ -3947,6 +3982,33 @@ const AGEND_SALAS = [
     allowsParallelExtra: false
   }
 ];
+
+// --- Bloques AM / PM (para salas con usesAmPmOnly) ---
+const AGEND_AM_START_MIN = 8 * 60;   // 08:00
+const AGEND_AM_END_MIN   = 13 * 60;  // 13:00
+const AGEND_PM_START_MIN = 13 * 60;  // 13:00
+const AGEND_PM_END_MIN   = 20 * 60;  // 20:00
+
+function _agendIsAmPmSala(salaId){
+  const s = _agendGetSala(salaId);
+  return !!(s && s.usesAmPmOnly);
+}
+function _agendBlockRange(block){
+  // block: 'AM' | 'PM'
+  if(block === 'PM') return { startMin: AGEND_PM_START_MIN, endMin: AGEND_PM_END_MIN };
+  return { startMin: AGEND_AM_START_MIN, endMin: AGEND_AM_END_MIN };
+}
+function _agendBlockOfSlot(slot){
+  if(!slot) return null;
+  if(slot.block === 'AM' || slot.block === 'PM') return slot.block;
+  // heurística: si el inicio está antes de las 13:00 → AM, si no PM
+  if(typeof slot.startMin === 'number') return slot.startMin < AGEND_PM_START_MIN ? 'AM' : 'PM';
+  return null;
+}
+function _agendBlockLabel(block){
+  if(block === 'PM') return 'PM (13:00–20:00)';
+  return 'AM (08:00–13:00)';
+}
 
 const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // legacy
 const AGEND_SLOT_GRANULARITY_MIN = 30;   // granularidad para selectores de horario (30 min)
@@ -4169,8 +4231,15 @@ function _agendSalaScheduleSummary(salaId){
   const sala = _agendGetSala(salaId);
   if(!sala || !sala.schedule) return '';
   const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const diasOpen = Object.keys(sala.schedule).map(Number).sort();
+  if(!diasOpen.length) return '';
+  if(sala.usesAmPmOnly){
+    // Para salas AM/PM: lista los días abiertos sin horarios precisos
+    const lista = diasOpen.map(d => dias[d]).join('·');
+    return `${lista} · AM y PM`;
+  }
   const parts = [];
-  Object.keys(sala.schedule).map(Number).sort().forEach(d => {
+  diasOpen.forEach(d => {
     const s = sala.schedule[d];
     parts.push(`${dias[d]} ${s.start}–${s.end}`);
   });
@@ -4346,6 +4415,7 @@ function openAgendamientoModule(){
   AGEND_STATE.unidadCode = null;
   AGEND_STATE.solicitanteNombre = '';
   AGEND_STATE.solicitanteTel = '';
+  AGEND_STATE.solicitanteEmail = '';
   // Restaurar sesión si existe
   const sess = agendLoadSession();
   if(sess && sess.tipo === 'unidad' && sess.unidadCode){
@@ -4353,6 +4423,7 @@ function openAgendamientoModule(){
     AGEND_STATE.unidadCode = sess.unidadCode;
     AGEND_STATE.solicitanteNombre = sess.nombre || '';
     AGEND_STATE.solicitanteTel = sess.tel || '';
+    AGEND_STATE.solicitanteEmail = sess.email || '';
     agendShowSalasView();
     return;
   }
@@ -4396,13 +4467,19 @@ function agendUnidadDoLogin(){
   const pin = document.getElementById('agendUnidadPin').value.trim();
   const nom = document.getElementById('agendUnidadNombre').value.trim();
   const tel = document.getElementById('agendUnidadTel').value.trim();
+  const emailEl = document.getElementById('agendUnidadEmail');
+  const email = emailEl ? emailEl.value.trim() : '';
   if(pin !== AGEND_DEFAULT_PIN){ alert('PIN incorrecto. (PIN inicial: 1234)'); return; }
   if(!nom){ alert('Ingresa el nombre del solicitante.'); return; }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    alert('El email no tiene un formato válido.'); return;
+  }
   AGEND_STATE.mode = 'unidad';
   AGEND_STATE.unidadCode = code;
   AGEND_STATE.solicitanteNombre = nom;
   AGEND_STATE.solicitanteTel = tel;
-  agendSaveSession({ tipo:'unidad', unidadCode:code, nombre:nom, tel });
+  AGEND_STATE.solicitanteEmail = email;
+  agendSaveSession({ tipo:'unidad', unidadCode:code, nombre:nom, tel, email });
   // Limpiar navStack porque venimos de un login
   AGEND_STATE.navStack = [];
   agendShowSalasView();
@@ -4414,6 +4491,7 @@ function agendLogoutUnidad(){
   AGEND_STATE.unidadCode = null;
   AGEND_STATE.solicitanteNombre = '';
   AGEND_STATE.solicitanteTel = '';
+  AGEND_STATE.solicitanteEmail = '';
   AGEND_STATE.navStack = [];
   _agendShowView('landing', false);
   _agendRefreshChromeForView('landing');
@@ -4597,8 +4675,11 @@ function agendOpenDia(dateStr){
   _agendSetHeadAction(null);
   // Horario per-sala para este día (null si está cerrada y no es admin)
   const salaHrs = _agendSalaHoursForDate(AGEND_STATE.salaId, dateStr);
+  const isAmPmSala = !!(sala && sala.usesAmPmOnly);
   let horarioTxt;
-  if(salaHrs){
+  if(isAmPmSala){
+    horarioTxt = salaHrs ? 'Bloques AM / PM' : 'Sala cerrada este día';
+  } else if(salaHrs){
     horarioTxt = `Horario ${_agendFmtRange(salaHrs.startMin, salaHrs.endMin)}`;
   } else {
     horarioTxt = `Sala cerrada este día`;
@@ -4622,6 +4703,11 @@ function agendRenderSlots(){
   const salaId = AGEND_STATE.salaId;
   const dateStr = AGEND_STATE.selectedDate;
   const sala = _agendGetSala(salaId);
+
+  // SALAS AM/PM: render alternativo (lista por bloque AM y PM)
+  if(sala && sala.usesAmPmOnly){
+    return _agendRenderSlotsAmPm(cont, sala, salaId, dateStr);
+  }
 
   // Horas hábiles per-sala para este día. Si está cerrado:
   //   - admin: usamos jornada por defecto (08-20) para poder visar Extras
@@ -4778,6 +4864,89 @@ function agendRenderSlots(){
   cont.innerHTML = html;
 }
 
+// Render alternativo para salas AM/PM (Accesos Vasculares)
+function _agendRenderSlotsAmPm(cont, sala, salaId, dateStr){
+  const isOpen = _agendIsDayOpenForSala(salaId, dateStr);
+  const todas = _agendGetDaySlots(salaId, dateStr);
+  const activas    = todas.filter(r => r.estado !== 'rechazada');
+  const rechazadas = todas.filter(r => r.estado === 'rechazada');
+  const ofAM = activas.filter(r => _agendBlockOfSlot(r) === 'AM').sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+  const ofPM = activas.filter(r => _agendBlockOfSlot(r) === 'PM').sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+
+  const renderReq = (r) => {
+    const est = r.estado || 'pendiente';
+    const unidad = _agendGetUnidad(r.unidadCode);
+    return `
+      <button type="button" class="agend-slot ${est}" onclick="agendOpenDetalle('${r.id}')">
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">${_gpEsc(r.paciente)}${r.edad?` · ${_gpEsc(String(r.edad))} a.`:''}</div>
+          <div class="agend-slot-proc">${_gpEsc(r.procedimiento)}</div>
+          <div class="agend-slot-meta">${unidad?unidad.ico+' '+_gpEsc(unidad.name):''} · ${_gpEsc(r.solicitanteNombre||'')}</div>
+        </div>
+        <div class="agend-slot-status ${est}">${est}</div>
+      </button>`;
+  };
+
+  let html = '';
+  if(!isOpen){
+    html += `
+      <div class="agend-day-section">Sala cerrada este día</div>
+      <div class="agend-day-closed-note">
+        ${sala.name} no recibe solicitudes este día. Elige otro día del calendario.
+      </div>`;
+    cont.innerHTML = html;
+    return;
+  }
+  const showCtaAM = AGEND_STATE.mode === 'unidad';
+  const showCtaPM = AGEND_STATE.mode === 'unidad';
+  // Bloque AM
+  html += `<div class="agend-day-section">Bloque AM <span class="agend-ampm-pill">08:00–13:00</span></div>`;
+  if(ofAM.length) ofAM.forEach(r => html += renderReq(r));
+  else html += `<div class="agend-day-closed-note" style="opacity:.75">Sin solicitudes en el bloque AM.</div>`;
+  if(showCtaAM){
+    html += `
+      <button type="button" class="agend-slot libre" onclick="_agendOpenFormBlock('${dateStr}','AM')">
+        <div class="agend-slot-body">
+          <span class="agend-slot-libre-text">+ Solicitar acceso vascular en bloque AM</span>
+        </div>
+        <div class="agend-slot-libre-cta">+ Solicitar</div>
+      </button>`;
+  }
+  // Bloque PM
+  html += `<div class="agend-day-section">Bloque PM <span class="agend-ampm-pill">13:00–20:00</span></div>`;
+  if(ofPM.length) ofPM.forEach(r => html += renderReq(r));
+  else html += `<div class="agend-day-closed-note" style="opacity:.75">Sin solicitudes en el bloque PM.</div>`;
+  if(showCtaPM){
+    html += `
+      <button type="button" class="agend-slot libre" onclick="_agendOpenFormBlock('${dateStr}','PM')">
+        <div class="agend-slot-body">
+          <span class="agend-slot-libre-text">+ Solicitar acceso vascular en bloque PM</span>
+        </div>
+        <div class="agend-slot-libre-cta">+ Solicitar</div>
+      </button>`;
+  }
+  // Rechazadas al final
+  if(rechazadas.length){
+    html += `<div class="agend-day-section">Solicitudes rechazadas</div>`;
+    for(const r of rechazadas) html += renderReq(r);
+  }
+  cont.innerHTML = html;
+}
+
+// Abrir formulario en sala AM/PM con bloque preseleccionado
+function _agendOpenFormBlock(dateStr, block){
+  if(AGEND_STATE.mode !== 'unidad'){
+    alert('Para solicitar entra como Unidad solicitante.');
+    return;
+  }
+  AGEND_STATE.selectedDate = dateStr;
+  AGEND_STATE.formBlock = (block === 'PM') ? 'PM' : 'AM';
+  // Pasamos cualquier HHMM — agendOpenFormForRange detecta AM/PM por la sala
+  agendOpenFormForRange('08:00','09:00');
+  // Forzar bloque elegido (override del default)
+  if(typeof _agendSelectBlock === 'function') _agendSelectBlock(AGEND_STATE.formBlock);
+}
+
 // --- Vista: Form solicitud ---
 // Helper interno: rellena ambos selectores y elige defaults razonables.
 // Si es Extra (rangeMin/rangeMax dados) → usa rango completo 08:00–20:00 con paso de 30 min.
@@ -4824,18 +4993,31 @@ function agendOpenFormForRange(startHHMM, endHHMM){
     alert('Para solicitar un agendamiento entra como Unidad solicitante.\nVuelve al inicio del módulo Agendamiento → "Solicitar agendamiento".');
     return;
   }
-  const startMin = _agendHHMMToMin(startHHMM) ?? AGEND_DAY_START_MIN;
-  const endMinHueco = _agendHHMMToMin(endHHMM) ?? AGEND_DAY_END_MIN;
-  // Default: 1 hora desde el inicio (o el hueco entero si es menor)
-  let endMin = Math.min(startMin + 60, endMinHueco);
-  if(endMin <= startMin) endMin = Math.min(startMin + AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_END_MIN);
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+
+  let startMin, endMin;
+  if(isAmPm){
+    // Para salas AM/PM, ignoramos el HHMM y elegimos AM por defecto
+    const rng = _agendBlockRange('AM');
+    startMin = rng.startMin;
+    endMin = rng.endMin;
+    AGEND_STATE.formBlock = 'AM';
+  } else {
+    startMin = _agendHHMMToMin(startHHMM) ?? AGEND_DAY_START_MIN;
+    const endMinHueco = _agendHHMMToMin(endHHMM) ?? AGEND_DAY_END_MIN;
+    // Default: 1 hora desde el inicio (o el hueco entero si es menor)
+    endMin = Math.min(startMin + 60, endMinHueco);
+    if(endMin <= startMin) endMin = Math.min(startMin + AGEND_SLOT_GRANULARITY_MIN, AGEND_DAY_END_MIN);
+    AGEND_STATE.formBlock = null;
+  }
   AGEND_STATE.formStartMin = startMin;
   AGEND_STATE.formEndMin   = endMin;
   AGEND_STATE.formIsExtra  = false;
   _agendShowView('form', true);
-  const sala = _agendGetSala(AGEND_STATE.salaId);
   const dt = _agendParseDateStr(AGEND_STATE.selectedDate);
-  const fmt = `${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${_agendFmtRange(startMin, endMin)}`;
+  const horarioTxt = isAmPm ? _agendBlockLabel('AM') : _agendFmtRange(startMin, endMin);
+  const fmt = `${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} · ${horarioTxt}`;
   _agendSetTitle('Nueva solicitud', fmt);
   _agendSetHeadAction(null);
   const head = document.getElementById('agendFormHead');
@@ -4847,16 +5029,95 @@ function agendOpenFormForRange(startHHMM, endHHMM){
         <div class="agend-day-head-sala">${sala?sala.name:''}</div>
       </div>`;
   }
-  // Reset form + rellenar selectores
+  // Reset form
   document.getElementById('afPaciente').value = '';
   document.getElementById('afEdad').value = '';
   document.getElementById('afRut').value = '';
-  document.getElementById('afProc').value = '';
   document.getElementById('afNotas').value = '';
   document.getElementById('afPrioridad').value = 'electiva';
-  _agendFillTimeSelects(startMin, endMin);
+  // Toggle modo horario y procedimiento según la sala
+  _agendApplyFormModeForSala(sala);
+  if(isAmPm){
+    _agendSelectBlock('AM');
+  } else {
+    _agendFillTimeSelects(startMin, endMin);
+  }
   _agendUpdateRangoHint();
   setTimeout(() => document.getElementById('afPaciente').focus(), 80);
+}
+
+// Aplica el modo del formulario según la sala (AM/PM vs horario preciso,
+// catálogo vs input libre, campos extras de accesos vasculares)
+function _agendApplyFormModeForSala(sala){
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+  const tieneCatalogo = !!(sala && Array.isArray(sala.procedimientosCatalogo) && sala.procedimientosCatalogo.length);
+  const esAccesos = !!(sala && sala.id === 'accesos_vasculares');
+  // Horario
+  const blkPreciso = document.getElementById('afHorarioPrecisoBlock');
+  const blkAmPm    = document.getElementById('afHorarioAmPmBlock');
+  if(blkPreciso) blkPreciso.style.display = isAmPm ? 'none' : '';
+  if(blkAmPm)    blkAmPm.style.display    = isAmPm ? '' : 'none';
+  // Procedimiento
+  const blkProcLibre = document.getElementById('afProcLibreBlock');
+  const blkProcCat   = document.getElementById('afProcCatalogoBlock');
+  if(blkProcLibre) blkProcLibre.style.display = tieneCatalogo ? 'none' : '';
+  if(blkProcCat)   blkProcCat.style.display   = tieneCatalogo ? '' : 'none';
+  // Habilitar/deshabilitar el `required` para evitar bloquear submit
+  const inpLibre = document.getElementById('afProc');
+  const selCat   = document.getElementById('afProcSelect');
+  if(inpLibre){
+    if(tieneCatalogo){ inpLibre.removeAttribute('required'); inpLibre.value=''; }
+    else { inpLibre.setAttribute('required',''); }
+  }
+  if(selCat){
+    if(tieneCatalogo){
+      // Rellenar opciones del catálogo
+      selCat.innerHTML = sala.procedimientosCatalogo.map(p =>
+        `<option value="${_gpEsc(p)}">${_gpEsc(p)}</option>`
+      ).join('');
+      selCat.setAttribute('required','');
+      selCat.onchange = _agendOnProcSelectChange;
+      _agendOnProcSelectChange();
+    } else {
+      selCat.removeAttribute('required');
+    }
+  }
+  // Campos extras de Accesos Vasculares
+  const blkExtras = document.getElementById('afAccesosExtraBlock');
+  if(blkExtras){
+    blkExtras.style.display = esAccesos ? '' : 'none';
+    if(esAccesos){
+      const el1 = document.getElementById('afAccesosLado'); if(el1) el1.value = '';
+      const el2 = document.getElementById('afAccesosUrg');  if(el2) el2.value = 'programado';
+      const el3 = document.getElementById('afAccesosVasc'); if(el3) el3.value = '';
+      const el4 = document.getElementById('afAccesosCoag'); if(el4) el4.value = '';
+    }
+  }
+}
+
+// Si en el catálogo se eligió "Otro acceso vascular" se muestra un input libre
+function _agendOnProcSelectChange(){
+  const sel = document.getElementById('afProcSelect');
+  const otro = document.getElementById('afProcOtro');
+  if(!sel || !otro) return;
+  const v = (sel.value || '').toLowerCase();
+  const esOtro = v.startsWith('otro');
+  otro.style.display = esOtro ? '' : 'none';
+  if(!esOtro) otro.value = '';
+}
+
+// Selector AM/PM (salas con usesAmPmOnly)
+function _agendSelectBlock(block){
+  if(block !== 'AM' && block !== 'PM') return;
+  AGEND_STATE.formBlock = block;
+  const rng = _agendBlockRange(block);
+  AGEND_STATE.formStartMin = rng.startMin;
+  AGEND_STATE.formEndMin   = rng.endMin;
+  const bAM = document.getElementById('afBlockAM');
+  const bPM = document.getElementById('afBlockPM');
+  if(bAM) bAM.classList.toggle('active', block === 'AM');
+  if(bPM) bPM.classList.toggle('active', block === 'PM');
+  _agendUpdateRangoHint();
 }
 
 // Compatibilidad: si en algún lugar legado se llama a la antigua firma agendOpenFormForHour(h)
@@ -4889,8 +5150,22 @@ function _agendOnTimeChange(which){
 function _agendUpdateRangoHint(){
   const hint = document.getElementById('afRangoHint');
   if(!hint) return;
+  const sala = _agendGetSala(AGEND_STATE.salaId);
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+  // Modo AM/PM: solo informar y validar día abierto
+  if(isAmPm){
+    const block = (AGEND_STATE.formBlock === 'PM') ? 'PM' : 'AM';
+    const isOpen = AGEND_STATE.selectedDate ? _agendIsDayOpenForSala(AGEND_STATE.salaId, AGEND_STATE.selectedDate) : true;
+    if(!isOpen){
+      hint.innerHTML = `<span style="color:#dc2626">⚠ Esta sala no recibe solicitudes ese día.</span>`;
+      return;
+    }
+    hint.innerHTML = `<span style="color:#0f766e">✓ Bloque <b>${block}</b> (${_agendBlockLabel(block).replace(/^.. /,'')}) · Confirmamos un horario aproximado al visar.</span>`;
+    return;
+  }
   const selStart = document.getElementById('afHoraInicio');
   const selEnd   = document.getElementById('afHoraFin');
+  if(!selStart || !selEnd){ hint.innerHTML = ''; return; }
   const startMin = _agendHHMMToMin(selStart.value);
   const endMin   = _agendHHMMToMin(selEnd.value);
   if(startMin == null || endMin == null || endMin <= startMin){
@@ -4924,33 +5199,60 @@ function _agendUpdateRangoHint(){
 
 function agendSubmitSolicitud(ev){
   if(ev) ev.preventDefault();
-  const paciente = document.getElementById('afPaciente').value.trim();
-  const edad = document.getElementById('afEdad').value.trim();
-  const rut = document.getElementById('afRut').value.trim();
-  const proc = document.getElementById('afProc').value.trim();
-  const notas = document.getElementById('afNotas').value.trim();
-  const prio = document.getElementById('afPrioridad').value;
-  const startHHMM = document.getElementById('afHoraInicio').value;
-  const endHHMM   = document.getElementById('afHoraFin').value;
-  if(!paciente){ alert('Falta el nombre del paciente.'); return; }
-  if(!proc){ alert('Falta el procedimiento.'); return; }
-  const startMin = _agendHHMMToMin(startHHMM);
-  const endMin   = _agendHHMMToMin(endHHMM);
-  if(startMin == null || endMin == null){
-    alert('Horario inválido.'); return;
-  }
-  if(endMin <= startMin){
-    alert('El horario de término debe ser mayor que el de inicio.'); return;
-  }
-  if(startMin < AGEND_DAY_START_MIN || endMin > AGEND_DAY_END_MIN){
-    alert(`Horario fuera del rango permitido (${_agendMinToHHMM(AGEND_DAY_START_MIN)}–${_agendMinToHHMM(AGEND_DAY_END_MIN)}).`); return;
-  }
   const salaId = AGEND_STATE.salaId;
   const dateStr = AGEND_STATE.selectedDate;
   const isExtra = !!AGEND_STATE.formIsExtra;
   const sala = _agendGetSala(salaId);
-  // Validación: si NO es Extra, debe respetar el horario regular de la sala
-  if(!isExtra){
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+  const tieneCatalogo = !!(sala && Array.isArray(sala.procedimientosCatalogo) && sala.procedimientosCatalogo.length);
+
+  const paciente = document.getElementById('afPaciente').value.trim();
+  const edad = document.getElementById('afEdad').value.trim();
+  const rut = document.getElementById('afRut').value.trim();
+  const notas = document.getElementById('afNotas').value.trim();
+  const prio = document.getElementById('afPrioridad').value;
+
+  // Procedimiento (catálogo o libre)
+  let proc;
+  if(tieneCatalogo){
+    const sel = document.getElementById('afProcSelect');
+    const otro = document.getElementById('afProcOtro');
+    const baseV = sel ? (sel.value || '').trim() : '';
+    if(!baseV){ alert('Selecciona un procedimiento.'); return; }
+    if(baseV.toLowerCase().startsWith('otro')){
+      const otroV = otro ? otro.value.trim() : '';
+      if(!otroV){ alert('Especifica el otro acceso vascular.'); return; }
+      proc = otroV;
+    } else {
+      proc = baseV;
+    }
+  } else {
+    proc = document.getElementById('afProc').value.trim();
+    if(!proc){ alert('Falta el procedimiento.'); return; }
+  }
+  if(!paciente){ alert('Falta el nombre del paciente.'); return; }
+
+  // Horario
+  let startMin, endMin, block = null;
+  if(isAmPm){
+    block = (AGEND_STATE.formBlock === 'PM') ? 'PM' : 'AM';
+    const rng = _agendBlockRange(block);
+    startMin = rng.startMin;
+    endMin   = rng.endMin;
+  } else {
+    const startHHMM = document.getElementById('afHoraInicio').value;
+    const endHHMM   = document.getElementById('afHoraFin').value;
+    startMin = _agendHHMMToMin(startHHMM);
+    endMin   = _agendHHMMToMin(endHHMM);
+    if(startMin == null || endMin == null){ alert('Horario inválido.'); return; }
+    if(endMin <= startMin){ alert('El horario de término debe ser mayor que el de inicio.'); return; }
+    if(startMin < AGEND_DAY_START_MIN || endMin > AGEND_DAY_END_MIN){
+      alert(`Horario fuera del rango permitido (${_agendMinToHHMM(AGEND_DAY_START_MIN)}–${_agendMinToHHMM(AGEND_DAY_END_MIN)}).`); return;
+    }
+  }
+
+  // Validación: si NO es Extra Y NO es modo AM/PM, debe respetar el horario regular de la sala
+  if(!isExtra && !isAmPm){
     const hrs = _agendSalaHoursForDate(salaId, dateStr);
     if(!hrs){
       alert(`${sala?sala.name:'Esta sala'} no tiene agenda regular este día.\nUsa "Agendamiento Extra" si necesitas atender igualmente (requiere visado).`);
@@ -4961,21 +5263,34 @@ function agendSubmitSolicitud(ev){
       return;
     }
   }
-  // 1) Solapamiento contra propias de la sala (paralelo permitido solo si Extra y sala lo permite)
-  const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin, null, isExtra);
-  if(overlap){
-    alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElige otro horario.`);
-    _agendUpdateRangoHint();
-    return;
+  // En modo AM/PM, verificar que la sala esté abierta ese día
+  if(isAmPm){
+    if(!_agendIsDayOpenForSala(salaId, dateStr)){
+      alert(`${sala?sala.name:'Esta sala'} no recibe solicitudes este día.`);
+      return;
+    }
   }
-  // 2) Cross-block contra otras salas (Endo/Imagenología reservan a Neuro/Onco/MedComp)
-  const cross = _agendFindCrossBlock(salaId, dateStr, startMin, endMin);
-  if(cross){
-    const otra = cross.sala ? cross.sala.name : 'otra sala';
-    alert(`${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)}. Esa franja queda bloqueada para ${sala?sala.name:'esta sala'}.\nElige otro horario.`);
-    _agendUpdateRangoHint();
-    return;
+
+  // Salas AM/PM no participan en overlap ni cross-block:
+  // su agenda es flexible (acepta paralelos sin tomar al anestesiólogo en un horario preciso)
+  if(!isAmPm){
+    // 1) Solapamiento contra propias de la sala (paralelo permitido solo si Extra y sala lo permite)
+    const overlap = _agendFindOverlap(salaId, dateStr, startMin, endMin, null, isExtra);
+    if(overlap){
+      alert(`Ese horario choca con otra solicitud: ${_agendFmtRange(overlap.startMin, overlap.endMin)} (${overlap.estado}).\nElige otro horario.`);
+      _agendUpdateRangoHint();
+      return;
+    }
+    // 2) Cross-block contra otras salas
+    const cross = _agendFindCrossBlock(salaId, dateStr, startMin, endMin);
+    if(cross){
+      const otra = cross.sala ? cross.sala.name : 'otra sala';
+      alert(`${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)}. Esa franja queda bloqueada para ${sala?sala.name:'esta sala'}.\nElige otro horario.`);
+      _agendUpdateRangoHint();
+      return;
+    }
   }
+
   const data = agendLoadData();
   data[salaId] = data[salaId] || {};
   if(!Array.isArray(data[salaId][dateStr])){
@@ -4989,10 +5304,19 @@ function agendSubmitSolicitud(ev){
     unidadCode: AGEND_STATE.unidadCode,
     solicitanteNombre: AGEND_STATE.solicitanteNombre,
     solicitanteTel: AGEND_STATE.solicitanteTel,
+    solicitanteEmail: AGEND_STATE.solicitanteEmail || '',
     estado: 'pendiente',
     createdAt: Date.now(),
     visadoBy: null, visadoAt: null, comentarioVisado: ''
   };
+  if(block) req.block = block;
+  // Campos extras para Accesos Vasculares
+  if(sala && sala.id === 'accesos_vasculares'){
+    const lado = document.getElementById('afAccesosLado'); if(lado) req.accesosLado = lado.value;
+    const urg  = document.getElementById('afAccesosUrg');  if(urg)  req.accesosUrgencia = urg.value;
+    const vasc = document.getElementById('afAccesosVasc'); if(vasc) req.accesosHallazgos = vasc.value.trim();
+    const coag = document.getElementById('afAccesosCoag'); if(coag) req.accesosCoagulacion = coag.value.trim();
+  }
   data[salaId][dateStr].push(req);
   data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
@@ -5044,9 +5368,11 @@ function agendOpenFormExtra(dateStr){
   document.getElementById('afPaciente').value = '';
   document.getElementById('afEdad').value = '';
   document.getElementById('afRut').value = '';
-  document.getElementById('afProc').value = '';
+  const procInp = document.getElementById('afProc'); if(procInp) procInp.value = '';
   document.getElementById('afNotas').value = '';
   document.getElementById('afPrioridad').value = 'electiva';
+  // Aplica modo de form (catálogo/AM-PM si corresponde — defensivo, las salas con Extra son horario libre)
+  _agendApplyFormModeForSala(sala);
   // En Extra: usar rango completo 08–20 (jornada amplia)
   _agendFillTimeSelects(startMin, endMin, { useFullDay: true });
   _agendUpdateRangoHint();
@@ -5063,9 +5389,13 @@ function agendOpenDetalle(reqId){
   const sala = _agendGetSala(salaId);
   const unidad = _agendGetUnidad(req.unidadCode);
   const dt = _agendParseDateStr(dateStr);
-  const rangoTxt = (typeof req.startMin === 'number' && typeof req.endMin === 'number')
-    ? _agendFmtRange(req.startMin, req.endMin)
-    : '—';
+  const isAmPmReq = !!(sala && sala.usesAmPmOnly);
+  const reqBlock = _agendBlockOfSlot(req);
+  const rangoTxt = isAmPmReq
+    ? (reqBlock ? `Bloque ${reqBlock}` : 'Bloque AM/PM')
+    : ((typeof req.startMin === 'number' && typeof req.endMin === 'number')
+        ? _agendFmtRange(req.startMin, req.endMin)
+        : '—');
   const fmt = `${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${rangoTxt}`;
   _agendSetTitle('Detalle de solicitud', fmt);
   _agendSetHeadAction(null);
@@ -5097,15 +5427,29 @@ function agendOpenDetalle(reqId){
       </div>`;
   }
   const extraBadge = req.isExtra ? ` <span class="agend-extra-pill">EXTRA</span>` : '';
+  const horarioRow = isAmPmReq
+    ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Bloque</div><div class="agend-detalle-v">${reqBlock||'—'} <span class="agend-ampm-pill">${reqBlock==='PM'?'13:00–20:00':'08:00–13:00'}</span></div></div>`
+    : `<div class="agend-detalle-row"><div class="agend-detalle-k">Horario</div><div class="agend-detalle-v">${(typeof req.startMin==='number'&&typeof req.endMin==='number')?_agendFmtRange(req.startMin,req.endMin):'—'}</div></div>`;
+  // Bloque opcional con campos extras de Accesos Vasculares
+  const accesosRows = (sala && sala.id === 'accesos_vasculares')
+    ? `
+      ${req.accesosLado ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Lado</div><div class="agend-detalle-v">${_gpEsc(req.accesosLado)}</div></div>` : ''}
+      ${req.accesosUrgencia ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Urgencia</div><div class="agend-detalle-v">${_gpEsc(req.accesosUrgencia)}</div></div>` : ''}
+      ${req.accesosHallazgos ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Hallazgos vasculares</div><div class="agend-detalle-v">${_gpEsc(req.accesosHallazgos)}</div></div>` : ''}
+      ${req.accesosCoagulacion ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Coagulación</div><div class="agend-detalle-v">${_gpEsc(req.accesosCoagulacion)}</div></div>` : ''}
+    `
+    : '';
   body.innerHTML = `
     <div class="agend-detalle-card">
       <div class="agend-detalle-row"><div class="agend-detalle-k">Estado</div><div class="agend-detalle-v"><span class="agend-slot-status ${req.estado}">${req.estado}</span>${extraBadge}</div></div>
+      ${horarioRow}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Paciente</div><div class="agend-detalle-v">${_gpEsc(req.paciente)}${req.edad?` · ${_gpEsc(String(req.edad))} años`:''}${req.rut?` · ${_gpEsc(req.rut)}`:''}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Procedimiento</div><div class="agend-detalle-v">${_gpEsc(req.procedimiento)}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Prioridad</div><div class="agend-detalle-v">${_gpEsc(req.prioridad||'electiva')}</div></div>
+      ${accesosRows}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Antecedentes</div><div class="agend-detalle-v">${req.notas?_gpEsc(req.notas):'<em style="color:#9ca3af">Sin antecedentes adicionales</em>'}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Unidad</div><div class="agend-detalle-v">${unidad?unidad.ico+' '+_gpEsc(unidad.name):'—'}</div></div>
-      <div class="agend-detalle-row"><div class="agend-detalle-k">Solicitante</div><div class="agend-detalle-v">${_gpEsc(req.solicitanteNombre||'—')}${req.solicitanteTel?`<br><span style="color:var(--muted);font-size:12px">${_gpEsc(req.solicitanteTel)}</span>`:''}</div></div>
+      <div class="agend-detalle-row"><div class="agend-detalle-k">Solicitante</div><div class="agend-detalle-v">${_gpEsc(req.solicitanteNombre||'—')}${req.solicitanteTel?`<br><span style="color:var(--muted);font-size:12px">📞 ${_gpEsc(req.solicitanteTel)}</span>`:''}${req.solicitanteEmail?`<br><span style="color:var(--muted);font-size:12px">✉️ ${_gpEsc(req.solicitanteEmail)}</span>`:''}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Creada</div><div class="agend-detalle-v">${new Date(req.createdAt).toLocaleString('es-CL')}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Visado</div><div class="agend-detalle-v">${visadoTxt}</div></div>
       ${actionsHtml}
@@ -5148,7 +5492,78 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   slot.visadoAt = Date.now();
   slot.comentarioVisado = comentario;
   agendSaveData(data);
+  // Notificación por email al solicitante (todas las salas EXCEPTO Endoscopía)
+  if(nuevoEstado === 'aprobada' && found.salaId !== 'endoscopia'){
+    _agendOfrecerMailtoConfirmacion(slot, found.salaId, found.dateStr);
+  }
   agendOpenDetalle(reqId);
+}
+
+// Abre el cliente de correo del navegador con un mensaje pre-llenado para
+// notificar al solicitante que la solicitud fue aprobada.
+// (Salas EXCEPTO Endoscopía — ver agendVisarSolicitud)
+function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
+  if(!req || !req.solicitanteEmail){
+    // Sin email del solicitante → solo aviso visual y skip
+    toast && toast('Aprobada (sin email del solicitante registrado)');
+    return;
+  }
+  const sala = _agendGetSala(salaId);
+  const unidad = _agendGetUnidad(req.unidadCode);
+  const dt = _agendParseDateStr(dateStr);
+  const fechaTxt = `${_agendDiasES[dt.getDay()]} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} de ${dt.getFullYear()}`;
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+  const block = _agendBlockOfSlot(req);
+  const horarioTxt = isAmPm
+    ? (block === 'PM' ? 'Bloque PM (aprox. 13:00–20:00)' : 'Bloque AM (aprox. 08:00–13:00)')
+    : ((typeof req.startMin === 'number' && typeof req.endMin === 'number')
+        ? `Horario ${_agendFmtRange(req.startMin, req.endMin)}`
+        : 'Horario por confirmar');
+  const visadoTxt = req.visadoBy ? `${req.visadoBy}` : 'Servicio de Anestesia';
+  const subject = `Agendamiento APROBADO · ${sala?sala.name:'Procedimiento'} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()}`;
+  const lineas = [];
+  lineas.push(`Estimado(a) ${req.solicitanteNombre || ''}:`);
+  lineas.push('');
+  lineas.push(`Te confirmamos que la siguiente solicitud de agendamiento fue APROBADA por el Servicio de Anestesia.`);
+  lineas.push('');
+  lineas.push(`• Sala: ${sala ? sala.name : '—'}`);
+  lineas.push(`• Unidad solicitante: ${unidad ? unidad.name : '—'}`);
+  lineas.push(`• Fecha: ${fechaTxt}`);
+  lineas.push(`• ${horarioTxt}`);
+  lineas.push(`• Paciente: ${req.paciente || '—'}${req.edad?` · ${req.edad} años`:''}${req.rut?` · RUT ${req.rut}`:''}`);
+  lineas.push(`• Procedimiento: ${req.procedimiento || '—'}`);
+  lineas.push(`• Prioridad: ${req.prioridad || 'electiva'}`);
+  if(req.notas) lineas.push(`• Antecedentes: ${req.notas}`);
+  // Extras Accesos Vasculares
+  if(salaId === 'accesos_vasculares'){
+    if(req.accesosLado)        lineas.push(`• Lado preferente: ${req.accesosLado}`);
+    if(req.accesosUrgencia)    lineas.push(`• Urgencia: ${req.accesosUrgencia}`);
+    if(req.accesosHallazgos)   lineas.push(`• Hallazgos vasculares: ${req.accesosHallazgos}`);
+    if(req.accesosCoagulacion) lineas.push(`• Coagulación: ${req.accesosCoagulacion}`);
+  }
+  if(req.isExtra) lineas.push(`• Tipo: AGENDAMIENTO EXTRA`);
+  lineas.push('');
+  if(req.comentarioVisado){
+    lineas.push(`Comentario del Servicio de Anestesia:`);
+    lineas.push(`"${req.comentarioVisado}"`);
+    lineas.push('');
+  }
+  lineas.push(`Aprobado por: ${visadoTxt}`);
+  lineas.push(`Fecha de visado: ${new Date(req.visadoAt || Date.now()).toLocaleString('es-CL')}`);
+  lineas.push('');
+  lineas.push('Por favor confirma la recepción de este correo.');
+  lineas.push('');
+  lineas.push('— Servicio de Anestesia');
+  const body = lineas.join('\n');
+  const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Confirmación rápida y luego abrir el cliente de correo
+  const ok = confirm(`Solicitud APROBADA. ¿Abrir tu cliente de correo para notificar a ${req.solicitanteEmail}?\n\nSi cancelas, la aprobación queda registrada igualmente.`);
+  if(!ok) return;
+  try{
+    window.location.href = url;
+  }catch(e){
+    try{ window.open(url, '_self'); }catch(e2){}
+  }
 }
 
 // --- Vista: Overview admin (pendientes / aprobadas / rechazadas) ---

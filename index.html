@@ -715,6 +715,13 @@ canvas{max-width:100%}
 
 /* Hint del rango horario en el form de solicitud */
 .agend-form-hint{font-size:12.5px;line-height:1.45;margin:-4px 0 12px;padding:8px 10px;background:#f3f4f6;border-radius:8px;min-height:18px}
+.agend-ampm-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 14px}
+.agend-ampm-btn{padding:14px 12px;border:2px solid #d1d5db;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;text-align:center;transition:all .15s}
+.agend-ampm-btn:hover{border-color:var(--green-deep);transform:translateY(-1px)}
+.agend-ampm-btn.active{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border-color:#0f766e;box-shadow:0 4px 12px rgba(13,148,136,.25)}
+.agend-ampm-btn .agend-ampm-lbl{font-size:18px;font-weight:800;letter-spacing:.5px}
+.agend-ampm-btn .agend-ampm-sub{font-size:11.5px;opacity:.85;margin-top:2px}
+.agend-ampm-pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ccfbf1;color:#0f766e;font-size:11px;font-weight:700;margin-left:6px;letter-spacing:.3px}
 
 /* Separador "Solicitudes rechazadas" en la vista de día */
 .agend-day-section{margin:18px 4px 6px;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
@@ -982,6 +989,8 @@ canvas{max-width:100%}
         <input type="text" id="agendUnidadNombre" placeholder="Dr/a. apellido, nombre" autocomplete="name" />
         <label>Teléfono / anexo de contacto</label>
         <input type="text" id="agendUnidadTel" placeholder="Ej: anexo 4321 o +56 9 ..." />
+        <label>Email de contacto <span style="color:var(--muted);font-weight:400">(para recibir confirmaciones)</span></label>
+        <input type="email" id="agendUnidadEmail" placeholder="tu.correo@hospital.cl" autocomplete="email" />
         <button type="button" class="agend-btn-primary" onclick="agendUnidadDoLogin()">Entrar</button>
       </div>
     </div>
@@ -1021,15 +1030,32 @@ canvas{max-width:100%}
     <div class="agend-view" data-view="form">
       <div id="agendFormHead" class="agend-day-head"></div>
       <form id="agendForm" class="agend-form-block" onsubmit="agendSubmitSolicitud(event)">
-        <label>Horario (08:00 a 20:00, bloques de 30 min) *</label>
-        <div class="row2">
-          <div>
-            <label style="font-size:12px;color:var(--muted);font-weight:500">Inicio</label>
-            <select id="afHoraInicio" onchange="_agendOnTimeChange('start')"></select>
+        <!-- Modo HORARIO PRECISO (default) -->
+        <div id="afHorarioPrecisoBlock">
+          <label>Horario (08:00 a 20:00, bloques de 30 min) *</label>
+          <div class="row2">
+            <div>
+              <label style="font-size:12px;color:var(--muted);font-weight:500">Inicio</label>
+              <select id="afHoraInicio" onchange="_agendOnTimeChange('start')"></select>
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--muted);font-weight:500">Término</label>
+              <select id="afHoraFin" onchange="_agendOnTimeChange('end')"></select>
+            </div>
           </div>
-          <div>
-            <label style="font-size:12px;color:var(--muted);font-weight:500">Término</label>
-            <select id="afHoraFin" onchange="_agendOnTimeChange('end')"></select>
+        </div>
+        <!-- Modo AM/PM (salas con usesAmPmOnly, ej: Accesos Vasculares) -->
+        <div id="afHorarioAmPmBlock" style="display:none">
+          <label>Bloque horario aproximado *</label>
+          <div class="agend-ampm-toggle">
+            <button type="button" id="afBlockAM" class="agend-ampm-btn active" onclick="_agendSelectBlock('AM')">
+              <div class="agend-ampm-lbl">AM</div>
+              <div class="agend-ampm-sub">08:00 – 13:00</div>
+            </button>
+            <button type="button" id="afBlockPM" class="agend-ampm-btn" onclick="_agendSelectBlock('PM')">
+              <div class="agend-ampm-lbl">PM</div>
+              <div class="agend-ampm-sub">13:00 – 20:00</div>
+            </button>
           </div>
         </div>
         <div id="afRangoHint" class="agend-form-hint"></div>
@@ -1045,8 +1071,43 @@ canvas{max-width:100%}
             <input type="text" id="afRut" placeholder="12.345.678-9" autocomplete="off" />
           </div>
         </div>
-        <label>Procedimiento solicitado *</label>
-        <input type="text" id="afProc" required placeholder="Ej: Colonoscopía + EDA, RM cerebral, Sedación dental..." />
+        <!-- Procedimiento: input libre (default) -->
+        <div id="afProcLibreBlock">
+          <label>Procedimiento solicitado *</label>
+          <input type="text" id="afProc" required placeholder="Ej: Colonoscopía + EDA, RM cerebral, Sedación dental..." />
+        </div>
+        <!-- Procedimiento: catálogo (salas con procedimientosCatalogo) -->
+        <div id="afProcCatalogoBlock" style="display:none">
+          <label>Procedimiento solicitado *</label>
+          <select id="afProcSelect"></select>
+          <input type="text" id="afProcOtro" placeholder="Especifica otro acceso vascular..." style="display:none;margin-top:6px" />
+        </div>
+        <!-- Campos clínicos extras (solo Accesos Vasculares) -->
+        <div id="afAccesosExtraBlock" style="display:none">
+          <div class="row2">
+            <div>
+              <label>Lado preferente</label>
+              <select id="afAccesosLado">
+                <option value="">— Sin preferencia —</option>
+                <option value="derecho">Derecho</option>
+                <option value="izquierdo">Izquierdo</option>
+                <option value="bilateral">Bilateral / Indistinto</option>
+              </select>
+            </div>
+            <div>
+              <label>Urgencia clínica</label>
+              <select id="afAccesosUrg">
+                <option value="programado">Programado</option>
+                <option value="hoy">Hoy mismo</option>
+                <option value="urgente">Urgente (&lt; 24h)</option>
+              </select>
+            </div>
+          </div>
+          <label>Hallazgos vasculares / accesos previos</label>
+          <textarea id="afAccesosVasc" placeholder="Vasos disponibles, accesos previos, trombosis, hematomas, ubicaciones a evitar..."></textarea>
+          <label>Plaquetas / Coagulación</label>
+          <input type="text" id="afAccesosCoag" placeholder="Ej: plaquetas 120k, INR 1.1, TACO suspendido hace 48h" autocomplete="off" />
+        </div>
         <label>Indicación clínica / antecedentes relevantes</label>
         <textarea id="afNotas" placeholder="Comorbilidades, alergias, medicamentos, ASA, ayuno, motivo del procedimiento..."></textarea>
         <label>Prioridad</label>
@@ -1579,6 +1640,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=40"></script>
+<script src="app.js?v=41"></script>
 </body>
 </html>
