@@ -570,6 +570,55 @@ canvas{max-width:100%}
 .gp-section.open .gp-section-chevron{transform:rotate(90deg)}
 .gp-section-body{display:none;padding:14px 16px;background:#fff}
 .gp-section.open .gp-section-body{display:block}
+
+/* ===== Portal Preanestésico · Grid de cards (home) ===== */
+.gp-portal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px}
+@media (max-width:520px){.gp-portal-grid{grid-template-columns:1fr;gap:10px}}
+.gp-portal-card{background:#fff;border:1.5px solid var(--border);border-radius:16px;padding:16px 14px 14px;cursor:pointer;font-family:inherit;text-align:left;color:inherit;display:flex;flex-direction:column;gap:8px;position:relative;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;min-height:148px;box-shadow:0 1px 3px rgba(15,68,53,.04)}
+.gp-portal-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(15,68,53,.10);border-color:#bbdfce}
+.gp-portal-card:active{transform:translateY(0)}
+.gp-portal-card-ico{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 2px 6px rgba(30,107,84,.25)}
+.gp-portal-card-title{font-weight:800;font-size:14.5px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.25;letter-spacing:-.1px}
+.gp-portal-card-desc{font-size:12px;color:var(--muted);line-height:1.45;flex:1}
+.gp-portal-card-arrow{position:absolute;top:14px;right:14px;color:var(--green-forest);font-size:18px;font-weight:700;opacity:.6}
+.gp-portal-card:hover .gp-portal-card-arrow{opacity:1;transform:translateX(2px);transition:transform .15s ease}
+
+/* ===== Portal Preanestésico · Sub-vista de sección (full content) ===== */
+.gp-section-view{display:none;animation:gpFadeIn .2s ease}
+.gp-section-view.active{display:block}
+@keyframes gpFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.gp-section-view-head{display:flex;align-items:center;gap:10px;margin:6px 0 14px}
+.gp-section-view-back{background:#fff;border:1.5px solid var(--border);color:var(--primary-dark);font-family:inherit;font-weight:700;font-size:13px;padding:8px 12px 8px 10px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background .15s,border-color .15s}
+.gp-section-view-back:hover{background:#ecfaf3;border-color:#bbdfce}
+.gp-section-view-back .gp-back-chev{font-size:16px;line-height:1;color:var(--green-forest)}
+.gp-section-view-titlewrap{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.gp-section-view-ico{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.gp-section-view-title{font-weight:800;font-size:16px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.2}
+@media (max-width:480px){.gp-section-view-title{font-size:14.5px}}
+
+/* ===== Portal Preanestésico · Hero con badges resumen ===== */
+.gp-hero{background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #bbf7d0;border-radius:14px;padding:13px 14px;margin-bottom:14px}
+.gp-hero-label{font-size:11px;color:var(--green-deep);font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.gp-hero-label-dot{width:6px;height:6px;border-radius:50%;background:var(--green-forest);display:inline-block}
+.gp-hero-chips{display:flex;flex-wrap:wrap;gap:6px}
+.gp-hero-chip{background:#fff;border:1.5px solid #bbf7d0;color:var(--primary-dark);font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:8px;line-height:1.3;letter-spacing:.1px;box-shadow:0 1px 2px rgba(15,68,53,.04)}
+
+/* ===== Portal Preanestésico · FAB calculadora ===== */
+.gp-fab{position:fixed;bottom:22px;right:22px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;border:none;border-radius:999px;padding:12px 18px 12px 14px;font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.3px;cursor:pointer;box-shadow:0 6px 20px rgba(15,68,53,.30),0 2px 6px rgba(15,68,53,.20);display:inline-flex;align-items:center;gap:8px;z-index:90;transition:transform .15s ease,box-shadow .15s ease}
+.gp-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(15,68,53,.36),0 3px 8px rgba(15,68,53,.22)}
+.gp-fab:active{transform:translateY(0)}
+.gp-fab.hidden{display:none!important}
+.gp-fab-ico{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:15px}
+@media (max-width:480px){.gp-fab{bottom:16px;right:16px;padding:11px 16px 11px 12px;font-size:12.5px}}
+
+/* ===== Portal Preanestésico · Modal calculadora ===== */
+.modal.gp-calc-modal .box{max-width:680px;width:calc(100% - 28px);padding:0;max-height:88vh;display:flex;flex-direction:column}
+.gp-calc-modal-head{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1.5px solid var(--border);flex-shrink:0}
+.gp-calc-modal-ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.gp-calc-modal-title{font-weight:800;font-size:15px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;flex:1;line-height:1.2}
+.gp-calc-modal-close{background:transparent;border:none;color:var(--muted);font-size:26px;line-height:1;cursor:pointer;padding:0 6px;font-family:inherit}
+.gp-calc-modal-close:hover{color:var(--primary-dark)}
+.gp-calc-modal-body{padding:14px 16px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
 .gp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .gp-table th{background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;padding:9px 10px;text-align:left;font-weight:700;font-size:11.5px;letter-spacing:.3px}
 .gp-table td{padding:9px 10px;border-top:1px solid var(--border);vertical-align:top;line-height:1.4}
@@ -1053,73 +1102,127 @@ canvas{max-width:100%}
     </div>
     <div id="gpSearchResults"></div>
     <div id="gpDefaultBlock">
-      <div class="gp-hint">O explora las secciones del Portal:</div>
-    </div>
+      <!-- HOME: grid de 6 tarjetas grandes -->
+      <div id="gpPortalHome">
+        <div class="gp-hint">Explora las secciones del Portal:</div>
+        <div class="gp-portal-grid">
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpConsulta')">
+            <div class="gp-portal-card-ico">📅</div>
+            <div class="gp-portal-card-title">Consulta Preanestésica</div>
+            <div class="gp-portal-card-desc">Agenda, horarios y sobrecupos</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpAyuno')">
+            <div class="gp-portal-card-ico">🍽️</div>
+            <div class="gp-portal-card-title">Ayuno Preoperatorio</div>
+            <div class="gp-portal-card-desc">Tiempos por ingesta + GLP-1</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpSusp')">
+            <div class="gp-portal-card-ico">💊</div>
+            <div class="gp-portal-card-title">Fármacos a Suspender</div>
+            <div class="gp-portal-card-desc">Qué seguir, qué suspender y cuándo</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpExam')">
+            <div class="gp-portal-card-ico">🧪</div>
+            <div class="gp-portal-card-title">Exámenes Preoperatorios</div>
+            <div class="gp-portal-card-desc">Qué pedir según ASA y riesgo</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpAnticoag')">
+            <div class="gp-portal-card-ico">🩸</div>
+            <div class="gp-portal-card-title">Anticoagulantes</div>
+            <div class="gp-portal-card-desc">Manejo perioperatorio · TACO/NOAC</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+          <button type="button" class="gp-portal-card" onclick="openGuiasSection('gpRiesgoCv')">
+            <div class="gp-portal-card-ico">❤️</div>
+            <div class="gp-portal-card-title">Riesgo Cardiovascular</div>
+            <div class="gp-portal-card-desc">RCRI, METs y derivación a Cardio</div>
+            <div class="gp-portal-card-arrow">›</div>
+          </button>
+        </div>
+      </div>
 
-    <!-- 1) Consulta Preanestésica -->
-    <div id="gpConsulta" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpConsulta')">
-        <div class="gp-section-ico">📅</div>
-        <div class="gp-section-title">Consulta Preanestésica · Agenda y sobrecupos</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpConsultaBody"></div>
-    </div>
+      <!-- SUB-VISTAS: una activa a la vez (full content por sección) -->
+      <div id="gpConsulta" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">📅</div>
+            <div class="gp-section-view-title">Consulta Preanestésica</div>
+          </div>
+        </div>
+        <div id="gpConsultaBody"></div>
+      </div>
 
-    <!-- 2) Ayuno + GLP-1 -->
-    <div id="gpAyuno" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpAyuno')">
-        <div class="gp-section-ico">🍽️</div>
-        <div class="gp-section-title">Ayuno Preoperatorio · Tiempos y GLP-1</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpAyunoBody"></div>
-    </div>
+      <div id="gpAyuno" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">🍽️</div>
+            <div class="gp-section-view-title">Ayuno Preoperatorio</div>
+          </div>
+        </div>
+        <div id="gpAyunoBody"></div>
+      </div>
 
-    <!-- 3) Suspensión Fármacos -->
-    <div id="gpSusp" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpSusp')">
-        <div class="gp-section-ico">💊</div>
-        <div class="gp-section-title">Fármacos a Suspender en el Preoperatorio</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpSuspBody"></div>
-    </div>
+      <div id="gpSusp" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">💊</div>
+            <div class="gp-section-view-title">Fármacos a Suspender en el Preoperatorio</div>
+          </div>
+        </div>
+        <div id="gpSuspBody"></div>
+      </div>
 
-    <!-- 4) Exámenes Preoperatorios -->
-    <div id="gpExam" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpExam')">
-        <div class="gp-section-ico">🧪</div>
-        <div class="gp-section-title">Exámenes Preoperatorios · Qué pedir y cuándo</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpExamBody"></div>
-    </div>
+      <div id="gpExam" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">🧪</div>
+            <div class="gp-section-view-title">Exámenes Preoperatorios</div>
+          </div>
+        </div>
+        <div id="gpExamBody"></div>
+      </div>
 
-    <!-- 5) Anticoagulantes / Antiagregantes -->
-    <div id="gpAnticoag" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpAnticoag')">
-        <div class="gp-section-ico">🩸</div>
-        <div class="gp-section-title">Anticoagulantes y Antiagregantes · Manejo periop</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpAnticoagBody"></div>
-    </div>
+      <div id="gpAnticoag" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">🩸</div>
+            <div class="gp-section-view-title">Anticoagulantes y Antiagregantes</div>
+          </div>
+        </div>
+        <div id="gpAnticoagBody"></div>
+      </div>
 
-    <!-- 6) Riesgo Cardiovascular -->
-    <div id="gpRiesgoCv" class="gp-section">
-      <button type="button" class="gp-section-head" onclick="toggleGuiasSection('gpRiesgoCv')">
-        <div class="gp-section-ico">❤️</div>
-        <div class="gp-section-title">Riesgo Cardiovascular y Derivación a Cardiología</div>
-        <div class="gp-section-chevron">›</div>
-      </button>
-      <div class="gp-section-body" id="gpRiesgoCvBody"></div>
+      <div id="gpRiesgoCv" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">❤️</div>
+            <div class="gp-section-view-title">Riesgo Cardiovascular y Derivación</div>
+          </div>
+        </div>
+        <div id="gpRiesgoCvBody"></div>
+      </div>
     </div>
 
     <div class="gp-foot-note">
       <b>⚠ Nota clínica.</b> Las recomendaciones de este Portal son orientativas y sintetizan los protocolos institucionales de la Clínica Universidad de los Andes y las guías ACC/AHA 2014 para cirugía no cardíaca. La decisión final debe individualizarse considerando comorbilidades, tipo de cirugía, técnica anestésica y riesgo trombótico/hemorrágico del paciente. Ante dudas, coordinar con Cardiología, Endocrinología o el Servicio de Anestesia.
     </div>
   </div>
+
+  <!-- FAB calculadora (solo visible en secciones con calc) -->
+  <button type="button" id="gpFab" class="gp-fab hidden" onclick="openCalcModal()">
+    <span class="gp-fab-ico">🧮</span>
+    <span id="gpFabLabel">Abrir calculadora</span>
+  </button>
 </div>
 
 <!-- AGENDAMIENTO DE PROCEDIMIENTOS (overlay full-screen) -->
@@ -1832,6 +1935,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=44"></script>
+<script src="app.js?v=45"></script>
 </body>
 </html>

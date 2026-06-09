@@ -3897,15 +3897,21 @@ function openGuiasModule(){
   if(mod) mod.classList.add('hidden');
   const g = document.getElementById('guiasScreen');
   if(g) g.classList.remove('hidden');
-  // Estado inicial: buscador limpio, bloque por defecto visible, tablas cerradas.
+  // Estado inicial: buscador limpio, bloque por defecto visible, home grid visible, sub-vistas cerradas.
   const inp = document.getElementById('gpSearchInput');
   if(inp){ inp.value=''; setTimeout(() => inp.focus(), 50); }
   const def = document.getElementById('gpDefaultBlock');
   if(def) def.classList.remove('hidden');
   const res = document.getElementById('gpSearchResults');
   if(res) res.innerHTML = '';
-  // Cerrar tablas: el CSS usa la clase 'open' en .gp-section para mostrar el body.
-  document.querySelectorAll('#guiasScreen .gp-section').forEach(s => s.classList.remove('open'));
+  // Volver al home grid: oculta sub-vistas y muestra el grid.
+  document.querySelectorAll('#guiasScreen .gp-section-view').forEach(s => s.classList.remove('active'));
+  const home = document.getElementById('gpPortalHome');
+  if(home) home.style.display = '';
+  // Oculta FAB
+  const fab = document.getElementById('gpFab');
+  if(fab) fab.classList.add('hidden');
+  if(typeof _GP_ACTIVE_CALC !== 'undefined'){ _GP_ACTIVE_CALC = null; }
   // Scroll del body al tope
   const body = document.querySelector('#guiasScreen .guias-body');
   if(body) body.scrollTop = 0;
@@ -4012,30 +4018,165 @@ function renderGuiasSearchResults(query){
     <div class="gp-results">${cards}</div>`;
 }
 
-// Mostrar/ocultar tablas completas.
-// El CSS controla visibilidad del body con la clase 'open' en .gp-section.
-const _GP_SECTIONS = ['gpConsulta','gpAyuno','gpSusp','gpExam','gpAnticoag','gpRiesgoCv'];
-function toggleGuiasSection(id){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const wasOpen = el.classList.contains('open');
-  // Cerrar todas las secciones
-  _GP_SECTIONS.forEach(x => {
-    const e = document.getElementById(x);
-    if(e) e.classList.remove('open');
-  });
-  if(!wasOpen){
-    el.classList.add('open');
-    if(id === 'gpConsulta') renderGuiasConsultaPreanestesica();
-    if(id === 'gpAyuno') renderGuiasAyunoTable();
-    if(id === 'gpSusp') renderGuiasSuspTable();
-    if(id === 'gpExam') renderGuiasExamenes();
-    if(id === 'gpAnticoag') renderGuiasAnticoag();
-    if(id === 'gpRiesgoCv') renderGuiasRiesgoCv();
-    // Scroll suave al elemento abierto
-    setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+// ============================================================
+// Portal Preanestésico · Navegación grid → sub-vista
+// ============================================================
+// Cada sección define: bodyId, render, hero (label + chips), y opcional calc {label, render}.
+const _GP_SECTIONS_META = {
+  gpConsulta: {
+    bodyId: 'gpConsultaBody',
+    render: () => renderGuiasConsultaPreanestesica(),
+    hero: {
+      label: 'Resumen rápido',
+      chips: ['Lun a Sáb · 08:00 – 17:00', '4 sobrecupos/día', 'Aviso ≥ 24 h']
+    }
+  },
+  gpAyuno: {
+    bodyId: 'gpAyunoBody',
+    render: () => renderGuiasAyunoTable(),
+    hero: {
+      label: 'Tiempos de ayuno',
+      chips: ['8 h sólidos', '6 h leche/fórmula', '2 h líquidos claros', 'GLP-1 ≥ 7 d']
+    }
+  },
+  gpSusp: {
+    bodyId: 'gpSuspBody',
+    render: () => renderGuiasSuspTable(),
+    hero: {
+      label: 'Reglas clave',
+      chips: ['AAS: continuar', 'Clopidogrel: 5–7 d', 'Warfarina: 5 d', 'NOACs: ver tabla']
+    }
+  },
+  gpExam: {
+    bodyId: 'gpExamBody',
+    render: () => renderGuiasExamenes(),
+    hero: {
+      label: 'Criterio general',
+      chips: ['ASA I–II bajo: nada', 'Pedir dirigido', 'Vigentes ≤ 6 meses']
+    },
+    calc: {
+      label: 'Abrir calculadora',
+      title: 'Calculadora de exámenes preoperatorios',
+      ico: '🧪',
+      render: () => _renderExamCalcCard()
+    }
+  },
+  gpAnticoag: {
+    bodyId: 'gpAnticoagBody',
+    render: () => renderGuiasAnticoag(),
+    hero: {
+      label: 'Decisiones clave',
+      chips: ['Riesgo tromb. vs hemorr.', 'Bridge según riesgo', 'Reversión urgente disponible']
+    }
+  },
+  gpRiesgoCv: {
+    bodyId: 'gpRiesgoCvBody',
+    render: () => renderGuiasRiesgoCv(),
+    hero: {
+      label: 'RCRI · referencia',
+      chips: ['0 factores → 0,4 %', '1 → 0,9 %', '2 → 6,6 %', '≥ 3 → ≥ 11 %', 'Umbral 4 METs']
+    },
+    calc: {
+      label: 'Abrir calculadora RCRI',
+      title: 'Calculadora RCRI · Lee Revised Cardiac Risk Index',
+      ico: '❤️',
+      render: () => _renderRcriCalcCard()
+    }
   }
+};
+const _GP_SECTIONS = Object.keys(_GP_SECTIONS_META);
+let _GP_ACTIVE_CALC = null;
+
+function _renderGpHero(hero){
+  if(!hero || !hero.chips || !hero.chips.length) return '';
+  const chips = hero.chips.map(c => `<span class="gp-hero-chip">${_gpEsc(c)}</span>`).join('');
+  return `
+    <div class="gp-hero">
+      <div class="gp-hero-label"><span class="gp-hero-label-dot"></span>${_gpEsc(hero.label || 'Resumen')}</div>
+      <div class="gp-hero-chips">${chips}</div>
+    </div>`;
 }
+
+function openGuiasSection(id){
+  const meta = _GP_SECTIONS_META[id];
+  if(!meta) return;
+  // Oculta home
+  const home = document.getElementById('gpPortalHome');
+  if(home) home.style.display = 'none';
+  // Oculta todas las sub-vistas
+  _GP_SECTIONS.forEach(k => {
+    const e = document.getElementById(k);
+    if(e) e.classList.remove('active');
+  });
+  // Muestra la sub-vista solicitada
+  const el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  // Render contenido
+  try{ if(typeof meta.render === 'function') meta.render(); }catch(e){ console.error('Render error', id, e); }
+  // Prepend hero al body si corresponde
+  const body = document.getElementById(meta.bodyId);
+  if(body && meta.hero){
+    body.insertAdjacentHTML('afterbegin', _renderGpHero(meta.hero));
+  }
+  // FAB calculadora
+  const fab = document.getElementById('gpFab');
+  if(fab){
+    if(meta.calc){
+      fab.classList.remove('hidden');
+      const lbl = document.getElementById('gpFabLabel');
+      if(lbl) lbl.textContent = meta.calc.label;
+      _GP_ACTIVE_CALC = meta.calc;
+    } else {
+      fab.classList.add('hidden');
+      _GP_ACTIVE_CALC = null;
+    }
+  }
+  // Scroll arriba
+  const wrap = document.querySelector('#guiasScreen .guias-body');
+  if(wrap){ try{ wrap.scrollTo({top:0, behavior:'instant'}); }catch(e){ wrap.scrollTop = 0; } }
+}
+
+function closeGuiasSection(){
+  // Oculta todas las sub-vistas
+  _GP_SECTIONS.forEach(k => {
+    const e = document.getElementById(k);
+    if(e) e.classList.remove('active');
+  });
+  // Muestra home
+  const home = document.getElementById('gpPortalHome');
+  if(home) home.style.display = '';
+  // Oculta FAB
+  const fab = document.getElementById('gpFab');
+  if(fab) fab.classList.add('hidden');
+  _GP_ACTIVE_CALC = null;
+  // Scroll arriba
+  const wrap = document.querySelector('#guiasScreen .guias-body');
+  if(wrap){ try{ wrap.scrollTo({top:0, behavior:'instant'}); }catch(e){ wrap.scrollTop = 0; } }
+}
+
+function openCalcModal(){
+  if(!_GP_ACTIVE_CALC) return;
+  const c = _GP_ACTIVE_CALC;
+  const inner = (typeof c.render === 'function') ? c.render() : '';
+  const html = `
+    <div class="gp-calc-modal-head">
+      <div class="gp-calc-modal-ico">${_gpEsc(c.ico || '🧮')}</div>
+      <div class="gp-calc-modal-title">${_gpEsc(c.title || 'Calculadora')}</div>
+      <button type="button" class="gp-calc-modal-close" onclick="closeCalcModal()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="gp-calc-modal-body">${inner}</div>`;
+  const modalEl = document.getElementById('modal');
+  if(modalEl) modalEl.classList.add('gp-calc-modal');
+  modal(html);
+}
+function closeCalcModal(){
+  const modalEl = document.getElementById('modal');
+  if(modalEl) modalEl.classList.remove('gp-calc-modal');
+  closeModal();
+}
+
+// Compatibilidad: si algún call-site antiguo usa toggleGuiasSection, redirige al nuevo flujo.
+function toggleGuiasSection(id){ openGuiasSection(id); }
 
 // Render tabla Ayuno + GLP-1
 function renderGuiasAyunoTable(){
@@ -4505,6 +4646,82 @@ window.resetExamenes = function(){
 // ============================================================
 // SECCIÓN: Exámenes Preoperatorios
 // ============================================================
+// Calc card de exámenes (se renderiza en el modal cuando el usuario presiona el FAB).
+function _renderExamCalcCard(){
+  return `
+    <p class="gp-calc-sub" style="margin-top:0">Ingresa datos del paciente y procedimiento → te decimos qué exámenes pedir, qué evitar y cuándo derivar/diferir.</p>
+    <form id="examCalcForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularExamenes();return false;">
+      <div class="gp-calc-grid">
+        <label class="gp-calc-field">
+          <span>Edad (años)</span>
+          <input type="number" id="exEdad" min="0" max="120" placeholder="Ej: 67" inputmode="numeric">
+        </label>
+        <label class="gp-calc-field">
+          <span>ASA</span>
+          <select id="exAsa">
+            <option value="1">ASA I — sano</option>
+            <option value="2">ASA II — enf. sistémica leve</option>
+            <option value="3">ASA III — enf. sistémica severa</option>
+            <option value="4">ASA IV — amenaza vital</option>
+          </select>
+        </label>
+        <label class="gp-calc-field">
+          <span>Riesgo quirúrgico</span>
+          <select id="exRiesgoQx">
+            <option value="bajo">Bajo (&lt;1%)</option>
+            <option value="intermedio">Intermedio (1–5%)</option>
+            <option value="alto">Alto (&gt;5%)</option>
+          </select>
+        </label>
+        <label class="gp-calc-field">
+          <span>Capacidad funcional</span>
+          <select id="exCf">
+            <option value="desconocida">Desconocida</option>
+            <option value=">=4METs">≥ 4 METs (sube 1 piso sin síntomas)</option>
+            <option value="<4METs">&lt; 4 METs (limitado)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="gp-calc-section-title">Comorbilidades</div>
+      <div class="gp-calc-chips">
+        <label class="gp-chk"><input type="checkbox" id="exComorb_DM"><span>Diabetes mellitus</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_HTA"><span>HTA</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_IRC"><span>ERC / Riesgo AKI</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_ICC"><span>ICC</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_CardioIsq"><span>Cardiopatía isquémica</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_EPOC"><span>EPOC / Asma severo</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_Hepatopatia"><span>Hepatopatía / DHC</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_TACO"><span>TACO / NOAC</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_MCP_DAI"><span>MCP / DAI</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exComorb_ACV_previo"><span>ACV / AIT previo</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEdadFertil"><span>Mujer en edad fértil</span></label>
+      </div>
+
+      <div class="gp-calc-section-title">Exámenes previos (válidos)</div>
+      <div class="gp-calc-chips">
+        <label class="gp-chk"><input type="checkbox" id="exEcgReciente"><span>ECG &lt; 12 meses sin cambios</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEcoReciente"><span>Ecocardio &lt; 12 meses sin cambios</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exLabsRecientes"><span>Labs &lt; 6 meses, estable</span></label>
+      </div>
+
+      <div class="gp-calc-section-title">Eventos cardiovasculares recientes</div>
+      <div class="gp-calc-chips">
+        <label class="gp-chk"><input type="checkbox" id="exEvt_ACV_3m"><span>ACV/AIT &lt; 3 meses</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_SCA"><span>Stent en SCA &lt; 12 m</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_CCE_6m"><span>Stent (cor. estable) &lt; 6 m</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_TS_3m"><span>Stent + cirugía tiempo-sensible &lt; 3 m</span></label>
+        <label class="gp-chk"><input type="checkbox" id="exEvt_ANGIO_SS_14d"><span>Angioplastia s/stent &lt; 14 d</span></label>
+      </div>
+
+      <div class="gp-calc-actions">
+        <button type="submit" class="gp-calc-btn primary">🧮 Calcular exámenes</button>
+        <button type="button" class="gp-calc-btn secondary" onclick="window.resetExamenes()">↺ Limpiar</button>
+      </div>
+    </form>
+    <div id="examResultado"></div>`;
+}
+
 function renderGuiasExamenes(){
   const cont = document.getElementById('gpExamBody');
   if(!cont) return;
@@ -4513,91 +4730,13 @@ function renderGuiasExamenes(){
     <div class="gp-callout" style="margin-bottom:14px">
       <strong>🧪 Criterio general:</strong> los exámenes preoperatorios deben pedirse <em>dirigidos</em> según ASA y magnitud del procedimiento. Los exámenes indiscriminados tienen alta prevalencia de falsos positivos y pueden llevar a mala toma de decisiones, suspensiones innecesarias y aumento de costos.
     </div>
-  `;
-
-  // ===== CALCULADORA =====
-  html += `
-    <div class="gp-calc-card">
-      <div class="gp-calc-head">
-        <span class="gp-calc-ico">🧮</span>
-        <span class="gp-calc-title">Calculadora de exámenes preoperatorios</span>
-      </div>
-      <p class="gp-calc-sub">Ingresa datos del paciente y procedimiento → te decimos qué exámenes pedir, qué evitar y cuándo derivar/diferir.</p>
-      <form id="examCalcForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularExamenes();return false;">
-        <div class="gp-calc-grid">
-          <label class="gp-calc-field">
-            <span>Edad (años)</span>
-            <input type="number" id="exEdad" min="0" max="120" placeholder="Ej: 67" inputmode="numeric">
-          </label>
-          <label class="gp-calc-field">
-            <span>ASA</span>
-            <select id="exAsa">
-              <option value="1">ASA I — sano</option>
-              <option value="2">ASA II — enf. sistémica leve</option>
-              <option value="3">ASA III — enf. sistémica severa</option>
-              <option value="4">ASA IV — amenaza vital</option>
-            </select>
-          </label>
-          <label class="gp-calc-field">
-            <span>Riesgo quirúrgico</span>
-            <select id="exRiesgoQx">
-              <option value="bajo">Bajo (&lt;1%)</option>
-              <option value="intermedio">Intermedio (1–5%)</option>
-              <option value="alto">Alto (&gt;5%)</option>
-            </select>
-          </label>
-          <label class="gp-calc-field">
-            <span>Capacidad funcional</span>
-            <select id="exCf">
-              <option value="desconocida">Desconocida</option>
-              <option value=">=4METs">≥ 4 METs (sube 1 piso sin síntomas)</option>
-              <option value="<4METs">&lt; 4 METs (limitado)</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="gp-calc-section-title">Comorbilidades</div>
-        <div class="gp-calc-chips">
-          <label class="gp-chk"><input type="checkbox" id="exComorb_DM"><span>Diabetes mellitus</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_HTA"><span>HTA</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_IRC"><span>ERC / Riesgo AKI</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_ICC"><span>ICC</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_CardioIsq"><span>Cardiopatía isquémica</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_EPOC"><span>EPOC / Asma severo</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_Hepatopatia"><span>Hepatopatía / DHC</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_TACO"><span>TACO / NOAC</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_MCP_DAI"><span>MCP / DAI</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exComorb_ACV_previo"><span>ACV / AIT previo</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEdadFertil"><span>Mujer en edad fértil</span></label>
-        </div>
-
-        <div class="gp-calc-section-title">Exámenes previos (válidos)</div>
-        <div class="gp-calc-chips">
-          <label class="gp-chk"><input type="checkbox" id="exEcgReciente"><span>ECG &lt; 12 meses sin cambios</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEcoReciente"><span>Ecocardio &lt; 12 meses sin cambios</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exLabsRecientes"><span>Labs &lt; 6 meses, estable</span></label>
-        </div>
-
-        <div class="gp-calc-section-title">Eventos cardiovasculares recientes</div>
-        <div class="gp-calc-chips">
-          <label class="gp-chk"><input type="checkbox" id="exEvt_ACV_3m"><span>ACV/AIT &lt; 3 meses</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_SCA"><span>Stent en SCA &lt; 12 m</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_CCE_6m"><span>Stent (cor. estable) &lt; 6 m</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_TS_3m"><span>Stent + cirugía tiempo-sensible &lt; 3 m</span></label>
-          <label class="gp-chk"><input type="checkbox" id="exEvt_ANGIO_SS_14d"><span>Angioplastia s/stent &lt; 14 d</span></label>
-        </div>
-
-        <div class="gp-calc-actions">
-          <button type="submit" class="gp-calc-btn primary">🧮 Calcular exámenes</button>
-          <button type="button" class="gp-calc-btn secondary" onclick="window.resetExamenes()">↺ Limpiar</button>
-        </div>
-      </form>
-      <div id="examResultado"></div>
+    <div class="gp-callout info" style="margin-bottom:14px">
+      <strong>🧮 Calculadora disponible.</strong> Usa el botón <strong>«Abrir calculadora»</strong> (abajo a la derecha) para obtener una recomendación personalizada según edad, ASA, comorbilidades y riesgo quirúrgico.
     </div>
   `;
 
   // ===== TABLAS DE REFERENCIA =====
-  html += '<h3 class="gp-h3" style="margin-top:22px">Tablas por riesgo quirúrgico × ASA</h3>';
+  html += '<h3 class="gp-h3" style="margin-top:14px">Tablas por riesgo quirúrgico × ASA</h3>';
   for(const key of ['bajo','intermedio','alto']){
     const m = EXAM_PREOP_MATRIX[key];
     html += `<div class="gp-subgroup"><div class="gp-subgroup-title">${_gpEsc(m.titulo)}</div><div class="gp-subgroup-desc">${_gpEsc(m.desc)}</div>`;
@@ -4695,6 +4834,28 @@ function renderGuiasAnticoag(){
 // ============================================================
 // SECCIÓN: Riesgo Cardiovascular y Derivación a Cardiología
 // ============================================================
+// Calc card de RCRI (se renderiza en el modal cuando el usuario presiona el FAB).
+function _renderRcriCalcCard(){
+  let html = '';
+  html += `
+    <p class="gp-calc-sub" style="margin-top:0">Marca los factores presentes en tu paciente. El RCRI estima el riesgo de evento cardíaco mayor (IAM, paro, BAV completo) en cirugía no cardíaca.</p>
+    <form id="rcriForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularRCRI();return false;">
+      <div class="gp-calc-chips gp-rcri-chips">
+  `;
+  RCRI_LABELS.forEach((label, i) => {
+    html += `<label class="gp-chk gp-chk-rcri"><input type="checkbox" id="rcriChk${i}"><span><span class="gp-rcri-num">${i+1}</span> ${_gpEsc(label)}</span></label>`;
+  });
+  html += `
+      </div>
+      <div class="gp-calc-actions">
+        <button type="submit" class="gp-calc-btn primary">🧮 Calcular puntaje y conducta</button>
+        <button type="button" class="gp-calc-btn secondary" onclick="window.resetRCRI()">↺ Limpiar</button>
+      </div>
+    </form>
+    <div id="rcriResultado"></div>`;
+  return html;
+}
+
 function renderGuiasRiesgoCv(){
   const cont = document.getElementById('gpRiesgoCvBody');
   if(!cont) return;
@@ -4702,6 +4863,9 @@ function renderGuiasRiesgoCv(){
   html += `
     <div class="gp-callout" style="margin-bottom:14px">
       <strong>❤️ Objetivo:</strong> identificar pacientes que requieren <strong>optimización médica</strong> o <strong>evaluación cardiológica</strong> antes de cirugía no cardíaca. Basado en <em>ACC/AHA 2014 Guideline on Perioperative Cardiovascular Evaluation for Noncardiac Surgery (Fleisher et al)</em>.
+    </div>
+    <div class="gp-callout info" style="margin-bottom:14px">
+      <strong>🧮 Calculadora RCRI disponible.</strong> Usa el botón <strong>«Abrir calculadora RCRI»</strong> (abajo a la derecha) para calcular el puntaje y la conducta sugerida.
     </div>
   `;
 
@@ -4729,32 +4893,6 @@ function renderGuiasRiesgoCv(){
   }
   html += '</tbody></table>';
   html += `<div class="gp-callout" style="margin-top:8px"><strong>👉 Umbral clave: 4 METs.</strong> El paciente debe ser capaz de subir un piso de escalera o caminar 6 km/h en plano sin síntomas. Si no puede o no se sabe, sube el rendimiento del test no invasivo.</div>`;
-
-  // RCRI — Calculadora interactiva
-  html += '<h3 class="gp-h3" style="margin-top:18px">Calculadora RCRI (Lee · Revised Cardiac Risk Index)</h3>';
-  html += `
-    <div class="gp-calc-card">
-      <div class="gp-calc-head">
-        <span class="gp-calc-ico">❤️</span>
-        <span class="gp-calc-title">Marca los factores presentes en tu paciente</span>
-      </div>
-      <p class="gp-calc-sub">El RCRI estima el riesgo de evento cardíaco mayor (IAM, paro, BAV completo) en cirugía no cardíaca.</p>
-      <form id="rcriForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularRCRI();return false;">
-        <div class="gp-calc-chips gp-rcri-chips">
-  `;
-  RCRI_LABELS.forEach((label, i) => {
-    html += `<label class="gp-chk gp-chk-rcri"><input type="checkbox" id="rcriChk${i}"><span><span class="gp-rcri-num">${i+1}</span> ${_gpEsc(label)}</span></label>`;
-  });
-  html += `
-        </div>
-        <div class="gp-calc-actions">
-          <button type="submit" class="gp-calc-btn primary">🧮 Calcular puntaje y conducta</button>
-          <button type="button" class="gp-calc-btn secondary" onclick="window.resetRCRI()">↺ Limpiar</button>
-        </div>
-      </form>
-      <div id="rcriResultado"></div>
-    </div>
-  `;
 
   // Tabla de referencia (para consulta sin calcular)
   html += '<h3 class="gp-h3" style="margin-top:18px">Tabla de referencia · RCRI</h3>';
