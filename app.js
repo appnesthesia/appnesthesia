@@ -145,7 +145,22 @@ function load(){
 }
 function save(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
+  // Marca el "timestamp de cambio local" para que bootSync sepa si lo nuestro
+  // es MÁS NUEVO que el remoto. Sin esto, una recarga rápida (antes de que
+  // el debounce de 1.5s dispare el push) sobreescribía los cambios locales
+  // con el estado remoto desactualizado y se perdían (protocolos, eventos,
+  // puntajes editados, etc.).
+  if(!_isApplyingRemote){
+    try{ localStorage.setItem(LS_KEY + '_localTs', new Date().toISOString()); }catch(e){}
+    _pendingPush = true;
+  }
   scheduleSyncPush();
+}
+// Igual que save() pero NO marca "dirty" ni timestamp local. Sirve para
+// persistir lo que vino del remoto/migraciones durante el boot, sin
+// hacer creer al próximo bootSync que el local es más nuevo.
+function saveRaw(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
 
 // ============================================================
@@ -161,6 +176,8 @@ let _syncTimer = null;
 let _syncStatus = 'idle';
 let _lastRemoteUpdatedAt = null;
 let _isApplyingRemote = false;
+let _pendingPush = false;       // hay cambios locales no enviados aún
+let _flushHandlersBound = false; // para no enganchar 2 veces
 
 function getBackendURL(){
   // 1) Override por institución
@@ -393,7 +410,14 @@ async function pushRemoteState(){
     }
     if(!r.ok){ _setSyncStatus('error'); return; }
     const data = await r.json().catch(()=>({}));
-    if(data && data._updatedAt) _lastRemoteUpdatedAt = data._updatedAt;
+    if(data && data._updatedAt){
+      _lastRemoteUpdatedAt = data._updatedAt;
+      // Alinea el "timestamp local" al que devolvió el servidor: ya
+      // estamos sincronizados, así que en el próximo boot NO se debe
+      // considerar que lo local es más nuevo que lo remoto.
+      try{ localStorage.setItem(LS_KEY + '_localTs', data._updatedAt); }catch(e){}
+    }
+    _pendingPush = false; // push exitoso → ya no hay cambios pendientes
 
     // 4) Reflejar las colecciones fusionadas en la copia local + pantalla.
     _isApplyingRemote = true;
@@ -415,6 +439,63 @@ async function pushRemoteState(){
   }
 }
 
+// Flush sincrónico de cambios pendientes. Lo llamamos cuando la página se
+// va a cerrar / pasa a background, así no perdemos ediciones hechas dentro
+// del debounce de 1.5s. Usa fetch keepalive (equivalente moderno de
+// sendBeacon, pero permite Authorization header).
+function _flushSyncNow(){
+  if(!_pendingPush) return;
+  if(_isApplyingRemote) return;
+  const base = getBackendURL();
+  if(!base || !INSTITUTION) return;
+  const token = getBackendToken();
+  if(!token) return;
+  // Cancelar el timer pendiente: lo estamos forzando ahora.
+  if(_syncTimer){ clearTimeout(_syncTimer); _syncTimer = null; }
+  try{
+    const isAdmin = state && state.isAdmin;
+    let payload;
+    if(isAdmin){
+      // Admin: manda el estado completo. Es seguro porque solo el admin
+      // puede tocar protocolos/eventos/staff desde la UI.
+      payload = _extractSharedState();
+    } else {
+      // Usuario normal: solo flusheamos vacaciones/intercambios (lo único
+      // que pueden editar). No tenemos remoto cargado acá, así que
+      // mandamos NUESTRA versión y el merge ocurrirá en el siguiente push
+      // regular cuando volvamos a abrir la app.
+      payload = { vacations: state.vacations || [], exchanges: state.exchanges || [] };
+    }
+    if(Array.isArray(payload.staff)) payload.staff = _stripDevicePrivateStaff(payload.staff);
+    if(payload.adminUser && typeof payload.adminUser === 'object'){
+      const a = {...payload.adminUser};
+      STAFF_DEVICE_PRIVATE_KEYS.forEach(k => { delete a[k]; });
+      payload.adminUser = a;
+    }
+    // keepalive: permite que la request siga viva aunque la página se cierre.
+    fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {
+      method: 'POST',
+      keepalive: true,
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+      body: JSON.stringify(payload)
+    }).catch(()=>{ /* mejor esfuerzo */ });
+    // Optimista: marcamos como flusheado (si falla, lo retomamos al reabrir).
+    _pendingPush = false;
+  }catch(e){ /* mejor esfuerzo */ }
+}
+
+function _bindFlushHandlers(){
+  if(_flushHandlersBound) return;
+  _flushHandlersBound = true;
+  try{
+    window.addEventListener('pagehide', _flushSyncNow);
+    window.addEventListener('beforeunload', _flushSyncNow);
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'hidden') _flushSyncNow();
+    });
+  }catch(e){}
+}
+
 function scheduleSyncPush(){
   if(_isApplyingRemote) return;
   if(_syncTimer) clearTimeout(_syncTimer);
@@ -426,7 +507,24 @@ async function bootSync(){
   if(!base){ _setSyncStatus('disabled'); return; }
   const remote = await fetchRemoteState();
   if(remote && !remote._empty){
-    _applyRemoteState(remote);
+    // ¿Lo local es más nuevo que lo remoto? Esto ocurre cuando el usuario
+    // editó algo y cerró la app antes de que el debounce de 1.5s pudiera
+    // empujar al backend. En ese caso, NO pisamos lo local con lo remoto.
+    // Pusheamos lo local primero (que es la versión "buena") y dejamos el
+    // estado local intacto.
+    let localTs = '';
+    try{ localTs = localStorage.getItem(LS_KEY + '_localTs') || ''; }catch(e){}
+    const remoteTs = remote._updatedAt || '';
+    const localIsNewer = localTs && (!remoteTs || localTs > remoteTs);
+    if(localIsNewer){
+      console.log('[bootSync] local('+localTs+') > remote('+remoteTs+') → pusheando local primero');
+      _pendingPush = true;
+      // pushRemoteState fusiona vacations/exchanges con remote internamente
+      // y, para admin, envía el estado local completo.
+      try{ await pushRemoteState(); }catch(e){ console.warn('bootSync push falló', e); }
+    } else {
+      _applyRemoteState(remote);
+    }
     try{
       const active = document.querySelector('.view.active');
       if(active){
@@ -3265,7 +3363,9 @@ async function selectInstitution(id){
     state = load();
     // Traer estado compartido del backend antes de seguir
     await bootSync();
-    save();
+    // saveRaw() en vez de save() para no falsear el timestamp local (ver boot())
+    saveRaw();
+    _bindFlushHandlers();
     document.getElementById('institutionPicker').classList.add('hidden');
     updateInstitutionUI();
     updateAdminUI();
@@ -3652,28 +3752,72 @@ const CONSULTA_PREANESTESICA = {
   contacto: 'Coordinación Servicio de Anestesia'
 };
 
-// --- Exámenes Preoperatorios: matriz por edad / ASA / cirugía ---
-const EXAM_PREOP_MATRIX = [
-  { edad:'< 40 años',  asa12_menor:'No requiere de rutina',
-    asa12_mayor:'Hemograma · Glicemia',
-    asa3p:'Hemograma · BUN/Creat · ELP · Glicemia · ECG · RxTx · Coagulación' },
-  { edad:'40 – 65 años', asa12_menor:'No requiere (si EF y anamnesis normales)',
-    asa12_mayor:'Hemograma · Glicemia · BUN/Creat · ECG (>50 a o ≥1 FRCV)',
-    asa3p:'Hemograma · BUN/Creat · ELP · Glicemia · ECG · RxTx · Coagulación · Perfil hepático' },
-  { edad:'> 65 años',  asa12_menor:'Hemograma · Glicemia · ECG',
-    asa12_mayor:'Hemograma · Glicemia · BUN/Creat · ELP · ECG',
-    asa3p:'Lo anterior + Pruebas hepáticas · Coagulación · Considerar ecocardiograma según RCRI' }
-];
+// --- Exámenes Preoperatorios: matrices por riesgo quirúrgico × ASA ---
+// Fuente: Actualizaciones en evaluación preoperatoria · Dr. F. Rojas (CUA, 2026)
+const EXAM_PREOP_MATRIX = {
+  bajo: {
+    titulo: 'Cirugía de bajo riesgo (<1%)',
+    desc: 'Ej.: cirugía menor ambulatoria, oftalmológica, dermatológica, endoscopía diagnóstica.',
+    rows: [
+      { test:'Hemograma',                  asa1:'No de rutina', asa2:'No de rutina', asa34:'No de rutina' },
+      { test:'Pruebas de coagulación',     asa1:'No de rutina', asa2:'No de rutina', asa34:'No de rutina' },
+      { test:'Función renal (BUN/Crea/ELP)', asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar si existe riesgo de AKI' },
+      { test:'Electrocardiograma',         asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar si no hay ECG de los últimos 12 meses' },
+      { test:'PFP / Gases arteriales',     asa1:'No de rutina', asa2:'No de rutina', asa34:'No de rutina' }
+    ]
+  },
+  intermedio: {
+    titulo: 'Cirugía de riesgo intermedio (1–5%)',
+    desc: 'Ej.: cirugía abdominal, ginecológica, urológica, otorrinolaringológica electiva.',
+    rows: [
+      { test:'Hemograma',                  asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar en pacientes con enfermedad CV o renal con cambios clínicos recientes' },
+      { test:'Pruebas de coagulación',     asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar en DHC · Considerar en TACO' },
+      { test:'Función renal (BUN/Crea/ELP)', asa1:'No de rutina', asa2:'Considerar si riesgo de AKI', asa34:'Indicado' },
+      { test:'Electrocardiograma',         asa1:'No de rutina', asa2:'Considerar en pacientes con FRCV', asa34:'Indicado' },
+      { test:'PFP / Gases arteriales',     asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar enviar a consulta de evaluación preoperatoria' }
+    ]
+  },
+  alto: {
+    titulo: 'Cirugía de alto riesgo (>5%)',
+    desc: 'Ej.: cirugía vascular mayor (aorta), torácica mayor, neurocirugía, transplante.',
+    rows: [
+      { test:'Hemograma',                  asa1:'Sí',  asa2:'Sí',  asa34:'Sí' },
+      { test:'Pruebas de coagulación',     asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar en DHC · Considerar en TACO' },
+      { test:'Función renal (BUN/Crea/ELP)', asa1:'Considerar si riesgo de AKI', asa2:'Sí', asa34:'Sí' },
+      { test:'Electrocardiograma',         asa1:'Considerar si no hay ECG de los últimos 12 meses', asa2:'Sí', asa34:'Sí' },
+      { test:'PFP / Gases arteriales',     asa1:'No de rutina', asa2:'No de rutina', asa34:'Considerar enviar a consulta de evaluación preoperatoria' }
+    ]
+  }
+};
+
+// Exámenes específicos según comorbilidad / situación clínica
 const EXAM_PREOP_ESPECIFICOS = [
-  { cond:'Diabetes mellitus',     pedir:'HbA1c (vigente <3 meses) + glicemia ayunas día de cirugía' },
-  { cond:'ERC / IRC',             pedir:'BUN · Creatinina · ELP · cálculo VFG · ECG · considerar perfil bioquímico' },
-  { cond:'ICC / Cardiopatía conocida', pedir:'ECG · Ecocardiograma reciente (<12 meses si estable, antes si descompensación) · proBNP si dudoso' },
-  { cond:'Hepatopatía / Cirrosis', pedir:'Perfil hepático · INR · Albúmina · Plaquetas · Clasificación Child-Pugh' },
-  { cond:'TACO / NOACs',          pedir:'INR día previo (TACO) · Plaquetas · Función renal (NOACs)' },
-  { cond:'Embarazo posible',      pedir:'β-HCG <72 h en mujeres en edad fértil' },
-  { cond:'EPOC / Asma severos',   pedir:'Espirometría reciente · RxTx · GSA si insuficiencia respiratoria' },
-  { cond:'SAOS / Sospecha SAOS',  pedir:'STOP-BANG · considerar polisomnografía y oximetría nocturna' },
-  { cond:'Inmunosupresión / VIH', pedir:'Hemograma · LDH · perfil bioquímico · función renal · evaluar serología según caso' }
+  { cond:'Diabetes mellitus',                     pedir:'HbA1c (vigente <3 meses) · HGT mismo día de la cirugía', nota:'Mantener glicemia perioperatoria <180 mg/dL. HbA1c no de rutina en no diabéticos.' },
+  { cond:'Mujer en edad fértil',                  pedir:'Anamnesis dirigida. β-HCG si existe duda razonable (con consentimiento)', nota:'Informar y documentar riesgos quirúrgicos/anestésicos en caso de embarazo.' },
+  { cond:'Síntomas urinarios o cirugía que afecte vía urinaria', pedir:'Orina completa · urocultivo', nota:'No solicitar de rutina en asintomáticos.' },
+  { cond:'Sospecha de IC sintomática / cardiopatía no estudiada', pedir:'Ecocardiograma + optimización por especialista (1B)', nota:'No repetir si ecocardiograma <12 meses sin cambios clínicos.' },
+  { cond:'Cirugía alto riesgo (>5%) con CF <4 METs o desconocida', pedir:'Considerar Angio-TAC coronario (2B)', nota:'Sin beneficio en pacientes con buena capacidad funcional o cirugía de bajo riesgo.' },
+  { cond:'≥65 a · o ≥45 a con síntomas · o enfermedad CV conocida', pedir:'Considerar NT-proBNP (2B) · troponinas según contexto', nota:'Útil para estratificación y vigilancia de MINS.' },
+  { cond:'Marcapasos (MCP) / Desfibrilador (DAI)', pedir:'Planificación previa si habrá interferencia electromagnética (1B). Reprogramación o imán intraop. en cirugía supraumbilical (1B)', nota:'Coordinar con cardiología/electrofisiología.' },
+  { cond:'TACO / NOAC',                           pedir:'INR día previo (TACO) · función renal y revisar tabla de suspensión (NOAC)', nota:'TTPa/TP/INR normales NO excluyen efecto residual de NOACs.' },
+  { cond:'EPOC severo o sospecha de hipoxemia',    pedir:'GSA · espirometría reciente', nota:'PFP/GSA no de rutina, solo dirigidos.' }
+];
+
+// Tiempos de espera obligatorios tras eventos CV (slides 39-40 del PPT)
+const EXAM_PREOP_DIFERIR = [
+  { evento:'ACV o AIT reciente',                                tiempo:'Diferir cirugía electiva ≥ 3 meses (2B)' },
+  { evento:'Angioplastia sin stent',                            tiempo:'Diferir ≥ 14 días' },
+  { evento:'Angioplastia c/stent en SCA',                       tiempo:'Diferir ≥ 12 meses idealmente' },
+  { evento:'Angioplastia c/stent (cardiopatía coronaria estable)', tiempo:'Diferir ≥ 6 meses' },
+  { evento:'Angioplastia c/stent + cirugía tiempo-sensible',    tiempo:'Diferir ≥ 3 meses (evitar siempre < 30 días)' }
+];
+
+// Recomendaciones generales (slide 41)
+const EXAM_PREOP_RECOMENDACIONES = [
+  'Exámenes siempre guiados por anamnesis y examen físico.',
+  'Considerar el ASA y riesgo inherente al procedimiento.',
+  'En pacientes estables, exámenes <6 meses siguen siendo válidos si no hay cambios clínicos.',
+  'Tanto laboratorio como imágenes tienen alta prevalencia de falsos positivos → pueden llevar a decisiones erróneas.'
 ];
 
 // --- Anticoagulantes / Antiagregantes: manejo periop ---
@@ -4017,6 +4161,348 @@ function abrirMailtoSobrecupo(){
 }
 
 // ============================================================
+// HELPER: Copiar al portapapeles (con fallback)
+// ============================================================
+function _gpCopyToClipboard(text, btnEl){
+  function feedback(ok){
+    if(!btnEl) return;
+    const orig = btnEl.dataset.origText || btnEl.textContent;
+    btnEl.dataset.origText = orig;
+    btnEl.textContent = ok ? '✓ Copiado al portapapeles' : '✗ No se pudo copiar';
+    btnEl.classList.add(ok ? 'gp-copy-ok' : 'gp-copy-fail');
+    setTimeout(()=>{
+      btnEl.textContent = orig;
+      btnEl.classList.remove('gp-copy-ok','gp-copy-fail');
+    }, 1800);
+  }
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=>feedback(true)).catch(()=>feedback(false));
+      return;
+    }
+  } catch(e){}
+  // Fallback
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    feedback(ok);
+  } catch(e){ feedback(false); }
+}
+
+// ============================================================
+// CALCULADORA RCRI (Lee · Revised Cardiac Risk Index)
+// ============================================================
+const RCRI_LABELS = [
+  'Cirugía de alto riesgo (intraperitoneal, intratorácica, vascular suprainguinal)',
+  'Cardiopatía isquémica (IAM previo, angina, prueba de esfuerzo +, Q patológicas en ECG)',
+  'Insuficiencia cardíaca congestiva',
+  'ACV o AIT previo',
+  'Diabetes mellitus en tratamiento con insulina',
+  'Creatinina sérica > 2 mg/dL'
+];
+
+function calcRCRI(flags){
+  // flags: array de 6 booleanos
+  const items = RCRI_LABELS.map((l,i)=>({ label:l, checked: !!flags[i] }));
+  const score = items.filter(x=>x.checked).length;
+  let riesgoPct, categoria, badgeClass;
+  if(score===0){ riesgoPct='0,4 %'; categoria='Muy bajo';   badgeClass='ok'; }
+  else if(score===1){ riesgoPct='0,9 %'; categoria='Bajo';     badgeClass='ok'; }
+  else if(score===2){ riesgoPct='6,6 %'; categoria='Elevado';  badgeClass='warn'; }
+  else              { riesgoPct='≥ 11 %'; categoria='Alto';     badgeClass='danger'; }
+
+  const recs = {};
+  if(score <= 1){
+    recs.conducta    = 'Proceder con la cirugía. Optimización médica estándar y monitorización perioperatoria habitual.';
+    recs.biomarc     = 'NT-proBNP / troponinas NO de rutina si no hay otros factores. Reservar para pacientes con síntomas o ≥65 años con enfermedad CV.';
+    recs.betaBloqueo = 'Mantener si ya está en tratamiento crónico. NO iniciar si tiempo pre-op < 7 días (riesgo de ACV y mortalidad).';
+    recs.estatinas   = 'Mantener si ya está en tratamiento. Considerar iniciar en pacientes con vasculopatía o cardiopatía isquémica conocida.';
+    recs.interconsulta = 'No requiere interconsulta cardiológica de rutina.';
+  } else if(score === 2){
+    recs.conducta    = 'Riesgo elevado. Evaluar capacidad funcional (METs). Si ≥ 4 METs y asintomático → proceder. Si < 4 METs o desconocida → considerar test no invasivo SOLO si el resultado va a modificar la conducta.';
+    recs.biomarc     = 'Considerar NT-proBNP pre-op (2B) + troponinas a las 24, 48 y 72 h post-op (vigilancia activa de MINS — Myocardial Injury after Non-cardiac Surgery).';
+    recs.betaBloqueo = 'Mantener si ya está en tratamiento. Iniciar solo con titulación lenta y si hay > 7 días disponibles antes de la cirugía.';
+    recs.estatinas   = 'Mantener si ya está en tratamiento. Considerar inicio en vasculopatía / cardiopatía isquémica.';
+    recs.interconsulta = 'Considerar interconsulta a Cardiología si capacidad funcional < 4 METs, o si cirugía vascular / torácica mayor.';
+  } else {
+    recs.conducta    = 'Riesgo alto. Diferir cirugía electiva hasta optimización cardiológica. Discutir balance riesgo-beneficio con paciente y equipo quirúrgico.';
+    recs.biomarc     = 'NT-proBNP pre-op + troponinas seriadas (basal, 24, 48 y 72 h post-op). Considerar monitorización en intermedio/UCI post-op.';
+    recs.betaBloqueo = 'Mantener si ya está en tratamiento. Considerar inicio cardio-selectivo (bisoprolol/metoprolol) con titulación lenta si tiempo disponible > 7 días.';
+    recs.estatinas   = 'Iniciar/optimizar estatina perioperatoria si no hay contraindicación.';
+    recs.interconsulta = 'Interconsulta a Cardiología obligatoria antes de cirugía electiva. Coordinar manejo post-op en intermedio/UCI según contexto.';
+  }
+  return { score, items, riesgoPct, categoria, badgeClass, recs };
+}
+
+function _gpRcriResumenTexto(r){
+  const checkedList = r.items.filter(x=>x.checked).map((x,i)=>'  • '+x.label).join('\n');
+  return [
+    'RCRI (Revised Cardiac Risk Index — Lee 1999)',
+    `Puntaje: ${r.score} / 6 · Riesgo: ${r.riesgoPct} (${r.categoria})`,
+    '',
+    'Factores presentes:',
+    (checkedList || '  (ninguno)'),
+    '',
+    `Conducta: ${r.recs.conducta}`,
+    `Biomarcadores: ${r.recs.biomarc}`,
+    `Beta-bloqueo: ${r.recs.betaBloqueo}`,
+    `Estatinas: ${r.recs.estatinas}`,
+    `Interconsulta: ${r.recs.interconsulta}`,
+    '',
+    'Generado por Appnesthesia · Portal Preanestésico'
+  ].join('\n');
+}
+
+window.calcularRCRI = function(){
+  const flags = RCRI_LABELS.map((_,i)=>{
+    const el = document.getElementById('rcriChk'+i);
+    return el ? !!el.checked : false;
+  });
+  const r = calcRCRI(flags);
+  const out = document.getElementById('rcriResultado');
+  if(!out) return;
+  const flagsList = r.items.filter(x=>x.checked).map(x=>`<li>${_gpEsc(x.label)}</li>`).join('') || '<li><em>Ningún factor seleccionado</em></li>';
+  out.innerHTML = `
+    <div class="gp-calc-result gp-calc-${r.badgeClass}">
+      <div class="gp-calc-score-row">
+        <div class="gp-calc-score-big">${r.score}<span>/6</span></div>
+        <div class="gp-calc-score-meta">
+          <div class="gp-calc-pct">${_gpEsc(r.riesgoPct)}</div>
+          <div class="gp-calc-cat">Riesgo ${_gpEsc(r.categoria)}</div>
+        </div>
+      </div>
+      <div class="gp-calc-flags">
+        <strong>Factores presentes:</strong>
+        <ul>${flagsList}</ul>
+      </div>
+      <div class="gp-calc-recs">
+        <div class="gp-calc-rec"><strong>Conducta:</strong> ${_gpEsc(r.recs.conducta)}</div>
+        <div class="gp-calc-rec"><strong>Biomarcadores:</strong> ${_gpEsc(r.recs.biomarc)}</div>
+        <div class="gp-calc-rec"><strong>Beta-bloqueo:</strong> ${_gpEsc(r.recs.betaBloqueo)}</div>
+        <div class="gp-calc-rec"><strong>Estatinas:</strong> ${_gpEsc(r.recs.estatinas)}</div>
+        <div class="gp-calc-rec"><strong>Interconsulta:</strong> ${_gpEsc(r.recs.interconsulta)}</div>
+      </div>
+      <button type="button" class="gp-copy-btn" onclick="_gpCopyToClipboard(window._lastRcriText, this)">📋 Copiar resumen al portapapeles</button>
+    </div>
+  `;
+  window._lastRcriText = _gpRcriResumenTexto(r);
+};
+
+window.resetRCRI = function(){
+  for(let i=0;i<RCRI_LABELS.length;i++){
+    const el = document.getElementById('rcriChk'+i);
+    if(el) el.checked = false;
+  }
+  const out = document.getElementById('rcriResultado');
+  if(out) out.innerHTML = '';
+};
+
+// ============================================================
+// CALCULADORA DE EXÁMENES PREOPERATORIOS
+// ============================================================
+// Devuelve: { pedir:[], evitar:[], diferir:[], interconsultas:[], notas:[] }
+function calcExamenesPreop(input){
+  const out = { pedir:[], evitar:[], diferir:[], interconsultas:[], notas:[] };
+  const {
+    edad = 0,
+    edadFertil = false,
+    asa = 1,
+    riesgoQx = 'bajo',     // 'bajo'|'intermedio'|'alto'
+    cf = 'desconocida',     // '>=4METs'|'<4METs'|'desconocida'
+    comorbs = [],           // ['DM','HTA','IRC','ICC','CardioIsq','EPOC','Hepatopatia','TACO','MCP_DAI','ACV_previo']
+    ecgReciente = false,    // ECG <12 m sin cambios
+    ecoReciente = false,    // Eco <12 m sin cambios
+    examenesRecientes = false, // labs <6 m, estable
+    eventosRecientes = []   // ver mapa abajo
+  } = input;
+
+  const has = c => comorbs.includes(c);
+  const matriz = EXAM_PREOP_MATRIX[riesgoQx];
+  if(!matriz){ out.notas.push('Riesgo quirúrgico no reconocido.'); return out; }
+
+  function cellFor(testKeyword){
+    const r = matriz.rows.find(x => x.test.toLowerCase().includes(testKeyword));
+    if(!r) return '';
+    if(asa <= 1) return r.asa1;
+    if(asa === 2) return r.asa2;
+    return r.asa34;
+  }
+  function classify(testLabel, cell){
+    if(!cell) return;
+    const c = String(cell).trim();
+    const cLower = c.toLowerCase();
+    // "Sí" o "Si" exacto, o que empiece con "indicado"
+    if(cLower === 'sí' || cLower === 'si' || /^indicado/i.test(c)){
+      out.pedir.push(testLabel);
+    } else if(/considerar/i.test(c)){
+      out.pedir.push(testLabel + ' (considerar · ' + c.replace(/^Considerar\s*/i,'').trim().toLowerCase() + ')');
+    } else {
+      out.evitar.push(testLabel + ' (no de rutina en este escenario)');
+    }
+  }
+
+  classify('Hemograma',          cellFor('hemograma'));
+  classify('Pruebas de coagulación', cellFor('coagulación'));
+  classify('Función renal (BUN/Crea/ELP)', cellFor('renal'));
+
+  // ECG: si ya hay reciente, omitir
+  const ecgCell = cellFor('electrocard');
+  if(ecgReciente){
+    out.notas.push('ECG previo < 12 meses sin cambios clínicos → no repetir.');
+  } else {
+    classify('Electrocardiograma', ecgCell);
+  }
+
+  // PFP/GSA por matriz
+  classify('PFP / Gases arteriales', cellFor('pfp'));
+
+  // === Específicos según comorbilidad ===
+  if(has('DM')){
+    out.pedir.push('HbA1c (si no hay examen < 3 meses) · HGT día de la cirugía');
+    out.notas.push('Mantener glicemia perioperatoria < 180 mg/dL.');
+  }
+  if(has('Hepatopatia')){
+    out.pedir.push('Perfil hepático · INR · albúmina · plaquetas · clasificación Child-Pugh');
+  }
+  if(has('TACO')){
+    out.pedir.push('INR día previo (TACO) · función renal (NOAC) · revisar tabla de suspensión');
+    out.notas.push('TTPa/TP/INR normales NO descartan efecto residual de NOACs.');
+  }
+  if(has('IRC')){
+    out.pedir.push('BUN · Creatinina · ELP · VFG estimada (si aún no incluido)');
+  }
+  if((has('ICC') || has('CardioIsq')) && !ecoReciente){
+    out.pedir.push('Ecocardiograma (1B si IC sintomática o no estudiada)');
+  } else if(ecoReciente){
+    out.notas.push('Ecocardiograma < 12 meses sin cambios clínicos → no repetir.');
+  }
+  if(has('EPOC')){
+    out.pedir.push('GSA · espirometría reciente si insuficiencia respiratoria sintomática');
+  }
+  if(has('MCP_DAI')){
+    out.interconsultas.push('Coordinar con Cardiología/Electrofisiología (planificación MCP/DAI ante interferencia electromagnética)');
+  }
+
+  // Embarazo
+  if(edadFertil){
+    out.pedir.push('β-HCG si duda razonable (anamnesis dirigida + consentimiento; documentar)');
+  }
+
+  // Pro-BNP / troponinas (2B): >=65 a, o >=45 a con enfermedad CV
+  if(edad >= 65 || (edad >= 45 && (has('CardioIsq') || has('ICC') || has('ACV_previo')))){
+    out.pedir.push('Considerar NT-proBNP (2B) · troponinas según contexto');
+  }
+
+  // Angio-TAC coronario: alto riesgo + CF baja
+  if(riesgoQx === 'alto' && (cf === '<4METs' || cf === 'desconocida')){
+    out.pedir.push('Considerar Angio-TAC coronario (2B)');
+    out.interconsultas.push('Considerar derivación a Cardiología (CF < 4 METs en cirugía de alto riesgo)');
+  }
+
+  // Eventos CV recientes → diferir
+  const eventMap = {
+    'ACV_3m':       'ACV o AIT < 3 meses → diferir cirugía electiva (mín. 3 meses · 2B)',
+    'STENT_SCA':    'Stent en SCA < 12 meses → diferir idealmente 12 meses',
+    'STENT_CCE_6m': 'Stent (cardiopatía coronaria estable) < 6 meses → diferir',
+    'STENT_TS_3m':  'Stent + cirugía tiempo-sensible < 3 meses → diferir (evitar < 30 días)',
+    'ANGIO_SS_14d': 'Angioplastia sin stent < 14 días → diferir'
+  };
+  for(const e of eventosRecientes){
+    if(eventMap[e]) out.diferir.push(eventMap[e]);
+  }
+
+  // Validez de exámenes recientes
+  if(examenesRecientes){
+    out.notas.push('Exámenes previos < 6 meses con condición clínica estable → válidos, no repetir.');
+  }
+
+  // De-duplicar
+  function uniq(arr){ const s=new Set(); const r=[]; for(const x of arr){ if(!s.has(x)){ s.add(x); r.push(x); } } return r; }
+  out.pedir = uniq(out.pedir);
+  out.evitar = uniq(out.evitar);
+  out.diferir = uniq(out.diferir);
+  out.interconsultas = uniq(out.interconsultas);
+  out.notas = uniq(out.notas);
+  return out;
+}
+
+function _gpExamResumenTexto(input, res){
+  const lines = [
+    'Exámenes preoperatorios sugeridos · Appnesthesia',
+    `Edad: ${input.edad || '—'} · ASA: ${input.asa} · Cirugía: ${input.riesgoQx} riesgo · CF: ${input.cf}`,
+    (input.comorbs && input.comorbs.length) ? `Comorbilidades: ${input.comorbs.join(', ')}` : null,
+    ''
+  ].filter(Boolean);
+  if(res.pedir.length){ lines.push('Solicitar:'); res.pedir.forEach(x=>lines.push('  • '+x)); lines.push(''); }
+  if(res.diferir.length){ lines.push('Diferir cirugía:'); res.diferir.forEach(x=>lines.push('  ⛔ '+x)); lines.push(''); }
+  if(res.interconsultas.length){ lines.push('Interconsultas:'); res.interconsultas.forEach(x=>lines.push('  → '+x)); lines.push(''); }
+  if(res.evitar.length){ lines.push('Evitar / no de rutina:'); res.evitar.forEach(x=>lines.push('  – '+x)); lines.push(''); }
+  if(res.notas.length){ lines.push('Notas:'); res.notas.forEach(x=>lines.push('  • '+x)); }
+  return lines.join('\n').trim();
+}
+
+window.calcularExamenes = function(){
+  function val(id){ const el=document.getElementById(id); return el ? el.value : ''; }
+  function chk(id){ const el=document.getElementById(id); return el ? !!el.checked : false; }
+  const comorbsList = ['DM','HTA','IRC','ICC','CardioIsq','EPOC','Hepatopatia','TACO','MCP_DAI','ACV_previo'];
+  const comorbs = comorbsList.filter(c => chk('exComorb_'+c));
+  const eventosList = ['ACV_3m','STENT_SCA','STENT_CCE_6m','STENT_TS_3m','ANGIO_SS_14d'];
+  const eventosRecientes = eventosList.filter(e => chk('exEvt_'+e));
+
+  const input = {
+    edad: parseInt(val('exEdad'),10) || 0,
+    edadFertil: chk('exEdadFertil'),
+    asa: parseInt(val('exAsa'),10) || 1,
+    riesgoQx: val('exRiesgoQx') || 'bajo',
+    cf: val('exCf') || 'desconocida',
+    comorbs,
+    ecgReciente: chk('exEcgReciente'),
+    ecoReciente: chk('exEcoReciente'),
+    examenesRecientes: chk('exLabsRecientes'),
+    eventosRecientes
+  };
+  const res = calcExamenesPreop(input);
+  const out = document.getElementById('examResultado');
+  if(!out) return;
+
+  function renderList(title, arr, cls){
+    if(!arr.length) return '';
+    return `<div class="gp-calc-block ${cls}"><strong>${_gpEsc(title)}</strong><ul>${arr.map(x=>`<li>${_gpEsc(x)}</li>`).join('')}</ul></div>`;
+  }
+
+  const totalReco = res.pedir.length + res.diferir.length + res.interconsultas.length;
+  const sumario = totalReco === 0
+    ? '<div class="gp-calc-block ok"><strong>✓ Sin exámenes adicionales sugeridos.</strong> El escenario clínico no requiere estudios de rutina más allá de la evaluación clínica.</div>'
+    : `<div class="gp-calc-sum">📋 <strong>${res.pedir.length}</strong> examen(es) sugerido(s) · <strong>${res.diferir.length}</strong> alerta(s) de diferir · <strong>${res.interconsultas.length}</strong> interconsulta(s)</div>`;
+
+  out.innerHTML = `
+    <div class="gp-calc-result">
+      ${sumario}
+      ${renderList('🔴 Diferir cirugía', res.diferir, 'danger')}
+      ${renderList('📋 Solicitar', res.pedir, 'pedir')}
+      ${renderList('→ Interconsultas', res.interconsultas, 'info')}
+      ${renderList('⚪ Evitar / no de rutina', res.evitar, 'evitar')}
+      ${renderList('💡 Notas clínicas', res.notas, 'nota')}
+      <button type="button" class="gp-copy-btn" onclick="_gpCopyToClipboard(window._lastExamText, this)">📋 Copiar resumen al portapapeles</button>
+    </div>
+  `;
+  window._lastExamText = _gpExamResumenTexto(input, res);
+};
+
+window.resetExamenes = function(){
+  ['exEdad'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['exAsa','exRiesgoQx','exCf'].forEach(id=>{ const el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  document.querySelectorAll('#examCalcForm input[type=checkbox]').forEach(el=>el.checked=false);
+  const out = document.getElementById('examResultado');
+  if(out) out.innerHTML = '';
+};
+
+// ============================================================
 // SECCIÓN: Exámenes Preoperatorios
 // ============================================================
 function renderGuiasExamenes(){
@@ -4025,31 +4511,133 @@ function renderGuiasExamenes(){
   let html = '';
   html += `
     <div class="gp-callout" style="margin-bottom:14px">
-      <strong>🧪 Criterio general:</strong> los exámenes preoperatorios deben pedirse <em>dirigidos</em>, según edad, comorbilidades (ASA) y magnitud de la cirugía. Los exámenes "de rutina" indiscriminados no mejoran el outcome y aumentan costos y demoras.
+      <strong>🧪 Criterio general:</strong> los exámenes preoperatorios deben pedirse <em>dirigidos</em> según ASA y magnitud del procedimiento. Los exámenes indiscriminados tienen alta prevalencia de falsos positivos y pueden llevar a mala toma de decisiones, suspensiones innecesarias y aumento de costos.
     </div>
   `;
-  // Matriz edad x ASA/cirugía
-  html += '<h3 class="gp-h3">Por edad y magnitud de cirugía</h3>';
-  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Edad</th><th>Cirugía menor · ASA I-II</th><th>Cirugía mayor electiva · ASA I-II</th><th>ASA III-IV o cirugía mayor/vascular</th></tr></thead><tbody>';
-  for(const r of EXAM_PREOP_MATRIX){
-    html += `<tr><td><strong>${_gpEsc(r.edad)}</strong></td><td>${_gpEsc(r.asa12_menor)}</td><td>${_gpEsc(r.asa12_mayor)}</td><td>${_gpEsc(r.asa3p)}</td></tr>`;
+
+  // ===== CALCULADORA =====
+  html += `
+    <div class="gp-calc-card">
+      <div class="gp-calc-head">
+        <span class="gp-calc-ico">🧮</span>
+        <span class="gp-calc-title">Calculadora de exámenes preoperatorios</span>
+      </div>
+      <p class="gp-calc-sub">Ingresa datos del paciente y procedimiento → te decimos qué exámenes pedir, qué evitar y cuándo derivar/diferir.</p>
+      <form id="examCalcForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularExamenes();return false;">
+        <div class="gp-calc-grid">
+          <label class="gp-calc-field">
+            <span>Edad (años)</span>
+            <input type="number" id="exEdad" min="0" max="120" placeholder="Ej: 67" inputmode="numeric">
+          </label>
+          <label class="gp-calc-field">
+            <span>ASA</span>
+            <select id="exAsa">
+              <option value="1">ASA I — sano</option>
+              <option value="2">ASA II — enf. sistémica leve</option>
+              <option value="3">ASA III — enf. sistémica severa</option>
+              <option value="4">ASA IV — amenaza vital</option>
+            </select>
+          </label>
+          <label class="gp-calc-field">
+            <span>Riesgo quirúrgico</span>
+            <select id="exRiesgoQx">
+              <option value="bajo">Bajo (&lt;1%)</option>
+              <option value="intermedio">Intermedio (1–5%)</option>
+              <option value="alto">Alto (&gt;5%)</option>
+            </select>
+          </label>
+          <label class="gp-calc-field">
+            <span>Capacidad funcional</span>
+            <select id="exCf">
+              <option value="desconocida">Desconocida</option>
+              <option value=">=4METs">≥ 4 METs (sube 1 piso sin síntomas)</option>
+              <option value="<4METs">&lt; 4 METs (limitado)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="gp-calc-section-title">Comorbilidades</div>
+        <div class="gp-calc-chips">
+          <label class="gp-chk"><input type="checkbox" id="exComorb_DM"><span>Diabetes mellitus</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_HTA"><span>HTA</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_IRC"><span>ERC / Riesgo AKI</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_ICC"><span>ICC</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_CardioIsq"><span>Cardiopatía isquémica</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_EPOC"><span>EPOC / Asma severo</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_Hepatopatia"><span>Hepatopatía / DHC</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_TACO"><span>TACO / NOAC</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_MCP_DAI"><span>MCP / DAI</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exComorb_ACV_previo"><span>ACV / AIT previo</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEdadFertil"><span>Mujer en edad fértil</span></label>
+        </div>
+
+        <div class="gp-calc-section-title">Exámenes previos (válidos)</div>
+        <div class="gp-calc-chips">
+          <label class="gp-chk"><input type="checkbox" id="exEcgReciente"><span>ECG &lt; 12 meses sin cambios</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEcoReciente"><span>Ecocardio &lt; 12 meses sin cambios</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exLabsRecientes"><span>Labs &lt; 6 meses, estable</span></label>
+        </div>
+
+        <div class="gp-calc-section-title">Eventos cardiovasculares recientes</div>
+        <div class="gp-calc-chips">
+          <label class="gp-chk"><input type="checkbox" id="exEvt_ACV_3m"><span>ACV/AIT &lt; 3 meses</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_SCA"><span>Stent en SCA &lt; 12 m</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_CCE_6m"><span>Stent (cor. estable) &lt; 6 m</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEvt_STENT_TS_3m"><span>Stent + cirugía tiempo-sensible &lt; 3 m</span></label>
+          <label class="gp-chk"><input type="checkbox" id="exEvt_ANGIO_SS_14d"><span>Angioplastia s/stent &lt; 14 d</span></label>
+        </div>
+
+        <div class="gp-calc-actions">
+          <button type="submit" class="gp-calc-btn primary">🧮 Calcular exámenes</button>
+          <button type="button" class="gp-calc-btn secondary" onclick="window.resetExamenes()">↺ Limpiar</button>
+        </div>
+      </form>
+      <div id="examResultado"></div>
+    </div>
+  `;
+
+  // ===== TABLAS DE REFERENCIA =====
+  html += '<h3 class="gp-h3" style="margin-top:22px">Tablas por riesgo quirúrgico × ASA</h3>';
+  for(const key of ['bajo','intermedio','alto']){
+    const m = EXAM_PREOP_MATRIX[key];
+    html += `<div class="gp-subgroup"><div class="gp-subgroup-title">${_gpEsc(m.titulo)}</div><div class="gp-subgroup-desc">${_gpEsc(m.desc)}</div>`;
+    html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Examen</th><th>ASA I</th><th>ASA II</th><th>ASA III y IV</th></tr></thead><tbody>';
+    for(const r of m.rows){
+      html += `<tr><td><strong>${_gpEsc(r.test)}</strong></td><td>${_gpEsc(r.asa1)}</td><td>${_gpEsc(r.asa2)}</td><td>${_gpEsc(r.asa34)}</td></tr>`;
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // Específicos por comorbilidad
+  html += '<h3 class="gp-h3" style="margin-top:22px">Exámenes específicos según comorbilidad / situación</h3>';
+  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Condición</th><th>Exámenes</th><th>Nota</th></tr></thead><tbody>';
+  for(const r of EXAM_PREOP_ESPECIFICOS){
+    html += `<tr><td><strong>${_gpEsc(r.cond)}</strong></td><td>${_gpEsc(r.pedir)}</td><td><em>${_gpEsc(r.nota||'')}</em></td></tr>`;
   }
   html += '</tbody></table></div>';
 
-  // Específicos por comorbilidad
-  html += '<h3 class="gp-h3" style="margin-top:18px">Exámenes específicos según comorbilidad</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Condición</th><th>Exámenes a solicitar</th></tr></thead><tbody>';
-  for(const r of EXAM_PREOP_ESPECIFICOS){
-    html += `<tr><td><strong>${_gpEsc(r.cond)}</strong></td><td>${_gpEsc(r.pedir)}</td></tr>`;
+  // Diferir cirugía
+  html += '<h3 class="gp-h3" style="margin-top:22px">Tiempos de espera tras eventos CV</h3>';
+  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Evento / antecedente</th><th>Tiempo recomendado</th></tr></thead><tbody>';
+  for(const r of EXAM_PREOP_DIFERIR){
+    html += `<tr><td><strong>${_gpEsc(r.evento)}</strong></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
+
+  // Recomendaciones generales
+  html += '<h3 class="gp-h3" style="margin-top:22px">Recomendaciones generales</h3>';
+  html += '<ul class="gp-bullets">';
+  for(const r of EXAM_PREOP_RECOMENDACIONES){
+    html += `<li>${_gpEsc(r)}</li>`;
+  }
+  html += '</ul>';
 
   html += `
-    <div class="gp-callout" style="margin-top:16px">
-      <strong>💡 Vigencia:</strong> en pacientes estables, los exámenes preoperatorios son útiles si fueron tomados en los últimos <strong>6 meses</strong>. En pacientes con condiciones dinámicas (DM mal controlada, ERC progresiva, ICC, hepatopatía), considerar <strong>vigencia &lt; 1 mes</strong> o solicitar nuevos.
+    <div class="gp-callout" style="margin-top:14px">
+      <strong>💡 Vigencia:</strong> en pacientes estables, los exámenes previos siguen vigentes hasta <strong>6 meses</strong>. En condiciones dinámicas (DM mal controlada, ERC progresiva, ICC, hepatopatía) → considerar vigencia &lt; 1 mes o solicitar nuevos.
     </div>
   `;
-  html += '<p class="gp-foot-note">Referencia: Recomendaciones institucionales Clínica Universidad de los Andes · ASA Practice Advisory on Preanesthesia Evaluation.</p>';
+  html += `<p class="gp-foot-note">Referencia: Actualizaciones en evaluación preoperatoria · Dr. Fernando Rojas, CUA (2026) · ESAIC/ESA Guidelines 2024 · ACC/AHA Perioperative Guidelines.</p>`;
   cont.innerHTML = html;
 }
 
@@ -4142,12 +4730,35 @@ function renderGuiasRiesgoCv(){
   html += '</tbody></table>';
   html += `<div class="gp-callout" style="margin-top:8px"><strong>👉 Umbral clave: 4 METs.</strong> El paciente debe ser capaz de subir un piso de escalera o caminar 6 km/h en plano sin síntomas. Si no puede o no se sabe, sube el rendimiento del test no invasivo.</div>`;
 
-  // RCRI
-  html += '<h3 class="gp-h3" style="margin-top:18px">Revised Cardiac Risk Index (Lee, RCRI)</h3>';
-  html += '<ul class="gp-rcri-list">';
-  RCRI_FACTORES.forEach((f,i) => { html += `<li><span class="gp-rcri-num">${i+1}</span> ${_gpEsc(f)}</li>`; });
-  html += '</ul>';
-  html += '<table class="gp-table" style="margin-top:8px"><thead><tr><th>Score</th><th>Riesgo de evento CV mayor (IAM, paro, BAV completo)</th></tr></thead><tbody>';
+  // RCRI — Calculadora interactiva
+  html += '<h3 class="gp-h3" style="margin-top:18px">Calculadora RCRI (Lee · Revised Cardiac Risk Index)</h3>';
+  html += `
+    <div class="gp-calc-card">
+      <div class="gp-calc-head">
+        <span class="gp-calc-ico">❤️</span>
+        <span class="gp-calc-title">Marca los factores presentes en tu paciente</span>
+      </div>
+      <p class="gp-calc-sub">El RCRI estima el riesgo de evento cardíaco mayor (IAM, paro, BAV completo) en cirugía no cardíaca.</p>
+      <form id="rcriForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularRCRI();return false;">
+        <div class="gp-calc-chips gp-rcri-chips">
+  `;
+  RCRI_LABELS.forEach((label, i) => {
+    html += `<label class="gp-chk gp-chk-rcri"><input type="checkbox" id="rcriChk${i}"><span><span class="gp-rcri-num">${i+1}</span> ${_gpEsc(label)}</span></label>`;
+  });
+  html += `
+        </div>
+        <div class="gp-calc-actions">
+          <button type="submit" class="gp-calc-btn primary">🧮 Calcular puntaje y conducta</button>
+          <button type="button" class="gp-calc-btn secondary" onclick="window.resetRCRI()">↺ Limpiar</button>
+        </div>
+      </form>
+      <div id="rcriResultado"></div>
+    </div>
+  `;
+
+  // Tabla de referencia (para consulta sin calcular)
+  html += '<h3 class="gp-h3" style="margin-top:18px">Tabla de referencia · RCRI</h3>';
+  html += '<table class="gp-table"><thead><tr><th>Score</th><th>Riesgo de evento CV mayor (IAM, paro, BAV completo)</th></tr></thead><tbody>';
   for(const r of RCRI_RIESGO){
     html += `<tr><td><strong>${_gpEsc(r.n)}</strong></td><td>${_gpEsc(r.riesgo)}</td></tr>`;
   }
@@ -6784,7 +7395,12 @@ async function boot(){
       ensureAllUserDefaults();
       // Traer estado compartido del backend (si está configurado)
       await bootSync();
-      save();
+      // OJO: usamos saveRaw() en lugar de save() para NO marcar como "dirty"
+      // ni pisar el timestamp local. De lo contrario, cada boot haría creer
+      // al próximo boot que lo local es más nuevo que lo remoto, lo cual
+      // bloquearía la sincronización entre dispositivos.
+      saveRaw();
+      _bindFlushHandlers();
       updateInstitutionUI();
 
       // 3) Flujo de usuario: ¿hay sesión activa?

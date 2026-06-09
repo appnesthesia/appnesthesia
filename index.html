@@ -631,6 +631,92 @@ canvas{max-width:100%}
 .gp-comorb-item{padding:9px 11px;background:#fafffd;border:1px solid var(--border);border-radius:10px;font-size:12.5px;line-height:1.45}
 .gp-comorb-item .comorb-name{font-weight:700;color:var(--primary-dark);display:block;margin-bottom:2px}
 
+/* Subgroup (tablas por riesgo quirúrgico) */
+.gp-subgroup{margin:14px 0;padding:12px 12px 10px;background:#fafffd;border:1px solid var(--border);border-radius:12px}
+.gp-subgroup-title{font-weight:800;font-size:13px;color:var(--primary-dark);margin-bottom:3px;font-family:'Manrope','Inter',sans-serif}
+.gp-subgroup-desc{font-size:11.5px;color:var(--muted);margin-bottom:8px;font-style:italic;line-height:1.4}
+.gp-bullets{margin:8px 0 8px 18px;padding:0;font-size:12.5px;line-height:1.55;color:var(--text)}
+.gp-bullets li{margin-bottom:4px}
+
+/* ===== Calculadora cards (RCRI + Exámenes) ===== */
+.gp-calc-card{margin:10px 0 16px;padding:14px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;border-radius:14px}
+.gp-calc-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.gp-calc-ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.gp-calc-title{font-weight:800;font-size:14px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.25}
+.gp-calc-sub{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+.gp-calc-form{background:#fff;border:1px solid var(--border);border-radius:11px;padding:12px}
+.gp-calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.gp-calc-field{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:700;color:var(--primary-dark);letter-spacing:.2px}
+.gp-calc-field span{font-size:11px;color:var(--text);text-transform:uppercase;letter-spacing:.4px;font-weight:700}
+.gp-calc-field input,.gp-calc-field select{padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:inherit;background:#fff;color:var(--text);width:100%;box-sizing:border-box}
+.gp-calc-field input:focus,.gp-calc-field select:focus{outline:none;border-color:var(--green-forest);box-shadow:0 0 0 3px rgba(34,124,80,.15)}
+.gp-calc-section-title{font-size:11px;font-weight:800;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 7px;padding-bottom:4px;border-bottom:1.5px solid #bbf7d0}
+.gp-calc-chips{display:flex;flex-wrap:wrap;gap:7px}
+.gp-chk{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;background:#f8fafc;border:1.5px solid var(--border);border-radius:9px;font-size:12.5px;cursor:pointer;user-select:none;transition:all .15s;line-height:1.3}
+.gp-chk:hover{background:#ecfdf5;border-color:#86efac}
+.gp-chk input{margin:0;cursor:pointer;accent-color:var(--green-forest)}
+.gp-chk input:checked + span{font-weight:700;color:var(--green-deep)}
+.gp-chk:has(input:checked){background:#dcfce7;border-color:var(--green-forest)}
+.gp-chk-rcri{flex-basis:100%}
+.gp-chk-rcri span{display:flex;align-items:flex-start;gap:8px;flex:1}
+.gp-rcri-chips{flex-direction:column;gap:6px}
+.gp-calc-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.gp-calc-btn{flex:1;min-width:140px;padding:11px 14px;border:none;border-radius:10px;font-weight:700;font-size:13.5px;font-family:inherit;cursor:pointer;letter-spacing:.2px;transition:all .15s}
+.gp-calc-btn.primary{background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;box-shadow:0 2px 6px rgba(34,124,80,.25)}
+.gp-calc-btn.primary:hover{filter:brightness(1.05)}
+.gp-calc-btn.secondary{background:#fff;border:1.5px solid var(--border);color:var(--text)}
+.gp-calc-btn.secondary:hover{background:#f4faf7;border-color:var(--green-forest);color:var(--green-deep)}
+.gp-calc-btn:active{transform:translateY(1px)}
+
+/* ===== Resultados ===== */
+.gp-calc-result{margin-top:14px;padding:14px;background:#fff;border:1.5px solid var(--border);border-radius:12px;animation:gpResultIn .25s ease-out}
+@keyframes gpResultIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.gp-calc-result.gp-calc-ok{border-left:5px solid #16a34a}
+.gp-calc-result.gp-calc-warn{border-left:5px solid #d97706}
+.gp-calc-result.gp-calc-danger{border-left:5px solid #dc2626}
+
+.gp-calc-score-row{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:1.5px dashed var(--border);margin-bottom:10px}
+.gp-calc-score-big{font-size:46px;font-weight:900;color:var(--primary-dark);line-height:1;font-family:'Manrope','Inter',sans-serif}
+.gp-calc-score-big span{font-size:18px;color:var(--muted);font-weight:700;margin-left:2px}
+.gp-calc-score-meta{flex:1}
+.gp-calc-pct{font-size:22px;font-weight:800;color:var(--primary-dark);line-height:1.1;font-family:'Manrope','Inter',sans-serif}
+.gp-calc-cat{font-size:12px;color:var(--muted);margin-top:2px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.gp-calc-result.gp-calc-ok .gp-calc-cat{color:#15803d}
+.gp-calc-result.gp-calc-warn .gp-calc-cat{color:#b45309}
+.gp-calc-result.gp-calc-danger .gp-calc-cat{color:#b91c1c}
+
+.gp-calc-flags{font-size:12.5px;color:var(--text);line-height:1.5;margin-bottom:10px}
+.gp-calc-flags strong{display:block;font-size:11.5px;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.gp-calc-flags ul{margin:0 0 0 18px;padding:0}
+.gp-calc-flags li{margin-bottom:2px}
+
+.gp-calc-recs{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.gp-calc-rec{padding:8px 10px;background:#fafffd;border-left:3px solid var(--green-forest);border-radius:7px;font-size:12.5px;line-height:1.5;color:var(--text)}
+.gp-calc-rec strong{color:var(--primary-dark);font-weight:700;margin-right:4px}
+
+.gp-calc-sum{padding:9px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;font-size:12.5px;color:#14532d;margin-bottom:10px;line-height:1.5}
+
+.gp-calc-block{margin:8px 0;padding:9px 11px;border-radius:9px;border-left:3px solid var(--border);background:#fafffd;font-size:12.5px;line-height:1.5}
+.gp-calc-block strong{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;color:var(--primary-dark)}
+.gp-calc-block ul{margin:0 0 0 18px;padding:0}
+.gp-calc-block li{margin-bottom:3px}
+.gp-calc-block.pedir{background:#f0fdf4;border-left-color:#16a34a;color:#14532d}
+.gp-calc-block.pedir strong{color:#15803d}
+.gp-calc-block.danger{background:#fef2f2;border-left-color:#dc2626;color:#7f1d1d}
+.gp-calc-block.danger strong{color:#b91c1c}
+.gp-calc-block.info{background:#eff6ff;border-left-color:#2563eb;color:#1e3a8a}
+.gp-calc-block.info strong{color:#1d4ed8}
+.gp-calc-block.evitar{background:#f8fafc;border-left-color:#94a3b8;color:#475569}
+.gp-calc-block.nota{background:#fffbeb;border-left-color:#d97706;color:#78350f}
+.gp-calc-block.nota strong{color:#b45309}
+.gp-calc-block.ok{background:#f0fdf4;border-left-color:#16a34a;color:#14532d}
+.gp-calc-block.ok strong{color:#15803d}
+
+.gp-copy-btn{display:block;width:100%;margin-top:10px;padding:10px 14px;background:#fff;border:1.5px dashed var(--green-forest);border-radius:10px;color:var(--green-deep);font-weight:700;font-size:12.5px;font-family:inherit;cursor:pointer;transition:all .15s}
+.gp-copy-btn:hover{background:#ecfdf5}
+.gp-copy-btn.gp-copy-ok{background:#16a34a;color:#fff;border-color:#16a34a;border-style:solid}
+.gp-copy-btn.gp-copy-fail{background:#dc2626;color:#fff;border-color:#dc2626;border-style:solid}
+
 @media (max-width:540px){
   .gp-row{flex-direction:column;gap:2px}
   .gp-row-k{width:auto;padding-top:0}
@@ -640,6 +726,10 @@ canvas{max-width:100%}
   .gp-agenda-medico{font-size:13px}
   .gp-mets-grid{grid-template-columns:1fr;gap:4px}
   .gp-mets-grid .mets-val{text-align:left}
+  .gp-calc-grid{grid-template-columns:1fr}
+  .gp-calc-score-big{font-size:38px}
+  .gp-calc-pct{font-size:19px}
+  .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
 /* ============ AGENDAMIENTO DE PROCEDIMIENTOS (full-screen overlay) ============ */
@@ -1742,6 +1832,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=42"></script>
+<script src="app.js?v=44"></script>
 </body>
 </html>
