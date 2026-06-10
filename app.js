@@ -4154,6 +4154,51 @@ function closeGuiasSection(){
   if(wrap){ try{ wrap.scrollTo({top:0, behavior:'instant'}); }catch(e){ wrap.scrollTop = 0; } }
 }
 
+// Volver context-aware del header del Portal:
+//   - Si hay una sub-vista abierta → vuelve al grid de cards
+//   - Si está en el grid → vuelve al selector de módulos
+function guiasBack(){
+  const anySubViewOpen = _GP_SECTIONS.some(k => {
+    const e = document.getElementById(k);
+    return e && e.classList.contains('active');
+  });
+  if(anySubViewOpen){
+    closeGuiasSection();
+  } else {
+    backToModulesFromGuias();
+  }
+}
+
+// Helper para construir un accordion (bloque desplegable).
+// items: [{ ico, title, meta, html, open }]
+function _renderGpAcc(items){
+  if(!Array.isArray(items)) return '';
+  let out = '';
+  for(const it of items){
+    if(!it) continue;
+    const openCls = it.open ? ' open' : '';
+    const ico = it.ico ? `<span class="gp-acc-ico">${_gpEsc(it.ico)}</span>` : '';
+    const meta = it.meta ? `<span class="gp-acc-meta">${_gpEsc(it.meta)}</span>` : '';
+    out += `
+      <div class="gp-acc${openCls}">
+        <button type="button" class="gp-acc-head" onclick="toggleGpAcc(this)">
+          ${ico}
+          <span class="gp-acc-title">${_gpEsc(it.title || '')}</span>
+          ${meta}
+          <span class="gp-acc-chev">›</span>
+        </button>
+        <div class="gp-acc-body">${it.html || ''}</div>
+      </div>`;
+  }
+  return out;
+}
+
+function toggleGpAcc(btn){
+  if(!btn) return;
+  const acc = btn.closest('.gp-acc');
+  if(acc) acc.classList.toggle('open');
+}
+
 function openCalcModal(){
   if(!_GP_ACTIVE_CALC) return;
   const c = _GP_ACTIVE_CALC;
@@ -4182,42 +4227,65 @@ function toggleGuiasSection(id){ openGuiasSection(id); }
 function renderGuiasAyunoTable(){
   const cont = document.getElementById('gpAyunoBody');
   if(!cont) return;
-  let html = '';
-  html += '<table class="gp-table" style="margin-bottom:12px"><thead><tr><th>Tipo de ingesta</th><th class="col-time">Tiempo mínimo</th></tr></thead><tbody>';
+  // Tabla tiempos de ayuno
+  let tablaAyuno = '<table class="gp-table"><thead><tr><th>Tipo de ingesta</th><th class="col-time">Tiempo mínimo</th></tr></thead><tbody>';
   for(const r of AYUNO_TABLE_DATA.rows){
-    html += `<tr><td>${_gpEsc(r.ingesta)}</td><td class="col-time">${_gpEsc(r.tiempo)}</td></tr>`;
+    tablaAyuno += `<tr><td>${_gpEsc(r.ingesta)}</td><td class="col-time">${_gpEsc(r.tiempo)}</td></tr>`;
   }
-  html += '</tbody></table>';
-  html += `
-    <div class="gp-callout">
+  tablaAyuno += '</tbody></table>';
+  tablaAyuno += `
+    <div class="gp-callout" style="margin-top:12px">
       <strong>⚠ En caso de duda</strong> sobre el cumplimiento del ayuno o el contenido gástrico, será criterio del <strong>anestesiólogo</strong> posponer o realizar el procedimiento, eventualmente apoyado en una <strong>ecografía gástrica</strong> para evaluar el contenido residual.
     </div>`;
-  html += '<h3 style="font-size:14px;font-weight:700;color:var(--primary-dark);margin:18px 0 8px;font-family:Manrope,Inter,sans-serif">Suspensión de Análogos GLP-1</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Fármaco</th><th class="col-time">Suspensión</th></tr></thead><tbody>';
+  // Tabla GLP-1
+  let tablaGlp1 = '<table class="gp-table"><thead><tr><th>Fármaco</th><th class="col-time">Suspensión</th></tr></thead><tbody>';
   for(const r of AYUNO_TABLE_DATA.glp1Rows){
-    html += `<tr><td>${_gpEsc(r.farmaco)}</td><td class="col-time">${_gpEsc(r.suspension)}</td></tr>`;
+    tablaGlp1 += `<tr><td>${_gpEsc(r.farmaco)}</td><td class="col-time">${_gpEsc(r.suspension)}</td></tr>`;
   }
-  html += '</tbody></table>';
-  html += '<p class="gp-foot-note">Referencia: Guía de Ayuno Perioperatorio y Suspensión de GLP-1 — Clínica Universidad de los Andes.</p>';
+  tablaGlp1 += '</tbody></table>';
+
+  const html = _renderGpAcc([
+    { ico:'⏱️', title:'Tiempos de ayuno por tipo de ingesta', meta:`${AYUNO_TABLE_DATA.rows.length} ítems`, html: tablaAyuno, open: true },
+    { ico:'💉', title:'Suspensión de análogos GLP-1', meta:`${AYUNO_TABLE_DATA.glp1Rows.length} fármacos`, html: tablaGlp1, open: false }
+  ]) + '<p class="gp-foot-note">Referencia: Guía de Ayuno Perioperatorio y Suspensión de GLP-1 — Clínica Universidad de los Andes.</p>';
   cont.innerHTML = html;
 }
 
-// Render tabla Suspensión de Fármacos
+// Render tabla Suspensión de Fármacos — agrupado por grupo en accordions.
 function renderGuiasSuspTable(){
   const cont = document.getElementById('gpSuspBody');
   if(!cont) return;
-  let html = '';
-  html += '<table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Acción</th><th>Tiempo / Observación</th></tr></thead><tbody>';
-  let lastGrupo = '';
+  // Agrupar por r.grupo preservando orden de aparición
+  const grupos = [];
+  const porGrupo = {};
   for(const r of SUSP_TABLE_DATA){
-    const grupoCell = (r.grupo !== lastGrupo) ? `<td class="group-cell">${_gpEsc(r.grupo)}</td>` : '<td></td>';
-    lastGrupo = r.grupo;
-    const accionCls = _gpActionClass(r.accion);
-    html += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td><span class="gp-badge ${accionCls}">${_gpEsc(r.accion.toUpperCase())}</span></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+    if(!Object.prototype.hasOwnProperty.call(porGrupo, r.grupo)){
+      grupos.push(r.grupo);
+      porGrupo[r.grupo] = [];
+    }
+    porGrupo[r.grupo].push(r);
   }
-  html += '</tbody></table>';
-  html += '<p class="gp-foot-note">Referencia: Guía de Suspensión de Fármacos Perioperatorios — Clínica Universidad de los Andes. Las recomendaciones son orientativas; cada paciente debe evaluarse individualmente.</p>';
-  cont.innerHTML = html;
+  // Icono por grupo (fallback a 💊)
+  const grupoIco = {
+    'Cardiovascular':'❤️',
+    'Diabetes':'🩺','Diabéticos':'🩺','Antidiabéticos':'🩺',
+    'Anticoagulantes':'🩸','Antiagregantes':'🩸',
+    'Psiquiátricos':'🧠','Neurológicos':'🧠',
+    'Hormonales':'⚖️','Anticonceptivos':'⚖️',
+    'Respiratorios':'🌬️',
+    'Inmunosupresores':'🛡️',
+    'Suplementos':'🌿','Herbales':'🌿'
+  };
+  const items = grupos.map((g, i) => {
+    let body = '<table class="gp-table"><thead><tr><th>Fármaco</th><th>Acción</th><th>Tiempo / Observación</th></tr></thead><tbody>';
+    for(const r of porGrupo[g]){
+      const accionCls = _gpActionClass(r.accion);
+      body += `<tr><td>${_gpEsc(r.farmaco)}</td><td><span class="gp-badge ${accionCls}">${_gpEsc(r.accion.toUpperCase())}</span></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+    }
+    body += '</tbody></table>';
+    return { ico: grupoIco[g] || '💊', title: g, meta: `${porGrupo[g].length}`, html: body, open: i === 0 };
+  });
+  cont.innerHTML = _renderGpAcc(items) + '<p class="gp-foot-note">Referencia: Guía de Suspensión de Fármacos Perioperatorios — Clínica Universidad de los Andes. Las recomendaciones son orientativas; cada paciente debe evaluarse individualmente.</p>';
 }
 
 // ============================================================
@@ -4239,22 +4307,25 @@ function renderGuiasConsultaPreanestesica(){
         <div class="gp-agenda-pill">${_gpEsc(a.bloque)}</div>
       </div>`;
   }
-  const html = `
-    <div class="gp-callout" style="margin-bottom:14px">
-      <strong>📅 Consulta Preanestésica programada</strong><br>
-      Estos son los horarios fijos para evaluación preanestésica con cada profesional. Coordina con la secretaria del Servicio de Anestesia para agendar a tu paciente.
-    </div>
-    <div class="gp-agenda-list">${cards}</div>
-    <div class="gp-sobrecupo-block">
+  const calloutHtml = `
+    <div class="gp-callout">
+      <strong>📅 Consulta Preanestésica programada.</strong> Estos son los horarios fijos para evaluación preanestésica con cada profesional. Coordina con la secretaria del Servicio de Anestesia para agendar a tu paciente.
+    </div>`;
+  const agendaHtml = `<div class="gp-agenda-list">${cards}</div>`;
+  const sobrecupoHtml = `
+    <div class="gp-sobrecupo-block" style="margin-top:0">
       <div class="gp-sobrecupo-title">¿No hay hora disponible?</div>
       <div class="gp-sobrecupo-desc">Solicita un <strong>sobrecupo</strong> o evaluación preanestésica adicional escribiendo directamente a ${_gpEsc(CONSULTA_PREANESTESICA.contacto)}.</div>
       <button type="button" class="gp-sobrecupo-btn" onclick="abrirMailtoSobrecupo()">
         ✉️ Solicitar sobrecupo por correo
       </button>
       <div class="gp-sobrecupo-foot">Se abrirá tu cliente de correo con el mensaje pre-llenado a <strong>${_gpEsc(CONSULTA_PREANESTESICA.sobrecupoEmail)}</strong>. Solo completa los datos del paciente y envía.</div>
-    </div>
-    <p class="gp-foot-note">La consulta preanestésica busca evaluar comorbilidades, riesgo perioperatorio, ajustar fármacos, indicar ayuno, y planificar la técnica anestésica con el paciente.</p>
-  `;
+    </div>`;
+  const html = _renderGpAcc([
+    { ico:'ℹ️',  title:'¿Qué es la Consulta Preanestésica?', html: calloutHtml, open: true },
+    { ico:'👤', title:'Agenda de profesionales y horarios', meta:`${agenda.length}`, html: agendaHtml, open: true },
+    { ico:'✉️', title:'Solicitar sobrecupo', html: sobrecupoHtml, open: false }
+  ]) + '<p class="gp-foot-note">La consulta preanestésica busca evaluar comorbilidades, riesgo perioperatorio, ajustar fármacos, indicar ayuno, y planificar la técnica anestésica con el paciente.</p>';
   cont.innerHTML = html;
 }
 
@@ -4725,58 +4796,59 @@ function _renderExamCalcCard(){
 function renderGuiasExamenes(){
   const cont = document.getElementById('gpExamBody');
   if(!cont) return;
-  let html = '';
-  html += `
-    <div class="gp-callout" style="margin-bottom:14px">
+
+  // Intro siempre visible
+  const intro = `
+    <div class="gp-callout" style="margin-bottom:8px">
       <strong>🧪 Criterio general:</strong> los exámenes preoperatorios deben pedirse <em>dirigidos</em> según ASA y magnitud del procedimiento. Los exámenes indiscriminados tienen alta prevalencia de falsos positivos y pueden llevar a mala toma de decisiones, suspensiones innecesarias y aumento de costos.
     </div>
-    <div class="gp-callout info" style="margin-bottom:14px">
+    <div class="gp-callout info" style="margin-bottom:12px">
       <strong>🧮 Calculadora disponible.</strong> Usa el botón <strong>«Abrir calculadora»</strong> (abajo a la derecha) para obtener una recomendación personalizada según edad, ASA, comorbilidades y riesgo quirúrgico.
-    </div>
-  `;
+    </div>`;
 
-  // ===== TABLAS DE REFERENCIA =====
-  html += '<h3 class="gp-h3" style="margin-top:14px">Tablas por riesgo quirúrgico × ASA</h3>';
+  // Tablas por riesgo × ASA (3 subtablas en un único accordion)
+  let tablasRiesgo = '';
   for(const key of ['bajo','intermedio','alto']){
     const m = EXAM_PREOP_MATRIX[key];
-    html += `<div class="gp-subgroup"><div class="gp-subgroup-title">${_gpEsc(m.titulo)}</div><div class="gp-subgroup-desc">${_gpEsc(m.desc)}</div>`;
-    html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Examen</th><th>ASA I</th><th>ASA II</th><th>ASA III y IV</th></tr></thead><tbody>';
+    tablasRiesgo += `<div class="gp-subgroup"><div class="gp-subgroup-title">${_gpEsc(m.titulo)}</div><div class="gp-subgroup-desc">${_gpEsc(m.desc)}</div>`;
+    tablasRiesgo += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Examen</th><th>ASA I</th><th>ASA II</th><th>ASA III y IV</th></tr></thead><tbody>';
     for(const r of m.rows){
-      html += `<tr><td><strong>${_gpEsc(r.test)}</strong></td><td>${_gpEsc(r.asa1)}</td><td>${_gpEsc(r.asa2)}</td><td>${_gpEsc(r.asa34)}</td></tr>`;
+      tablasRiesgo += `<tr><td><strong>${_gpEsc(r.test)}</strong></td><td>${_gpEsc(r.asa1)}</td><td>${_gpEsc(r.asa2)}</td><td>${_gpEsc(r.asa34)}</td></tr>`;
     }
-    html += '</tbody></table></div></div>';
+    tablasRiesgo += '</tbody></table></div></div>';
   }
 
   // Específicos por comorbilidad
-  html += '<h3 class="gp-h3" style="margin-top:22px">Exámenes específicos según comorbilidad / situación</h3>';
-  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Condición</th><th>Exámenes</th><th>Nota</th></tr></thead><tbody>';
+  let especificos = '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Condición</th><th>Exámenes</th><th>Nota</th></tr></thead><tbody>';
   for(const r of EXAM_PREOP_ESPECIFICOS){
-    html += `<tr><td><strong>${_gpEsc(r.cond)}</strong></td><td>${_gpEsc(r.pedir)}</td><td><em>${_gpEsc(r.nota||'')}</em></td></tr>`;
+    especificos += `<tr><td><strong>${_gpEsc(r.cond)}</strong></td><td>${_gpEsc(r.pedir)}</td><td><em>${_gpEsc(r.nota||'')}</em></td></tr>`;
   }
-  html += '</tbody></table></div>';
+  especificos += '</tbody></table></div>';
 
   // Diferir cirugía
-  html += '<h3 class="gp-h3" style="margin-top:22px">Tiempos de espera tras eventos CV</h3>';
-  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Evento / antecedente</th><th>Tiempo recomendado</th></tr></thead><tbody>';
+  let diferir = '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Evento / antecedente</th><th>Tiempo recomendado</th></tr></thead><tbody>';
   for(const r of EXAM_PREOP_DIFERIR){
-    html += `<tr><td><strong>${_gpEsc(r.evento)}</strong></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
+    diferir += `<tr><td><strong>${_gpEsc(r.evento)}</strong></td><td>${_gpEsc(r.tiempo)}</td></tr>`;
   }
-  html += '</tbody></table></div>';
+  diferir += '</tbody></table></div>';
 
-  // Recomendaciones generales
-  html += '<h3 class="gp-h3" style="margin-top:22px">Recomendaciones generales</h3>';
-  html += '<ul class="gp-bullets">';
+  // Recomendaciones generales + vigencia
+  let recoms = '<ul class="gp-bullets">';
   for(const r of EXAM_PREOP_RECOMENDACIONES){
-    html += `<li>${_gpEsc(r)}</li>`;
+    recoms += `<li>${_gpEsc(r)}</li>`;
   }
-  html += '</ul>';
-
-  html += `
+  recoms += '</ul>';
+  recoms += `
     <div class="gp-callout" style="margin-top:14px">
       <strong>💡 Vigencia:</strong> en pacientes estables, los exámenes previos siguen vigentes hasta <strong>6 meses</strong>. En condiciones dinámicas (DM mal controlada, ERC progresiva, ICC, hepatopatía) → considerar vigencia &lt; 1 mes o solicitar nuevos.
-    </div>
-  `;
-  html += `<p class="gp-foot-note">Referencia: Actualizaciones en evaluación preoperatoria · Dr. Fernando Rojas, CUA (2026) · ESAIC/ESA Guidelines 2024 · ACC/AHA Perioperative Guidelines.</p>`;
+    </div>`;
+
+  const html = intro + _renderGpAcc([
+    { ico:'📊', title:'Tablas por riesgo quirúrgico × ASA', meta:'3 tablas', html: tablasRiesgo, open: true },
+    { ico:'🩺', title:'Específicos por comorbilidad / situación', meta:`${EXAM_PREOP_ESPECIFICOS.length}`, html: especificos, open: false },
+    { ico:'⏳', title:'Tiempos de espera tras eventos CV', meta:`${EXAM_PREOP_DIFERIR.length}`, html: diferir, open: false },
+    { ico:'📝', title:'Recomendaciones generales', html: recoms, open: false }
+  ]) + `<p class="gp-foot-note">Referencia: Actualizaciones en evaluación preoperatoria · Dr. Fernando Rojas, CUA (2026) · ESAIC/ESA Guidelines 2024 · ACC/AHA Perioperative Guidelines.</p>`;
   cont.innerHTML = html;
 }
 
@@ -4786,29 +4858,31 @@ function renderGuiasExamenes(){
 function renderGuiasAnticoag(){
   const cont = document.getElementById('gpAnticoagBody');
   if(!cont) return;
-  let html = '';
-  html += `
+
+  const intro = `
     <div class="gp-callout" style="margin-bottom:14px">
       <strong>🩸 Antes de suspender:</strong> evalúa siempre <em>riesgo trombótico vs. hemorrágico</em>. En stents coronarios recientes, válvulas mecánicas o ETV reciente, la suspensión sin coordinación con cardiología/hematología puede ser de alto riesgo.
     </div>
   `;
+
   // Tabla principal
-  html += '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Suspender antes de cirugía</th><th>Reiniciar postop</th></tr></thead><tbody>';
+  let tablaPrincipal = '<div class="gp-table-scroll"><table class="gp-table"><thead><tr><th>Grupo</th><th>Fármaco</th><th>Suspender antes de cirugía</th><th>Reiniciar postop</th></tr></thead><tbody>';
   let lastGrupo = '';
   for(const r of ANTICOAG_TABLE){
     const grupoCell = (r.grupo !== lastGrupo) ? `<td class="group-cell"><strong>${_gpEsc(r.grupo)}</strong></td>` : '<td></td>';
     lastGrupo = r.grupo;
-    html += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td>${_gpEsc(r.suspender)}</td><td>${_gpEsc(r.reiniciar)}</td></tr>`;
+    tablaPrincipal += `<tr>${grupoCell}<td>${_gpEsc(r.farmaco)}</td><td>${_gpEsc(r.suspender)}</td><td>${_gpEsc(r.reiniciar)}</td></tr>`;
   }
-  html += '</tbody></table></div>';
+  tablaPrincipal += '</tbody></table></div>';
 
-  // Calls-out críticos
-  html += `
-    <h3 class="gp-h3" style="margin-top:18px">Situaciones que requieren coordinación</h3>
-    <div class="gp-callout danger">
+  const stent = `
+    <div class="gp-callout danger" style="margin:0">
       <strong>⛔ Stent coronario reciente:</strong> NO suspender la doble antiagregación (DAPT) si stent farmacoactivo (DES) &lt;6 meses o stent metálico (BMS) &lt;30 días, salvo cirugía emergente. Coordinar con cardiología siempre.
     </div>
-    <div class="gp-callout warning" style="margin-top:10px">
+  `;
+
+  const bridging = `
+    <div class="gp-callout warning" style="margin:0">
       <strong>⚠ Alto riesgo trombótico → considerar bridging con HBPM:</strong>
       <ul style="margin:6px 0 0 18px;padding:0">
         <li>FA con CHA₂DS₂-VASc ≥ 4 o ACV/AIT reciente</li>
@@ -4817,7 +4891,10 @@ function renderGuiasAnticoag(){
         <li>Trombofilia conocida con ETV recurrente</li>
       </ul>
     </div>
-    <div class="gp-callout" style="margin-top:10px">
+  `;
+
+  const reversion = `
+    <div class="gp-callout" style="margin:0">
       <strong>🚨 Reversión urgente:</strong>
       <ul style="margin:6px 0 0 18px;padding:0">
         <li><strong>TACO</strong> → CCP de 4 factores (Beriplex / Octaplex) + Vit K EV</li>
@@ -4827,7 +4904,14 @@ function renderGuiasAnticoag(){
       </ul>
     </div>
   `;
-  html += '<p class="gp-foot-note">Referencia: ACC/AHA Periprocedural Management of Antithrombotic Therapy · ESC Guidelines 2022 · Protocolo institucional Clínica Universidad de los Andes.</p>';
+
+  const html = intro + _renderGpAcc([
+    { ico:'💊', title:'Tabla principal: TACO / NOAC / Antiagregantes / HBPM', meta:`${ANTICOAG_TABLE.length} fármacos`, html: tablaPrincipal, open: true },
+    { ico:'⛔', title:'Stent coronario reciente — cuándo NO suspender', html: stent, open: false },
+    { ico:'⚠️', title:'Bridging con HBPM en alto riesgo trombótico', html: bridging, open: false },
+    { ico:'🚨', title:'Reversión urgente de anticoagulantes', html: reversion, open: false }
+  ]) + `<p class="gp-foot-note">Referencia: ACC/AHA Periprocedural Management of Antithrombotic Therapy · ESC Guidelines 2022 · Protocolo institucional Clínica Universidad de los Andes.</p>`;
+
   cont.innerHTML = html;
 }
 
@@ -4859,8 +4943,8 @@ function _renderRcriCalcCard(){
 function renderGuiasRiesgoCv(){
   const cont = document.getElementById('gpRiesgoCvBody');
   if(!cont) return;
-  let html = '';
-  html += `
+
+  const intro = `
     <div class="gp-callout" style="margin-bottom:14px">
       <strong>❤️ Objetivo:</strong> identificar pacientes que requieren <strong>optimización médica</strong> o <strong>evaluación cardiológica</strong> antes de cirugía no cardíaca. Basado en <em>ACC/AHA 2014 Guideline on Perioperative Cardiovascular Evaluation for Noncardiac Surgery (Fleisher et al)</em>.
     </div>
@@ -4870,9 +4954,8 @@ function renderGuiasRiesgoCv(){
   `;
 
   // Algoritmo
-  html += '<h3 class="gp-h3">Algoritmo simplificado AHA/ACC</h3>';
-  html += `
-    <ol class="gp-algoritmo">
+  const algoritmo = `
+    <ol class="gp-algoritmo" style="margin:0">
       <li><strong>¿Cirugía emergente?</strong> → ir a pabellón, manejar el riesgo en el perioperatorio. <em>Sin evaluación adicional</em>.</li>
       <li><strong>¿Condición cardíaca activa?</strong> (SCA, ICC descompensada, arritmia significativa, valvulopatía severa sintomática) → <strong>diferir y derivar a Cardiología</strong>.</li>
       <li><strong>¿Cirugía de bajo riesgo cardiovascular (&lt;1%)?</strong> → seguir con la cirugía. <em>Sin más estudios</em>.</li>
@@ -4886,26 +4969,23 @@ function renderGuiasRiesgoCv(){
   `;
 
   // METs
-  html += '<h3 class="gp-h3" style="margin-top:18px">Capacidad funcional — escala METs</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Carga</th><th>Equivalencia funcional</th></tr></thead><tbody>';
+  let mets = '<table class="gp-table"><thead><tr><th>Carga</th><th>Equivalencia funcional</th></tr></thead><tbody>';
   for(const r of METS_TABLE){
-    html += `<tr><td><strong>${_gpEsc(r.mets)}</strong></td><td>${_gpEsc(r.actividad)}</td></tr>`;
+    mets += `<tr><td><strong>${_gpEsc(r.mets)}</strong></td><td>${_gpEsc(r.actividad)}</td></tr>`;
   }
-  html += '</tbody></table>';
-  html += `<div class="gp-callout" style="margin-top:8px"><strong>👉 Umbral clave: 4 METs.</strong> El paciente debe ser capaz de subir un piso de escalera o caminar 6 km/h en plano sin síntomas. Si no puede o no se sabe, sube el rendimiento del test no invasivo.</div>`;
+  mets += '</tbody></table>';
+  mets += `<div class="gp-callout" style="margin-top:8px"><strong>👉 Umbral clave: 4 METs.</strong> El paciente debe ser capaz de subir un piso de escalera o caminar 6 km/h en plano sin síntomas. Si no puede o no se sabe, sube el rendimiento del test no invasivo.</div>`;
 
-  // Tabla de referencia (para consulta sin calcular)
-  html += '<h3 class="gp-h3" style="margin-top:18px">Tabla de referencia · RCRI</h3>';
-  html += '<table class="gp-table"><thead><tr><th>Score</th><th>Riesgo de evento CV mayor (IAM, paro, BAV completo)</th></tr></thead><tbody>';
+  // Tabla de referencia RCRI
+  let rcriRef = '<table class="gp-table"><thead><tr><th>Score</th><th>Riesgo de evento CV mayor (IAM, paro, BAV completo)</th></tr></thead><tbody>';
   for(const r of RCRI_RIESGO){
-    html += `<tr><td><strong>${_gpEsc(r.n)}</strong></td><td>${_gpEsc(r.riesgo)}</td></tr>`;
+    rcriRef += `<tr><td><strong>${_gpEsc(r.n)}</strong></td><td>${_gpEsc(r.riesgo)}</td></tr>`;
   }
-  html += '</tbody></table>';
+  rcriRef += '</tbody></table>';
 
   // Derivación a Cardiología
-  html += '<h3 class="gp-h3" style="margin-top:18px">¿Cuándo derivar a Cardiología?</h3>';
-  html += `
-    <div class="gp-callout warning">
+  const derivar = `
+    <div class="gp-callout warning" style="margin:0">
       <ul style="margin:0;padding-left:18px">
         <li>Riesgo CV elevado <strong>+</strong> capacidad funcional &lt; 4 METs o no evaluable.</li>
         <li>Síndrome coronario agudo, angina inestable o IAM reciente (&lt; 60 días).</li>
@@ -4920,7 +5000,12 @@ function renderGuiasRiesgoCv(){
     </div>
   `;
 
-  html += `<p class="gp-foot-note">Referencia: Fleisher LA et al. <em>2014 ACC/AHA Guideline on Perioperative Cardiovascular Evaluation and Management of Patients Undergoing Noncardiac Surgery</em>. J Am Coll Cardiol. 2014;64(22):e77-e137. · Lee TH et al. <em>Revised Cardiac Risk Index</em>. Circulation 1999;100:1043-9.</p>`;
+  const html = intro + _renderGpAcc([
+    { ico:'🧭', title:'Algoritmo simplificado AHA/ACC', meta:'4 pasos', html: algoritmo, open: true },
+    { ico:'🏃', title:'Capacidad funcional — escala METs', meta:`${METS_TABLE.length}`, html: mets, open: false },
+    { ico:'📊', title:'Tabla de referencia · RCRI', meta:`${RCRI_RIESGO.length}`, html: rcriRef, open: false },
+    { ico:'❤️', title:'¿Cuándo derivar a Cardiología?', html: derivar, open: false }
+  ]) + `<p class="gp-foot-note">Referencia: Fleisher LA et al. <em>2014 ACC/AHA Guideline on Perioperative Cardiovascular Evaluation and Management of Patients Undergoing Noncardiac Surgery</em>. J Am Coll Cardiol. 2014;64(22):e77-e137. · Lee TH et al. <em>Revised Cardiac Risk Index</em>. Circulation 1999;100:1043-9.</p>`;
 
   cont.innerHTML = html;
 }
