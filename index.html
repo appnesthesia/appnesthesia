@@ -1064,6 +1064,28 @@ canvas{max-width:100%}
 .mi-pref-row:last-child{border-bottom:none}
 .mi-pref-label{font-size:13px;font-weight:600}
 .mi-pref-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ===== Calendario de Eventos — Vista mensual ===== */
+.evt-cal-wrap{background:var(--card);border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.07);overflow:hidden;margin-bottom:6px;border:1px solid var(--border)}
+.evt-cal-header{display:flex;align-items:center;padding:13px 16px 11px;gap:8px;border-bottom:1px solid var(--border)}
+.evt-cal-nav{background:none;border:none;font-size:22px;cursor:pointer;color:var(--primary);padding:0 6px;line-height:1;border-radius:8px;transition:background .12s}
+.evt-cal-nav:hover{background:#e8f5f0}
+.evt-cal-title{font-weight:800;font-size:15px;color:var(--primary-dark);flex:1;text-align:center;letter-spacing:.3px;font-family:'Manrope','Inter',sans-serif}
+.evt-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 6px 12px;gap:2px}
+.evt-cal-dow{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);padding:4px 0 8px;letter-spacing:.5px;text-transform:uppercase}
+.evt-cal-cell{min-height:48px;display:flex;flex-direction:column;align-items:center;padding:5px 2px 4px;border-radius:10px;cursor:pointer;transition:background .12s;position:relative}
+.evt-cal-cell.empty{cursor:default;background:none!important}
+.evt-cal-cell:not(.empty):hover{background:#e8f5f0}
+.evt-cal-cell.today .evt-cal-num{background:var(--primary);color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.evt-cal-cell.selected{background:#d4ede5!important}
+.evt-cal-cell.selected .evt-cal-num{color:var(--primary-dark);font-weight:800}
+.evt-cal-num{font-size:13px;color:var(--text);font-weight:500;line-height:1;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.evt-cal-cell.has-events .evt-cal-num{font-weight:700;color:var(--primary-dark)}
+.evt-cal-dots{display:flex;gap:3px;margin-top:2px;justify-content:center;flex-wrap:wrap}
+.evt-cal-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0}
+.evt-cal-legend{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 12px;border-top:1px solid var(--border)}
+.evt-cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:500}
+.evt-cal-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1809,21 +1831,12 @@ canvas{max-width:100%}
 <!-- EVENTOS -->
 <section class="view" id="view-eventos">
   <div class="section">
-    <div class="alert info" style="font-size:12.5px;margin-bottom:10px">
-      📅 Calendario interno del servicio: reuniones, cumpleaños y fechas importantes.
-    </div>
-    <div class="btn-row admin-only" style="display:none;margin-bottom:10px">
-      <button class="btn sm accent" onclick="openEventModal()">+ Agregar evento</button>
-    </div>
-    <div class="btn-row" style="margin-bottom:14px">
+    <div class="btn-row" style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <button class="btn sm secondary" id="notifPermBtn" onclick="requestNotifPermissionInteractive()" style="display:none">🔔 Activar notificaciones</button>
+      <button class="btn sm accent admin-only" style="display:none;margin-left:auto" onclick="openEventModal()">+ Agregar evento</button>
     </div>
-    <h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:0 0 8px">🎯 Próximos 7 días</h4>
-    <div id="eventosProx"></div>
-    <h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:18px 0 8px">🎂 Cumpleaños del mes</h4>
-    <div id="eventosCumple"></div>
-    <h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:18px 0 8px">📋 Todos los eventos</h4>
-    <div id="eventosTodos"></div>
+    <div id="evtCalContainer"></div>
+    <div id="evtDayDetail" style="margin-top:14px"></div>
   </div>
 </section>
 

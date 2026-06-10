@@ -228,8 +228,10 @@ function _renderSyncIndicator(){
 function _setSyncStatus(s){ _syncStatus = s; _renderSyncIndicator(); }
 
 // Campos PRIVADOS por dispositivo de cada staff que NUNCA suben a la nube
-// (pinHash = clave personal del dispositivo; preferences/activityLog = privados)
-const STAFF_DEVICE_PRIVATE_KEYS = ['pinHash', 'preferences', 'activityLog'];
+// (preferences/activityLog = privados por dispositivo)
+// NOTA: pinHash YA NO está aquí — se sincroniza en la nube para que la clave
+// configurada en un dispositivo sea requerida en todos los demás.
+const STAFF_DEVICE_PRIVATE_KEYS = ['preferences', 'activityLog'];
 
 function _stripDevicePrivateStaff(staffArr){
   if(!Array.isArray(staffArr)) return staffArr;
@@ -242,9 +244,11 @@ function _stripDevicePrivateStaff(staffArr){
 }
 
 // Toma un array remoto de staff (sin datos privados) y, para cada uno,
-// pega encima el pinHash/preferences/activityLog que estén GUARDADOS LOCAL
-// para ese mismo id. Así las cuentas del dispositivo (PIN, preferencias)
-// no se pierden cuando jalamos el estado compartido.
+// pega encima las preferences/activityLog que estén GUARDADOS LOCAL
+// para ese mismo id. Así las preferencias del dispositivo no se pierden.
+// pinHash: si el remoto ya tiene PIN, se respeta (nube gana).
+// Si el remoto no tiene PIN pero el local sí, se mantiene el local
+// para que suba al siguiente sync (primer dispositivo en configurarlo).
 function _mergeStaffPreservingDeviceLocal(remoteStaff, localStaff){
   const localById = {};
   (localStaff||[]).forEach(s=>{ if(s && s.id) localById[s.id] = s; });
@@ -256,6 +260,9 @@ function _mergeStaffPreservingDeviceLocal(remoteStaff, localStaff){
     STAFF_DEVICE_PRIVATE_KEYS.forEach(k => {
       if(ls[k] !== undefined) merged[k] = ls[k];
     });
+    // pinHash: si el remoto no tiene PIN pero el local sí, preservamos el local
+    // para que el próximo push lo suba a la nube.
+    if(!merged.pinHash && ls && ls.pinHash) merged.pinHash = ls.pinHash;
     return merged;
   });
 }
@@ -4028,7 +4035,7 @@ const _GP_SECTIONS_META = {
     render: () => renderGuiasConsultaPreanestesica(),
     hero: {
       label: 'Resumen rápido',
-      chips: ['Lun a Sáb · 08:00 – 17:00', '4 sobrecupos/día', 'Aviso ≥ 24 h']
+      chips: ['Mar, Mié y Vie · 08:00–14:00 hrs', 'Solicite sobrecupo con el botón de abajo']
     }
   },
   gpAyuno: {
@@ -4319,7 +4326,7 @@ function renderGuiasConsultaPreanestesica(){
       <button type="button" class="gp-sobrecupo-btn" onclick="abrirMailtoSobrecupo()">
         ✉️ Solicitar sobrecupo por correo
       </button>
-      <div class="gp-sobrecupo-foot">Se abrirá tu cliente de correo con el mensaje pre-llenado a <strong>${_gpEsc(CONSULTA_PREANESTESICA.sobrecupoEmail)}</strong>. Solo completa los datos del paciente y envía.</div>
+      <div class="gp-sobrecupo-foot">Se abrirá tu correo con el mensaje pre-llenado. Solo completa los datos y envía.</div>
     </div>`;
   const html = _renderGpAcc([
     { ico:'ℹ️',  title:'¿Qué es la Consulta Preanestésica?', html: calloutHtml, open: true },
@@ -6907,33 +6914,149 @@ function birthdaysThisMonth(){
   return all.filter(e=>e.date.slice(5,7)===month);
 }
 
+// ── Estado del calendario de eventos ──────────────────────────────────────
+let _evtCalYear  = null;
+let _evtCalMonth = null; // 0-indexed (0=Enero)
+let _evtSelectedDay = null;
+
 function renderEventos(){
   updateNotifPermBtn();
-  const prox = eventsInNextDays(7);
-  const proxBox = document.getElementById('eventosProx');
-  if(prox.length === 0){
-    proxBox.innerHTML = '<div class="empty" style="padding:14px"><span class="big" style="font-size:24px">📅</span>Sin eventos en los próximos 7 días</div>';
-  } else {
-    proxBox.innerHTML = prox.map(renderEventCard).join('');
+  // Inicializar al mes actual si no está configurado
+  if(_evtCalYear === null || _evtCalMonth === null){
+    const now = new Date();
+    _evtCalYear  = now.getFullYear();
+    _evtCalMonth = now.getMonth();
   }
-  // Cumpleaños
-  const bds = birthdaysThisMonth();
-  const bdsBox = document.getElementById('eventosCumple');
-  if(bds.length === 0){
-    bdsBox.innerHTML = '<div class="empty" style="padding:12px;font-size:12px">No hay cumpleaños este mes</div>';
-  } else {
-    bdsBox.innerHTML = bds.map(renderEventCard).join('');
-  }
-  // Todos
-  const all = expandedEvents().filter(e=>{
-    if(!e.date) return false;
-    return daysBetween(e.date, todayISO())>=-30;
+  _renderEvtCalGrid();
+  _renderEvtDayDetail();
+  // Actualizar visibilidad del botón admin-only dentro de la sección
+  const adminBtns = document.querySelectorAll('#view-eventos .admin-only');
+  adminBtns.forEach(b=>{ b.style.display = (state && state.isAdmin) ? '' : 'none'; });
+}
+
+function evtCalNav(delta){
+  let d = new Date(_evtCalYear, _evtCalMonth + delta, 1);
+  _evtCalYear  = d.getFullYear();
+  _evtCalMonth = d.getMonth();
+  _evtSelectedDay = null;
+  _renderEvtCalGrid();
+  _renderEvtDayDetail();
+}
+
+function selectEvtDay(dateStr){
+  _evtSelectedDay = (_evtSelectedDay === dateStr) ? null : dateStr;
+  _renderEvtCalGrid();
+  _renderEvtDayDetail();
+}
+
+function _renderEvtCalGrid(){
+  const container = document.getElementById('evtCalContainer');
+  if(!container) return;
+
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const dayNames = ['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
+
+  const year  = _evtCalYear;
+  const month = _evtCalMonth;
+  const today = todayISO();
+
+  // Primer día del mes y total de días
+  const firstDay   = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  // Desplazamiento inicial: Lunes=0 … Domingo=6
+  let startDow = (firstDay.getDay() + 6) % 7;
+
+  // Construir mapa de eventos por día { dayNumber: [events] }
+  const allEvts = expandedEvents();
+  const byDay = {};
+  allEvts.forEach(e=>{
+    if(!e.date) return;
+    const [ey, em, ed] = e.date.split('-').map(Number);
+    if(ey === year && (em-1) === month){
+      (byDay[ed] = byDay[ed]||[]).push(e);
+    }
   });
-  const allBox = document.getElementById('eventosTodos');
-  if(all.length === 0){
-    allBox.innerHTML = '<div class="empty" style="padding:14px"><span class="big" style="font-size:24px">📋</span>No hay eventos cargados</div>';
+
+  // Construir celdas
+  let cells = '';
+  let idx = 0;
+  for(let i=0; i<startDow; i++){ cells += '<div class="evt-cal-cell empty"></div>'; idx++; }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const ds  = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isT = ds === today;
+    const isS = ds === _evtSelectedDay;
+    const evts = byDay[d] || [];
+
+    // Hasta 3 puntos de colores distintos
+    const colors = [...new Set(evts.slice(0,4).map(e=>{
+      if(e.kind==='birthday') return '#ec4899';
+      const m = eventTypeMeta(e.type); return m ? m.color : '#6366f1';
+    }))].slice(0,3);
+    const dots = colors.map(c=>`<span class="evt-cal-dot" style="background:${c}"></span>`).join('');
+
+    cells += `<div class="evt-cal-cell${isT?' today':''}${isS?' selected':''}${evts.length?' has-events':''}" onclick="selectEvtDay('${ds}')"><span class="evt-cal-num">${d}</span>${dots?`<div class="evt-cal-dots">${dots}</div>`:''}</div>`;
+    idx++;
+  }
+  // Completar última fila
+  while(idx % 7 !== 0){ cells += '<div class="evt-cal-cell empty"></div>'; idx++; }
+
+  // Leyenda de tipos de eventos presentes en el mes
+  const typesInMonth = [...new Set(
+    Object.values(byDay).flat().filter(e=>e.kind!=='birthday').map(e=>e.type)
+  )];
+  let legendHtml = '';
+  if(typesInMonth.length){
+    const items = typesInMonth.map(t=>{
+      const m = eventTypeMeta(t);
+      return m ? `<span class="evt-cal-legend-item"><span class="evt-cal-legend-dot" style="background:${m.color}"></span>${m.label}</span>` : '';
+    }).join('');
+    const hasBday = Object.values(byDay).flat().some(e=>e.kind==='birthday');
+    const bdayItem = hasBday ? `<span class="evt-cal-legend-item"><span class="evt-cal-legend-dot" style="background:#ec4899"></span>Cumpleaños</span>` : '';
+    legendHtml = `<div class="evt-cal-legend">${items}${bdayItem}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="evt-cal-wrap">
+      <div class="evt-cal-header">
+        <button class="evt-cal-nav" onclick="evtCalNav(-1)">&#8249;</button>
+        <span class="evt-cal-title">${monthNames[month]} ${year}</span>
+        <button class="evt-cal-nav" onclick="evtCalNav(1)">&#8250;</button>
+      </div>
+      <div class="evt-cal-grid">
+        ${dayNames.map(n=>`<div class="evt-cal-dow">${n}</div>`).join('')}
+        ${cells}
+      </div>
+      ${legendHtml}
+    </div>`;
+}
+
+function _renderEvtDayDetail(){
+  const box = document.getElementById('evtDayDetail');
+  if(!box) return;
+
+  if(!_evtSelectedDay){
+    // Sin día seleccionado: mostrar próximos eventos
+    const prox = eventsInNextDays(30);
+    if(prox.length === 0){
+      box.innerHTML = '<div class="empty" style="padding:20px;text-align:center"><span style="font-size:28px">📅</span><br><span style="font-size:13px;color:var(--muted)">Sin eventos en los próximos 30 días</span></div>';
+    } else {
+      box.innerHTML = '<h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:0 0 8px">📋 Próximos eventos</h4>' + prox.map(renderEventCard).join('');
+    }
+    return;
+  }
+
+  const dayEvts = expandedEvents().filter(e=>e.date===_evtSelectedDay);
+  const fecha   = formatDateLong(_evtSelectedDay);
+  const canEdit = state && state.isAdmin;
+  if(dayEvts.length === 0){
+    const addBtn = canEdit
+      ? `<button class="btn sm accent" style="margin-top:10px" onclick="openEventModal(null)">+ Agregar en esta fecha</button>` : '';
+    box.innerHTML = `<div class="empty" style="padding:18px;text-align:center"><span style="font-size:24px">📅</span><br><strong style="font-size:13px">${fecha}</strong><br><span style="font-size:12px;color:var(--muted)">Sin eventos este día</span>${addBtn}</div>`;
   } else {
-    allBox.innerHTML = all.map(renderEventCard).join('');
+    box.innerHTML = `<h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:0 0 8px">📅 ${fecha}</h4>` + dayEvts.map(renderEventCard).join('');
   }
 }
 
