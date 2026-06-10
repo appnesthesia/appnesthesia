@@ -491,6 +491,35 @@ function _flushSyncNow(){
   }catch(e){ /* mejor esfuerzo */ }
 }
 
+// Sube SOLO el pinHash de un staff al estado remoto, sin tocar nada más.
+// Resuelve el problema de que los usuarios no-admin solo pueden subir
+// vacaciones/intercambios en el push normal, pero necesitan subir su PIN.
+// Hace un read-modify-write quirúrgico: lee el estado remoto, actualiza
+// solo ese campo, y vuelve a subir — sin pisar datos del admin.
+async function _pushMyPinHash(staffId, pinHash) {
+  const base = getBackendURL();
+  if(!base || !INSTITUTION) return;
+  const token = getBackendToken();
+  if(!token) return;
+  try {
+    const rr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store', headers:{'Authorization':'Bearer '+token}});
+    if(!rr.ok) return;
+    const remote = await rr.json();
+    if(!remote || remote._empty) return;
+    const staffArr = Array.isArray(remote.staff)
+      ? remote.staff.map(s => s.id === staffId ? {...s, pinHash} : s)
+      : [];
+    const payload = {...remote, staff: staffArr};
+    delete payload._updatedAt;
+    delete payload._empty;
+    await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify(payload)
+    });
+  } catch(e) { /* mejor esfuerzo — PIN queda guardado localmente */ }
+}
+
 function _bindFlushHandlers(){
   if(_flushHandlersBound) return;
   _flushHandlersBound = true;
@@ -3711,8 +3740,8 @@ const AYUNO_TABLE_DATA = {
     { ingesta:'Leche materna', tiempo:'4 horas' },
     { ingesta:'Fórmula láctea infantil', tiempo:'6 horas' },
     { ingesta:'Leche no humana / lácteos', tiempo:'6 horas' },
-    { ingesta:'Comida ligera (tostada + líquido claro)', tiempo:'6 horas' },
-    { ingesta:'Comida copiosa, alta en grasas y/o proteínas (frituras, carnes rojas, lácteos enteros, comidas abundantes)', tiempo:'8 horas' }
+    { ingesta:'Sólidos en general — norma general (comida estándar, comida ligera, tostada, etc.)', tiempo:'6 horas', nota:'Norma general según guías europeas ESA 2023' },
+    { ingesta:'Comida copiosa Y con alto contenido graso y/o proteico (frituras, carnes rojas, lácteos enteros, comida abundante) — AMBAS condiciones deben cumplirse', tiempo:'8 horas', nota:'Solo aplica 8h cuando sea copiosa + grasa/proteica. Si hay duda: criterio del anestesiólogo ± ecografía gástrica' }
   ],
   glp1Rows: [
     { farmaco:'Semaglutida oral (Rybelsus)', suspension:'El día previo' },
@@ -4043,7 +4072,7 @@ const _GP_SECTIONS_META = {
     render: () => renderGuiasAyunoTable(),
     hero: {
       label: 'Tiempos de ayuno',
-      chips: ['8 h sólidos', '6 h leche/fórmula', '2 h líquidos claros', 'GLP-1 ≥ 7 d']
+      chips: ['6 h sólidos (norma general)', '8 h si copiosa + grasa/prot.', '2 h líquidos claros', 'GLP-1 ≥ 7 d']
     }
   },
   gpSusp: {
@@ -4237,12 +4266,13 @@ function renderGuiasAyunoTable(){
   // Tabla tiempos de ayuno
   let tablaAyuno = '<table class="gp-table"><thead><tr><th>Tipo de ingesta</th><th class="col-time">Tiempo mínimo</th></tr></thead><tbody>';
   for(const r of AYUNO_TABLE_DATA.rows){
-    tablaAyuno += `<tr><td>${_gpEsc(r.ingesta)}</td><td class="col-time">${_gpEsc(r.tiempo)}</td></tr>`;
+    const notaHtml = r.nota ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4">${_gpEsc(r.nota)}</div>` : '';
+    tablaAyuno += `<tr><td>${_gpEsc(r.ingesta)}${notaHtml}</td><td class="col-time" style="white-space:nowrap"><strong>${_gpEsc(r.tiempo)}</strong></td></tr>`;
   }
   tablaAyuno += '</tbody></table>';
   tablaAyuno += `
-    <div class="gp-callout" style="margin-top:12px">
-      <strong>⚠ En caso de duda</strong> sobre el cumplimiento del ayuno o el contenido gástrico, será criterio del <strong>anestesiólogo</strong> posponer o realizar el procedimiento, eventualmente apoyado en una <strong>ecografía gástrica</strong> para evaluar el contenido residual.
+    <div class="gp-callout warning" style="margin-top:12px">
+      <strong>⚠ Regla clave:</strong> La norma general para sólidos es <strong>6 horas</strong> (guías europeas ESA 2023). Las <strong>8 horas</strong> aplican <em>únicamente</em> cuando la comida es <strong>copiosa Y además rica en grasas y/o proteínas</strong> (ambas condiciones). En caso de duda o cuando la comida fue copiosa + grasa/proteica, la decisión queda a <strong>criterio del anestesiólogo</strong> según evaluación personalizada y eventual <strong>ecografía gástrica</strong>.
     </div>`;
   // Tabla GLP-1
   let tablaGlp1 = '<table class="gp-table"><thead><tr><th>Fármaco</th><th class="col-time">Suspensión</th></tr></thead><tbody>';
@@ -4316,7 +4346,7 @@ function renderGuiasConsultaPreanestesica(){
   }
   const calloutHtml = `
     <div class="gp-callout">
-      <strong>📅 Consulta Preanestésica programada.</strong> Estos son los horarios fijos para evaluación preanestésica con cada profesional. Coordina con la secretaria del Servicio de Anestesia para agendar a tu paciente.
+      <strong>📅 Consulta Preanestésica programada.</strong> Estos son los horarios disponibles para evaluación preanestésica con cada profesional. Contáctese directamente con el Servicio de Anestesia para coordinar la hora.
     </div>`;
   const agendaHtml = `<div class="gp-agenda-list">${cards}</div>`;
   const sobrecupoHtml = `
@@ -7038,13 +7068,21 @@ function _renderEvtDayDetail(){
   if(!box) return;
 
   if(!_evtSelectedDay){
-    // Sin día seleccionado: mostrar próximos eventos
+    // Sin día seleccionado: lista desplegable colapsada por defecto
     const prox = eventsInNextDays(30);
-    if(prox.length === 0){
-      box.innerHTML = '<div class="empty" style="padding:20px;text-align:center"><span style="font-size:28px">📅</span><br><span style="font-size:13px;color:var(--muted)">Sin eventos en los próximos 30 días</span></div>';
-    } else {
-      box.innerHTML = '<h4 style="font-size:13px;font-weight:700;color:var(--primary-dark);margin:0 0 8px">📋 Próximos eventos</h4>' + prox.map(renderEventCard).join('');
-    }
+    const count = prox.length;
+    const inner = count === 0
+      ? '<div style="padding:12px 14px;font-size:12.5px;color:var(--muted);text-align:center">Sin eventos en los próximos 30 días</div>'
+      : prox.map(renderEventCard).join('');
+    box.innerHTML = `
+      <details class="evt-prox-details">
+        <summary class="evt-prox-summary">
+          <span>📋 Próximos eventos</span>
+          <span class="evt-prox-badge">${count}</span>
+          <span class="evt-prox-arrow">›</span>
+        </summary>
+        <div class="evt-prox-body">${inner}</div>
+      </details>`;
     return;
   }
 
@@ -7534,6 +7572,8 @@ async function promptSetupUserPin(user){
               }
               user.pinHash = await hashPIN(pin, user.id);
               save();
+              // Sube el PIN a la nube de inmediato (los no-admin no hacen push del staff array)
+              _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
               closePinPad();
               toast && toast('PIN creado');
               res(true);
@@ -7608,6 +7648,8 @@ async function changeUserPIN(){
                 state.adminPinHash = await hashPIN(pin, '__admin__');
               } else {
                 u.pinHash = await hashPIN(pin, u.id);
+                // Sube el PIN a la nube de inmediato
+                _pushMyPinHash(u.id, u.pinHash).catch(()=>{});
               }
               save();
               closePinPad();

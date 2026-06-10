@@ -518,7 +518,12 @@ canvas{max-width:100%}
 .gp-intro{margin-bottom:14px}
 .gp-intro h2{font-family:'Manrope','Inter',sans-serif;font-size:20px;font-weight:800;margin:0 0 4px;color:var(--primary-dark)}
 .gp-intro p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
-.gp-search-wrap{position:sticky;top:0;z-index:50;margin:-4px 0 12px;padding:10px 0 8px;background:linear-gradient(180deg,#f0faf5 0%,#f0faf5 75%,rgba(240,250,245,0) 100%)}
+.gp-search-wrap{position:sticky;top:0;z-index:50;margin:-4px 0 16px;padding:10px 0 8px;background:linear-gradient(180deg,#f0faf5 0%,#f0faf5 75%,rgba(240,250,245,0) 100%)}
+.gp-search{border:2.5px solid var(--primary)!important;box-shadow:0 4px 16px rgba(30,107,84,.14)!important;font-size:15.5px!important}
+.gp-search:focus{border-color:var(--primary-dark)!important;box-shadow:0 6px 22px rgba(15,68,53,.22)!important}
+/* FAB calculadora — pulso suave para llamar la atención */
+@keyframes gpFabPulse{0%,100%{box-shadow:0 6px 20px rgba(15,68,53,.30),0 2px 6px rgba(15,68,53,.20),0 0 0 0 rgba(30,107,84,0)}60%{box-shadow:0 8px 26px rgba(15,68,53,.40),0 2px 6px rgba(15,68,53,.25),0 0 0 9px rgba(30,107,84,.12)}}
+.gp-fab:not(.hidden){animation:gpFabPulse 2.8s ease-in-out infinite}
 .gp-results-header{font-size:11.5px;color:var(--muted);margin:4px 4px 12px;font-weight:700;text-transform:uppercase;letter-spacing:.45px}
 .gp-results-header strong{color:var(--primary-dark);text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:800}
 .gp-notes-list{margin:4px 0 0;padding-left:18px;line-height:1.5;color:var(--text);font-size:12.5px}
@@ -1086,6 +1091,16 @@ canvas{max-width:100%}
 .evt-cal-legend{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 12px;border-top:1px solid var(--border)}
 .evt-cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:500}
 .evt-cal-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ===== Desplegable "Próximos eventos" en calendario ===== */
+.evt-prox-details{background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.evt-prox-details[open] .evt-prox-arrow{transform:rotate(90deg)}
+.evt-prox-summary{display:flex;align-items:center;gap:8px;padding:13px 16px;cursor:pointer;list-style:none;user-select:none;font-weight:700;font-size:13.5px;color:var(--primary-dark)}
+.evt-prox-summary::-webkit-details-marker{display:none}
+.evt-prox-summary:hover{background:#f0fdf4}
+.evt-prox-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;min-width:20px;text-align:center}
+.evt-prox-arrow{font-size:18px;margin-left:auto;color:var(--muted);transition:transform .2s;line-height:1}
+.evt-prox-body{padding:6px 4px 8px;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -1159,8 +1174,8 @@ canvas{max-width:100%}
     </div>
   </div>
   <div class="guias-body">
-    <div class="gp-intro">
-      <h2>Buscador rápido de fármacos</h2>
+    <div class="gp-intro" style="background:linear-gradient(135deg,#e8f5f0,#f0fdf4);border:1.5px solid #bbf7d0;border-radius:14px;padding:14px 16px;margin-bottom:4px">
+      <h2 style="font-size:18px;margin-bottom:6px">🔎 Buscador de fármacos perioperatorios</h2>
       <p>Escribe el nombre genérico o comercial (Ej.: <i>aspirina</i>, <i>ozempic</i>, <i>plavix</i>, <i>jardiance</i>) para ver la recomendación perioperatoria.</p>
     </div>
     <div class="gp-search-wrap">
