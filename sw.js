@@ -7,7 +7,7 @@
 //   - skipWaiting + clients.claim → reemplaza al SW anterior sin esperar
 //     a que el usuario cierre todas las pestañas.
 
-const CACHE = 'anestesia-v48';
+const CACHE = 'anestesia-v49';
 const ASSETS = [
   './',
   './index.html',
@@ -18,6 +18,8 @@ const ASSETS = [
   './icon-maskable.png',
   './logo.png',
   './logo.svg',
+  './logo-aria.png',
+  './configs/aria-conocimiento.json',
   './configs/index.json',
   './configs/andes.json',
   './protocolos/ERAS-Colon-y-Bariatrica.pdf',

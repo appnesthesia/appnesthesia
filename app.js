@@ -3377,6 +3377,21 @@ function getAiURL(){
 }
 function aiAvailable(){ return !!getAiURL(); }
 
+// --- Base de conocimiento de ARIA (configs/aria-conocimiento.json) ---
+// Guías y resúmenes que el equipo agrega; ARIA los usa como contexto.
+let _ariaKB = null;
+async function loadAriaKB(){
+  if(_ariaKB !== null) return _ariaKB;
+  try{
+    const r = await fetch('configs/aria-conocimiento.json', {cache:'no-cache'});
+    if(r.ok){
+      const data = await r.json();
+      _ariaKB = Array.isArray(data.entradas) ? data.entradas : [];
+    } else { _ariaKB = []; }
+  }catch(e){ _ariaKB = []; }
+  return _ariaKB;
+}
+
 // --- RAG ligero: arma contexto con las filas de las tablas de la app
 // que coinciden con la pregunta (coagulación, anticoagulantes, exámenes) ---
 function _aiBuildContext(question){
@@ -3417,7 +3432,18 @@ function _aiBuildContext(question){
     });
   }catch(e){}
 
-  // 4) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
+  // 4) Base de conocimiento ARIA (guías agregadas por el servicio)
+  try{
+    (_ariaKB||[]).forEach(e=>{
+      if(!e || !e.contenido) return;
+      const kws = (e.keywords||[]).map(_gpNorm);
+      const hayTitulo = _gpNorm(e.titulo||'');
+      const match = kws.some(kw => kw && q.includes(kw)) || words.some(w => hayTitulo.includes(w));
+      if(match) matches.push('[Guía·' + (e.titulo||e.id) + '] ' + e.contenido);
+    });
+  }catch(e){}
+
+  // 5) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
   if(/riesgo|mets?|rcri|cardiolog|isquemia|esfuerzo|dobutamina/.test(q)){
     try{
       matches.push('[RCRI] Factores: ' + RCRI_FACTORES.join(' · '));
@@ -3442,6 +3468,7 @@ async function _aiCall(payload){
 // --- UI del chat ---
 function openAiChat(){
   if(!aiAvailable()){ alert('El asistente de IA aún no está configurado.\n\nDespliega el Worker de la carpeta worker-ia y agrega "aiURL" en configs/andes.json.'); return; }
+  try{ loadAriaKB(); }catch(e){}
   document.getElementById('aiChatOverlay').classList.remove('hidden');
   _aiRenderMessages();
   setTimeout(()=>{ try{ document.getElementById('aiChatInput').focus(); }catch(e){} }, 150);
@@ -3469,6 +3496,7 @@ function _aiRenderMessages(){
 }
 async function aiSendMessage(){
   if(_aiBusy) return;
+  try{ await loadAriaKB(); }catch(e){}
   const input = document.getElementById('aiChatInput');
   const text = (input.value||'').trim();
   if(!text) return;

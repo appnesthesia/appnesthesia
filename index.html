@@ -858,6 +858,21 @@ canvas{max-width:100%}
 }
 
 /* ============ ASISTENTE IA ============ */
+/* Botón ARIA de cabecera (todas las pantallas) */
+.aria-btn{width:38px;height:38px;border-radius:50%;border:none;padding:0;cursor:pointer;background:transparent;flex-shrink:0;position:relative;animation:ariaGlow 3s ease-in-out infinite}
+.aria-btn img{width:100%;height:100%;border-radius:50%;display:block;box-shadow:0 2px 8px rgba(124,58,237,.40)}
+.aria-btn:hover{transform:scale(1.08)}
+.aria-btn:active{transform:scale(.96)}
+@keyframes ariaGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(124,58,237,0))}50%{filter:drop-shadow(0 0 7px rgba(139,92,246,.55))}}
+/* Pill ARIA en el selector de módulos */
+.aria-pill{display:flex;align-items:center;gap:11px;width:100%;margin-top:12px;padding:11px 13px;border-radius:14px;border:1.5px solid #c4b5fd;background:linear-gradient(135deg,#f5f3ff,#ede9fe);cursor:pointer;font-family:inherit;text-align:left;transition:all .15s}
+.aria-pill:hover{border-color:#8b5cf6;background:linear-gradient(135deg,#ede9fe,#ddd6fe);transform:translateY(-1px);box-shadow:0 6px 14px -3px rgba(124,58,237,.25)}
+.aria-pill img{width:40px;height:40px;border-radius:11px;flex-shrink:0;box-shadow:0 2px 8px rgba(124,58,237,.35)}
+.aria-pill-txt{flex:1;min-width:0;font-size:13.5px;color:#4c1d95;line-height:1.3}
+.aria-pill-txt b{font-weight:800}
+.aria-pill-sub{display:block;font-size:11.5px;color:#7c3aed;margin-top:2px;font-weight:500}
+.aria-pill-arrow{color:#7c3aed;font-size:20px;font-weight:700;flex-shrink:0}
+
 .ai-chat-overlay{position:fixed;inset:0;background:rgba(8,28,21,.55);backdrop-filter:blur(3px);z-index:11000;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:640px){.ai-chat-overlay{align-items:center}}
 .ai-chat-overlay.hidden{display:none!important}
@@ -1219,6 +1234,11 @@ canvas{max-width:100%}
         <div class="mod-item-arrow">›</div>
       </button>
     </div>
+    <button type="button" class="aria-pill ai-entry-btn" onclick="openAiChat()">
+      <img src="logo-aria.png?v=49" alt="ARIA"/>
+      <span class="aria-pill-txt"><b>ARIA</b> · Asistente IA de Appnesthesia<span class="aria-pill-sub">Pregúntale sobre fármacos, exámenes y riesgo CV</span></span>
+      <span class="aria-pill-arrow">›</span>
+    </button>
     <div class="mod-actions">
       <button class="btn" onclick="cambiarInstitucionFromModules()">‹ Cambiar institución</button>
     </div>
@@ -1234,6 +1254,7 @@ canvas{max-width:100%}
       <h1>Portal Preanestésico</h1>
       <div class="guias-sub">Prepara a tu paciente</div>
     </div>
+    <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>
   </div>
   <div class="guias-body">
     <div class="gp-intro" style="background:linear-gradient(135deg,#e8f5f0,#f0fdf4);border:1.5px solid #bbf7d0;border-radius:14px;padding:14px 16px;margin-bottom:4px">
@@ -1282,7 +1303,7 @@ canvas{max-width:100%}
             <p class="gp-portal-card-desc">RCRI, METs y derivación a Cardiología</p>
           </button>
           <button type="button" class="gp-portal-card ai-entry-btn" onclick="openAiChat()" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
-            <div class="gp-portal-card-ico" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)"><span>🤖</span></div>
+            <div class="gp-portal-card-ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:14px;display:block"/></div>
             <h3 class="gp-portal-card-title">ARIA · Asistente IA</h3>
             <p class="gp-portal-card-desc">El asistente de IA de Appnesthesia — pregunta en lenguaje natural y responde con las tablas de la app</p>
           </button>
@@ -1379,6 +1400,7 @@ canvas{max-width:100%}
       <div id="agendSub" class="agend-sub"></div>
       <button type="button" id="agendAdminChip" class="agend-admin-chip hidden" onclick="agendSalirAdminConfirm()"><span class="agend-admin-chip-ico">🛡️</span><span id="agendAdminChipName">Admin</span><span class="agend-admin-chip-x">·  Salir</span></button>
     </div>
+    <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>
     <button type="button" id="agendHeadAction" class="agend-head-action hidden" onclick="agendHeadActionClick()"></button>
   </div>
   <div class="agend-body">
@@ -1612,6 +1634,7 @@ canvas{max-width:100%}
   <h1 id="hdrTitle">Appnesthesia</h1>
   <div id="syncStatus" class="sync-status" style="display:none" onclick="promptBackendToken()" title="Estado de sincronización con backend"></div>
   <button id="backendCfgBtn" class="admin-only sync-cfg-btn" style="display:none" onclick="promptBackendToken()" title="Configurar backend">⚙</button>
+  <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>
   <button class="admin-toggle" id="adminBtn" onclick="toggleAdmin()">Modo usuario</button>
 </header>
 
@@ -1705,7 +1728,7 @@ canvas{max-width:100%}
       <p>Próximamente: bloqueos, dosis y anatomía</p>
     </button>
     <button class="card ai-entry-btn" onclick="openAiChat()" style="grid-column:span 2;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
-      <div class="ico" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center"><span style="font-size:20px">🤖</span></div>
+      <div class="ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:12px;display:block"/></div>
       <h3>ARIA · Asistente IA</h3>
       <p>El asistente de inteligencia artificial de Appnesthesia — consulta fármacos, exámenes y riesgo CV con las tablas de la app</p>
     </button>
@@ -2082,7 +2105,7 @@ canvas{max-width:100%}
 <div id="aiChatOverlay" class="ai-chat-overlay hidden">
   <div class="ai-chat-box">
     <div class="ai-chat-head">
-      <div class="ai-chat-head-ico">🤖</div>
+      <div class="ai-chat-head-ico"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:11px;display:block"/></div>
       <div class="ai-chat-head-title">ARIA<div class="ai-chat-head-sub">Asistente de Referencia e Información Anestésica · Appnesthesia</div></div>
       <button type="button" class="ai-chat-clear" onclick="aiClearChat()" title="Nueva conversación">↺</button>
       <button type="button" class="ai-chat-close" onclick="closeAiChat()" title="Cerrar">×</button>
@@ -2102,6 +2125,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=48"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>
