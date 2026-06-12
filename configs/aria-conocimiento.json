@@ -1,6 +1,6 @@
 {
-  "_ayuda": "Base de conocimiento de ARIA. Agrega entradas con: id (único), titulo, keywords (palabras que activan la entrada al preguntarle a ARIA) y contenido (el texto que ARIA usará como referencia). Mientras más específicas las keywords, mejor. Sube este archivo a GitHub en la carpeta configs/ después de editarlo.",
-  "version": 2,
+  "_ayuda": "Base de conocimiento de ARIA. Cada entrada: id (único), titulo, fuente (guía/paper de origen que ARIA citará), keywords (palabras que la activan) y contenido. Sube este archivo a configs/ en GitHub tras editarlo.",
+  "version": 3,
   "entradas": [
     {
       "id": "ayuno",
@@ -16,7 +16,8 @@
         "comida",
         "npo"
       ],
-      "contenido": "Líquidos claros (agua, té, jugo sin pulpa, bebidas isotónicas): 2 h. Leche materna: 4 h. Fórmula láctea / leche no humana: 6 h. Comida liviana (tostadas, sin grasa): 6 h. Comida completa con grasas o frituras: 8 h. ASA 2023 fomenta líquidos claros hasta 2 h en adultos y niños (incluyendo carbohidratos en ERAS) salvo contraindicación (vaciamiento gástrico retardado, obstrucción, emergencia)."
+      "contenido": "Líquidos claros (agua, té, jugo sin pulpa, bebidas isotónicas): 2 h. Leche materna: 4 h. Fórmula láctea / leche no humana: 6 h. Comida liviana (tostadas, sin grasa): 6 h. Comida completa con grasas o frituras: 8 h. ASA 2023 fomenta líquidos claros hasta 2 h en adultos y niños (incluyendo carbohidratos en ERAS) salvo contraindicación (vaciamiento gástrico retardado, obstrucción, emergencia).",
+      "fuente": "ASA Practice Guidelines for Preoperative Fasting (Anesthesiology 2023)"
     },
     {
       "id": "glp1",
@@ -37,7 +38,8 @@
         "gip",
         "incretina"
       ],
-      "contenido": "Guía multisociedad 2024 (AGA/ASMBS/ISPCOP/SAGES) y consenso británico 2025: decisión compartida, NO suspensión universal. Pacientes en fase de escalada de dosis o con síntomas GI (náuseas, vómitos, plenitud, distensión) = mayor riesgo de estómago lleno. Opciones: suspender 1 semana (dosis semanal: semaglutida, dulaglutida, tirzepatida) o el día previo (diaria: liraglutida), O mantener + dieta líquida clara 24 h previas. Si duda: ultrasonido gástrico; estómago lleno → secuencia rápida o diferir. No suspender en indicación por DM2 sin plan alternativo de control glicémico."
+      "contenido": "Guía multisociedad 2024 (AGA/ASMBS/ISPCOP/SAGES) y consenso británico 2025: decisión compartida, NO suspensión universal. Pacientes en fase de escalada de dosis o con síntomas GI (náuseas, vómitos, plenitud, distensión) = mayor riesgo de estómago lleno. Opciones: suspender 1 semana (dosis semanal: semaglutida, dulaglutida, tirzepatida) o el día previo (diaria: liraglutida), O mantener + dieta líquida clara 24 h previas. Si duda: ultrasonido gástrico; estómago lleno → secuencia rápida o diferir. No suspender en indicación por DM2 sin plan alternativo de control glicémico.",
+      "fuente": "Guía multisociedad AGA/ASMBS/ISPCOP/SAGES 2024; consenso británico (Anaesthesia 2025)"
     },
     {
       "id": "nvpo",
@@ -57,7 +59,8 @@
         "antiemetico",
         "antiemético"
       ],
-      "contenido": "Factores Apfel: mujer, no fumador, historia NVPO/cinetosis, opioides postop. Estrategia por riesgo (4ª guía consenso 2020): 1-2 factores → 2 antieméticos de clases distintas; ≥3 factores → 3-4 intervenciones. Opciones: ondansetrón 4 mg IV al final, dexametasona 4-8 mg IV a la inducción, droperidol 0,625-1,25 mg, TIVA con propofol, evitar/minimizar opioides y óxido nitroso. Rescate: clase distinta a la profilaxis usada."
+      "contenido": "Factores Apfel: mujer, no fumador, historia NVPO/cinetosis, opioides postop. Estrategia por riesgo (4ª guía consenso 2020): 1-2 factores → 2 antieméticos de clases distintas; ≥3 factores → 3-4 intervenciones. Opciones: ondansetrón 4 mg IV al final, dexametasona 4-8 mg IV a la inducción, droperidol 0,625-1,25 mg, TIVA con propofol, evitar/minimizar opioides y óxido nitroso. Rescate: clase distinta a la profilaxis usada.",
+      "fuente": "4ª Guía de Consenso para el manejo de NVPO (Gan et al, Anesth Analg 2020)"
     },
     {
       "id": "hta",
@@ -76,7 +79,8 @@
         "valsartan",
         "valsartán"
       ],
-      "contenido": "Cirugía electiva: razonable proceder si PA <180/110 sin daño de órgano blanco agudo. IECA/ARA-II: suspender 24 h antes si el esquema lo permite (riesgo de hipotensión refractaria a la inducción), mantener si IC con FE reducida. Betabloqueadores y calcioantagonistas: mantener. Diuréticos: omitir dosis de la mañana. PA ≥180/110 persistente: evaluar diferir electiva y optimizar."
+      "contenido": "Cirugía electiva: razonable proceder si PA <180/110 sin daño de órgano blanco agudo. IECA/ARA-II: suspender 24 h antes si el esquema lo permite (riesgo de hipotensión refractaria a la inducción), mantener si IC con FE reducida. Betabloqueadores y calcioantagonistas: mantener. Diuréticos: omitir dosis de la mañana. PA ≥180/110 persistente: evaluar diferir electiva y optimizar.",
+      "fuente": "ACC/AHA Hypertension Guideline; recomendaciones perioperatorias ESC 2022"
     },
     {
       "id": "anemia",
@@ -92,7 +96,8 @@
         "patient blood management",
         "pbm"
       ],
-      "contenido": "Pesquisar anemia en cirugía con sangrado esperado >500 mL idealmente 4 semanas antes. Hb <13 g/dL (ambos sexos, criterio PBM): estudiar. Ferropenia (ferritina <30 µg/L, o <100 con saturación transferrina <20%): hierro EV (carboximaltosa) si cirugía <6 semanas; hierro oral si hay más tiempo. Considerar diferir cirugía electiva mayor hasta corregir anemia significativa. Umbral transfusional restrictivo: Hb 7-8 g/dL según comorbilidad."
+      "contenido": "Pesquisar anemia en cirugía con sangrado esperado >500 mL idealmente 4 semanas antes. Hb <13 g/dL (ambos sexos, criterio PBM): estudiar. Ferropenia (ferritina <30 µg/L, o <100 con saturación transferrina <20%): hierro EV (carboximaltosa) si cirugía <6 semanas; hierro oral si hay más tiempo. Considerar diferir cirugía electiva mayor hasta corregir anemia significativa. Umbral transfusional restrictivo: Hb 7-8 g/dL según comorbilidad.",
+      "fuente": "NATA / Patient Blood Management consensus (Anaesthesia 2017); ESAIC PBM"
     },
     {
       "id": "via_aerea_dificil",
@@ -107,7 +112,8 @@
         "ventilacion dificil",
         "ventilación difícil"
       ],
-      "contenido": "Predictores de intubación difícil: Mallampati III-IV, apertura bucal <3 cm, distancia tiromentoniana <6 cm, cuello corto/grueso, movilidad cervical reducida, retrognatia, incisivos prominentes, test mordida labio superior grado 3. Ventilación difícil con máscara: barba, IMC >26, edentado, >55 años, roncador (OBESE). Antecedente de VAD documentada es el mejor predictor → planificar con algoritmo DAS/ASA 2022, considerar intubación vigil con fibroscopio."
+      "contenido": "Predictores de intubación difícil: Mallampati III-IV, apertura bucal <3 cm, distancia tiromentoniana <6 cm, cuello corto/grueso, movilidad cervical reducida, retrognatia, incisivos prominentes, test mordida labio superior grado 3. Ventilación difícil con máscara: barba, IMC >26, edentado, >55 años, roncador (OBESE). Antecedente de VAD documentada es el mejor predictor → planificar con algoritmo DAS/ASA 2022, considerar intubación vigil con fibroscopio.",
+      "fuente": "ASA Difficult Airway Guidelines 2022; DAS"
     },
     {
       "id": "aha_acc_2024",
@@ -123,7 +129,8 @@
         "condicion cardiaca activa",
         "condición cardíaca activa"
       ],
-      "contenido": "Pasos: 1) Cirugía de emergencia → operar con vigilancia. 2) Condición cardíaca aguda (SCA, IC descompensada, arritmia inestable, valvulopatía severa sintomática) → diferir y tratar. 3) Estimar riesgo combinando RCRI y riesgo del procedimiento (<1% bajo; ≥1% elevado). 4) Riesgo elevado → capacidad funcional: ≥4 METs o DASI >34 → operar. 5) CF <4 METs o desconocida → ECG + NT-proBNP; test de isquemia (eco estrés/perfusión) SOLO si cambia la conducta. 6) Revascularización preoperatoria NO de rutina, solo si indicación propia. Fuente: Thompson et al, Circulation 2024."
+      "contenido": "Pasos: 1) Cirugía de emergencia → operar con vigilancia. 2) Condición cardíaca aguda (SCA, IC descompensada, arritmia inestable, valvulopatía severa sintomática) → diferir y tratar. 3) Estimar riesgo combinando RCRI y riesgo del procedimiento (<1% bajo; ≥1% elevado). 4) Riesgo elevado → capacidad funcional: ≥4 METs o DASI >34 → operar. 5) CF <4 METs o desconocida → ECG + NT-proBNP; test de isquemia (eco estrés/perfusión) SOLO si cambia la conducta. 6) Revascularización preoperatoria NO de rutina, solo si indicación propia. Fuente: Thompson et al, Circulation 2024.",
+      "fuente": "Thompson A et al. 2024 AHA/ACC Perioperative Guideline. Circulation 2024;150:e351-e442"
     },
     {
       "id": "biomarcadores_mins",
@@ -139,7 +146,8 @@
         "injuria miocárdica",
         "infarto perioperatorio"
       ],
-      "contenido": "NT-proBNP preop (≥65 años, o ≥45 con enfermedad CV, o RCRI ≥1 en cirugía elevada): <300 pg/mL = bajo riesgo. Elevado → vigilancia con troponinas postop (basal, 24, 48 h) para detectar MINS (injuria miocárdica tras cirugía no cardíaca): elevación de troponina sin necesidad de síntomas; asociada a mortalidad a 30 días. Manejo MINS: descartar etiología no isquémica, AAS + estatina, control FC/PA, considerar cardiología. La mayoría de los MINS son silentes — sin vigilancia no se detectan (guías CCS 2017, ESC 2022, AHA/ACC 2024)."
+      "contenido": "NT-proBNP preop (≥65 años, o ≥45 con enfermedad CV, o RCRI ≥1 en cirugía elevada): <300 pg/mL = bajo riesgo. Elevado → vigilancia con troponinas postop (basal, 24, 48 h) para detectar MINS (injuria miocárdica tras cirugía no cardíaca): elevación de troponina sin necesidad de síntomas; asociada a mortalidad a 30 días. Manejo MINS: descartar etiología no isquémica, AAS + estatina, control FC/PA, considerar cardiología. La mayoría de los MINS son silentes — sin vigilancia no se detectan (guías CCS 2017, ESC 2022, AHA/ACC 2024).",
+      "fuente": "Canadian Cardiovascular Society 2017; ESC 2022; AHA/ACC 2024"
     },
     {
       "id": "bridging",
@@ -156,7 +164,8 @@
         "válvula mecánica",
         "taco"
       ],
-      "contenido": "Suspender warfarina 5 días antes (acenocumarol 3 días), INR <1,5 el día de cirugía. Bridging con HBPM SOLO en alto riesgo trombótico: válvula mecánica mitral o aórtica de modelo antiguo, FA con CHA₂DS₂-VASc ≥7 o ACV/AIT <3 meses, ETV <3 meses, trombofilia severa. En riesgo bajo-moderado el bridging AUMENTA sangrado sin reducir tromboembolismo (BRIDGE trial). Última dosis de HBPM terapéutica 24 h antes. Reinicio warfarina: 12-24 h postop con hemostasia. DOACs NO requieren bridging."
+      "contenido": "Suspender warfarina 5 días antes (acenocumarol 3 días), INR <1,5 el día de cirugía. Bridging con HBPM SOLO en alto riesgo trombótico: válvula mecánica mitral o aórtica de modelo antiguo, FA con CHA₂DS₂-VASc ≥7 o ACV/AIT <3 meses, ETV <3 meses, trombofilia severa. En riesgo bajo-moderado el bridging AUMENTA sangrado sin reducir tromboembolismo (BRIDGE trial). Última dosis de HBPM terapéutica 24 h antes. Reinicio warfarina: 12-24 h postop con hemostasia. DOACs NO requieren bridging.",
+      "fuente": "ACCP/CHEST Perioperative Antithrombotic Guideline 2022; BRIDGE trial (NEJM 2015)"
     },
     {
       "id": "dapt_stents",
@@ -172,7 +181,8 @@
         "clopidogrel y cirugia",
         "angioplastia"
       ],
-      "contenido": "Cirugía electiva: diferir ≥6 meses tras DES (≥3 meses si cirugía tiempo-sensible, nunca <30 días), ≥30 días tras BMS, ≥12 meses idealmente tras stent por SCA, ≥14 días tras angioplastia con balón. Si cirugía impostergable con stent reciente: MANTENER AAS siempre que sea posible, suspender solo el inhibidor P2Y12 (clopidogrel/ticagrelor 5 días, prasugrel 7), reiniciarlo <48 h postop. Suspender DAPT completa sin coordinar con cardiología = riesgo de trombosis del stent (mortalidad alta). Decisión siempre multidisciplinaria."
+      "contenido": "Cirugía electiva: diferir ≥6 meses tras DES (≥3 meses si cirugía tiempo-sensible, nunca <30 días), ≥30 días tras BMS, ≥12 meses idealmente tras stent por SCA, ≥14 días tras angioplastia con balón. Si cirugía impostergable con stent reciente: MANTENER AAS siempre que sea posible, suspender solo el inhibidor P2Y12 (clopidogrel/ticagrelor 5 días, prasugrel 7), reiniciarlo <48 h postop. Suspender DAPT completa sin coordinar con cardiología = riesgo de trombosis del stent (mortalidad alta). Decisión siempre multidisciplinaria.",
+      "fuente": "ACC/AHA DAPT Guideline; 2024 AHA/ACC Perioperative Guideline"
     },
     {
       "id": "betabloqueo_estatinas",
@@ -188,7 +198,8 @@
         "atorvastatina",
         "rosuvastatina"
       ],
-      "contenido": "Betabloqueadores: MANTENER en usuario crónico (suspensión brusca = rebote). NO iniciar el día previo ni <7 días antes (POISE: inicio agudo con dosis altas ↑ ACV y mortalidad). Si hay indicación (isquemia en test, RCRI ≥3), iniciar ≥7 días antes con titulación (bisoprolol/metoprolol, FC objetivo 60-70 sin hipotensión). Estatinas: mantener SIEMPRE; considerar iniciar en cirugía vascular y pacientes con indicación propia — reduce eventos CV perioperatorios. No suspender por la cirugía."
+      "contenido": "Betabloqueadores: MANTENER en usuario crónico (suspensión brusca = rebote). NO iniciar el día previo ni <7 días antes (POISE: inicio agudo con dosis altas ↑ ACV y mortalidad). Si hay indicación (isquemia en test, RCRI ≥3), iniciar ≥7 días antes con titulación (bisoprolol/metoprolol, FC objetivo 60-70 sin hipotensión). Estatinas: mantener SIEMPRE; considerar iniciar en cirugía vascular y pacientes con indicación propia — reduce eventos CV perioperatorios. No suspender por la cirugía.",
+      "fuente": "POISE trial (Lancet 2008); AHA/ACC 2024; ESC 2022"
     },
     {
       "id": "valvulopatias",
@@ -204,7 +215,8 @@
         "tavr",
         "soplo"
       ],
-      "contenido": "Estenosis aórtica severa (AVA <1 cm², gradiente medio ≥40 mmHg): sintomática → diferir electiva, evaluar RVA/TAVI primero. Asintomática: cirugía de riesgo bajo-intermedio razonable con monitorización invasiva; evitar hipotensión, mantener ritmo sinusal y precarga, vasopresor de elección fenilefrina/noradrenalina. Soplo no estudiado + síntomas o ≥III/VI → ecocardiograma preoperatorio. Estenosis mitral severa: control de FC (evitar taquicardia). Insuficiencias regurgitantes toleran mejor: mantener precarga, evitar bradicardia, reducir postcarga."
+      "contenido": "Estenosis aórtica severa (AVA <1 cm², gradiente medio ≥40 mmHg): sintomática → diferir electiva, evaluar RVA/TAVI primero. Asintomática: cirugía de riesgo bajo-intermedio razonable con monitorización invasiva; evitar hipotensión, mantener ritmo sinusal y precarga, vasopresor de elección fenilefrina/noradrenalina. Soplo no estudiado + síntomas o ≥III/VI → ecocardiograma preoperatorio. Estenosis mitral severa: control de FC (evitar taquicardia). Insuficiencias regurgitantes toleran mejor: mantener precarga, evitar bradicardia, reducir postcarga.",
+      "fuente": "ACC/AHA Valvular Heart Disease Guideline 2020/2021; ESC 2022 non-cardiac surgery"
     },
     {
       "id": "vad_manejo",
@@ -224,7 +236,8 @@
         "intubacion vigil",
         "intubación vigil"
       ],
-      "contenido": "VAD anticipada con riesgo de ventilación difícil/aspiración/desaturación rápida → intubación VIGIL (fibroscopio o videolaringoscopio) con tópica + sedación titulada. No anticipada: maximizar primer intento (posición, preoxigenación, VL de entrada); máximo 3+1 intentos de laringoscopía, entre intentos VENTILAR; fracaso → dispositivo supraglótico 2ª generación; fracaso de DSG + no ventilable (CICO) → cricotiroidotomía con bisturí-bougie-tubo SIN demora. Pedir ayuda precozmente, declarar el fracaso en voz alta, limitar fijación en intentos repetidos."
+      "contenido": "VAD anticipada con riesgo de ventilación difícil/aspiración/desaturación rápida → intubación VIGIL (fibroscopio o videolaringoscopio) con tópica + sedación titulada. No anticipada: maximizar primer intento (posición, preoxigenación, VL de entrada); máximo 3+1 intentos de laringoscopía, entre intentos VENTILAR; fracaso → dispositivo supraglótico 2ª generación; fracaso de DSG + no ventilable (CICO) → cricotiroidotomía con bisturí-bougie-tubo SIN demora. Pedir ayuda precozmente, declarar el fracaso en voz alta, limitar fijación en intentos repetidos.",
+      "fuente": "ASA Difficult Airway Guidelines 2022; DAS guidelines"
     },
     {
       "id": "hipertermia_maligna",
@@ -239,7 +252,8 @@
         "rigidez",
         "masetero"
       ],
-      "contenido": "Sospecha: hipercapnia inexplicada y progresiva + taquicardia + rigidez (masetero) + hipertermia tardía tras halogenados o succinilcolina. Manejo: 1) Suspender gatillantes, hiperventilar O₂ 100% flujo alto 10 L/min, avisar y pedir dantroleno. 2) DANTROLENO 2,5 mg/kg IV bolo, repetir cada 5-10 min hasta control (puede requerir >10 mg/kg). 3) Enfriar activo si T >39°C (suero frío IV, hielo; parar a 38°C). 4) Tratar hiperK (Ca, insulina-glucosa, bicarbonato), arritmias (NO calcioantagonistas con dantroleno). 5) Diuresis >1 mL/kg/h, vigilar mioglobinuria. UCI ≥24 h. Hotline MHAUS y carro de HM disponibles."
+      "contenido": "Sospecha: hipercapnia inexplicada y progresiva + taquicardia + rigidez (masetero) + hipertermia tardía tras halogenados o succinilcolina. Manejo: 1) Suspender gatillantes, hiperventilar O₂ 100% flujo alto 10 L/min, avisar y pedir dantroleno. 2) DANTROLENO 2,5 mg/kg IV bolo, repetir cada 5-10 min hasta control (puede requerir >10 mg/kg). 3) Enfriar activo si T >39°C (suero frío IV, hielo; parar a 38°C). 4) Tratar hiperK (Ca, insulina-glucosa, bicarbonato), arritmias (NO calcioantagonistas con dantroleno). 5) Diuresis >1 mL/kg/h, vigilar mioglobinuria. UCI ≥24 h. Hotline MHAUS y carro de HM disponibles.",
+      "fuente": "MHAUS (Malignant Hyperthermia Association of the US) — protocolo vigente"
     },
     {
       "id": "anafilaxia_periop",
@@ -255,7 +269,8 @@
         "rash",
         "triptasa"
       ],
-      "contenido": "Causas frecuentes: BNM (rocuronio > otros), antibióticos (cefazolina), látex, clorhexidina. Manejo: suspender sospechoso, ADRENALINA IV en bolos titulados (grado II: 10-20 µg; grado III: 50-100 µg; PCR: 1 mg + RCP), repetir cada 1-2 min, infusión 0,05-0,1 µg/kg/min si refractaria. Cristaloides 20 mL/kg rápido. O₂ 100%, elevar piernas. Refractaria: noradrenalina, vasopresina, glucagón si usuario de betabloqueo, azul de metileno como rescate. Triptasa sérica: 1-2 h, 4-6 h y 24 h. Derivar a estudio alergo-anestésico con lista de fármacos expuestos."
+      "contenido": "Causas frecuentes: BNM (rocuronio > otros), antibióticos (cefazolina), látex, clorhexidina. Manejo: suspender sospechoso, ADRENALINA IV en bolos titulados (grado II: 10-20 µg; grado III: 50-100 µg; PCR: 1 mg + RCP), repetir cada 1-2 min, infusión 0,05-0,1 µg/kg/min si refractaria. Cristaloides 20 mL/kg rápido. O₂ 100%, elevar piernas. Refractaria: noradrenalina, vasopresina, glucagón si usuario de betabloqueo, azul de metileno como rescate. Triptasa sérica: 1-2 h, 4-6 h y 24 h. Derivar a estudio alergo-anestésico con lista de fármacos expuestos.",
+      "fuente": "6th NAP6 (RCoA/AAGBI); guías de anafilaxia perioperatoria ASA/EAACI"
     },
     {
       "id": "last",
@@ -273,7 +288,8 @@
         "emulsion lipidica",
         "emulsión lipídica"
       ],
-      "contenido": "Pródromo: sabor metálico, tinnitus, agitación → convulsiones → colapso CV (bupivacaína puede debutar con arritmia). Manejo ASRA: parar inyección, pedir ayuda + kit lípidos, O₂ 100%/asegurar vía aérea, benzodiacepina para convulsiones (evitar propofol en inestabilidad). EMULSIÓN LIPÍDICA 20%: bolo 100 mL en 2-3 min (>70 kg) o 1,5 mL/kg, luego infusión 200-250 mL en 15-20 min; repetir bolo hasta x2 si inestable (máx ~12 mL/kg). PCR: RCP con adrenalina en dosis bajas (≤1 µg/kg), EVITAR vasopresina, lidocaína y betabloqueo; considerar ECMO precoz. Monitorizar ≥4-6 h tras evento."
+      "contenido": "Pródromo: sabor metálico, tinnitus, agitación → convulsiones → colapso CV (bupivacaína puede debutar con arritmia). Manejo ASRA: parar inyección, pedir ayuda + kit lípidos, O₂ 100%/asegurar vía aérea, benzodiacepina para convulsiones (evitar propofol en inestabilidad). EMULSIÓN LIPÍDICA 20%: bolo 100 mL en 2-3 min (>70 kg) o 1,5 mL/kg, luego infusión 200-250 mL en 15-20 min; repetir bolo hasta x2 si inestable (máx ~12 mL/kg). PCR: RCP con adrenalina en dosis bajas (≤1 µg/kg), EVITAR vasopresina, lidocaína y betabloqueo; considerar ECMO precoz. Monitorizar ≥4-6 h tras evento.",
+      "fuente": "ASRA Practice Advisory on Local Anesthetic Systemic Toxicity (2020/2021)"
     },
     {
       "id": "laringo_bronco",
@@ -287,7 +303,8 @@
         "desaturación brusca",
         "larson"
       ],
-      "contenido": "Laringoespasmo: quitar estímulo, CPAP con O₂ 100% + maniobra de Larson (presión retroauricular en escotadura de laringoespasmo) + profundizar con propofol 0,5-1 mg/kg; si persiste/desatura → succinilcolina 0,1-0,5 mg/kg IV (o 4 mg/kg IM sin vía) + ventilar; preparar intubación. Pediatría: alto riesgo con IRA reciente. Broncoespasmo: profundizar anestesia (sevoflurano, ketamina), salbutamol en el circuito (8-10 puffs), adrenalina IV titulada si severo, hidrocortisona 100 mg, sulfato de magnesio 2 g IV en 20 min; descartar anafilaxia, tubo en carina, neumotórax, aspiración."
+      "contenido": "Laringoespasmo: quitar estímulo, CPAP con O₂ 100% + maniobra de Larson (presión retroauricular en escotadura de laringoespasmo) + profundizar con propofol 0,5-1 mg/kg; si persiste/desatura → succinilcolina 0,1-0,5 mg/kg IV (o 4 mg/kg IM sin vía) + ventilar; preparar intubación. Pediatría: alto riesgo con IRA reciente. Broncoespasmo: profundizar anestesia (sevoflurano, ketamina), salbutamol en el circuito (8-10 puffs), adrenalina IV titulada si severo, hidrocortisona 100 mg, sulfato de magnesio 2 g IV en 20 min; descartar anafilaxia, tubo en carina, neumotórax, aspiración.",
+      "fuente": "Consensos de manejo de eventos críticos de vía aérea (DAS/APA pediátrica)"
     },
     {
       "id": "asra_2025",
@@ -303,7 +320,8 @@
         "high dose",
         "doac nivel"
       ],
-      "contenido": "Novedades de la 5ª edición (enero 2025) respecto a ASRA 2018 (base de las tablas de la app): terminología cambia de profiláctica/terapéutica a LOW DOSE / HIGH DOSE (alineada con ESAIC/ESRA). Incorpora monitorización por niveles: nivel residual de DOAC <30 ng/mL o anti-Xa ≤0,1 UI/mL es aceptable para bloqueo neuroaxial, plexo profundo o periférico profundo. Intervalos de DOACs individualizados por función renal y riesgo trombótico. NO se recomienda usar agentes de reversión para procedimientos neuroaxiales electivos. Clasifica explícitamente bloqueos en neuroaxiales vs plexo/periférico profundo vs superficiales."
+      "contenido": "Novedades de la 5ª edición (enero 2025) respecto a ASRA 2018 (base de las tablas de la app): terminología cambia de profiláctica/terapéutica a LOW DOSE / HIGH DOSE (alineada con ESAIC/ESRA). Incorpora monitorización por niveles: nivel residual de DOAC <30 ng/mL o anti-Xa ≤0,1 UI/mL es aceptable para bloqueo neuroaxial, plexo profundo o periférico profundo. Intervalos de DOACs individualizados por función renal y riesgo trombótico. NO se recomienda usar agentes de reversión para procedimientos neuroaxiales electivos. Clasifica explícitamente bloqueos en neuroaxiales vs plexo/periférico profundo vs superficiales.",
+      "fuente": "ASRA Pain Medicine — Regional Anesthesia in the Patient Receiving Antithrombotic/Thrombolytic Therapy, 5ª edición (Reg Anesth Pain Med 2025)"
     },
     {
       "id": "sglt2",
@@ -320,7 +338,8 @@
         "cetoacidosis euglicemica",
         "cetoacidosis euglicémica"
       ],
-      "contenido": "Riesgo: cetoacidosis diabética EUGLICÉMICA (glicemia puede ser <250 mg/dL) favorecida por ayuno, cirugía y deshidratación. Suspender 3-4 días antes de cirugía electiva (FDA: 3 días; ertugliflozina 4). Día de cirugía: medir cetonas si síntomas (náuseas, dolor abdominal, taquipnea) o cirugía mayor; cetonemia >1,5 mmol/L con acidosis → tratar como CAD (insulina + glucosa IV). No reiniciar hasta ingesta oral normal y estabilidad. En cirugía de urgencia con SGLT2 activo: vigilar cetonas y gases perioperatoriamente."
+      "contenido": "Riesgo: cetoacidosis diabética EUGLICÉMICA (glicemia puede ser <250 mg/dL) favorecida por ayuno, cirugía y deshidratación. Suspender 3-4 días antes de cirugía electiva (FDA: 3 días; ertugliflozina 4). Día de cirugía: medir cetonas si síntomas (náuseas, dolor abdominal, taquipnea) o cirugía mayor; cetonemia >1,5 mmol/L con acidosis → tratar como CAD (insulina + glucosa IV). No reiniciar hasta ingesta oral normal y estabilidad. En cirugía de urgencia con SGLT2 activo: vigilar cetonas y gases perioperatoriamente.",
+      "fuente": "Consenso británico GLP-1/SGLT2 (Anaesthesia 2025); aviso FDA sobre SGLT2"
     },
     {
       "id": "saos",
@@ -335,7 +354,8 @@
         "roncador",
         "osa"
       ],
-      "contenido": "STOP-BANG: ronquido fuerte, cansancio diurno, apneas observadas, presión alta, IMC >35, edad >50, cuello >40 cm, sexo masculino. 0-2 bajo riesgo; 3-4 intermedio; 5-8 alto. Alto riesgo o SAOS conocido: traer y usar su CPAP perioperatorio, preferir técnicas regionales y analgesia ahorradora de opioides, extubación despierto en semisentado, monitorización postop prolongada con oximetría continua (no dar de alta a sala sin observación si requirió opioides). Evitar sedantes de larga acción. SAOS severo no estudiado + cirugía mayor electiva → considerar evaluación previa."
+      "contenido": "STOP-BANG: ronquido fuerte, cansancio diurno, apneas observadas, presión alta, IMC >35, edad >50, cuello >40 cm, sexo masculino. 0-2 bajo riesgo; 3-4 intermedio; 5-8 alto. Alto riesgo o SAOS conocido: traer y usar su CPAP perioperatorio, preferir técnicas regionales y analgesia ahorradora de opioides, extubación despierto en semisentado, monitorización postop prolongada con oximetría continua (no dar de alta a sala sin observación si requirió opioides). Evitar sedantes de larga acción. SAOS severo no estudiado + cirugía mayor electiva → considerar evaluación previa.",
+      "fuente": "ASA Practice Guidelines for OSA; Society of Anesthesia and Sleep Medicine (SASM)"
     },
     {
       "id": "glicemia",
@@ -350,7 +370,8 @@
         "hipoglicemia",
         "hba1c"
       ],
-      "contenido": "Objetivo perioperatorio: 100-180 mg/dL. HbA1c idealmente <8-8,5% para electiva mayor. Metformina: suspender el día de la cirugía (riesgo acidosis láctica si hipoperfusión/contraste); reiniciar con función renal estable. Sulfonilureas: omitir día de cirugía (hipoglicemia). Insulina basal: 75-80% de la dosis nocturna previa; glargina mantener ~80%; suspender prandiales en ayuno. Bomba de insulina: mantener basal en cirugía corta. HGT cada 1-2 h intraop en DM. Hiperglicemia >180: corrección con insulina rápida IV/SC según protocolo; >250 con cetonas → descartar CAD."
+      "contenido": "Objetivo perioperatorio: 100-180 mg/dL. HbA1c idealmente <8-8,5% para electiva mayor. Metformina: suspender el día de la cirugía (riesgo acidosis láctica si hipoperfusión/contraste); reiniciar con función renal estable. Sulfonilureas: omitir día de cirugía (hipoglicemia). Insulina basal: 75-80% de la dosis nocturna previa; glargina mantener ~80%; suspender prandiales en ayuno. Bomba de insulina: mantener basal en cirugía corta. HGT cada 1-2 h intraop en DM. Hiperglicemia >180: corrección con insulina rápida IV/SC según protocolo; >250 con cetonas → descartar CAD.",
+      "fuente": "Joint British Diabetes Societies (JBDS) perioperative; consensos de manejo glicémico"
     },
     {
       "id": "adulto_mayor",
@@ -367,7 +388,8 @@
         "geriátrico",
         "deterioro cognitivo"
       ],
-      "contenido": "Tamizaje de fragilidad (Clinical Frailty Scale, FRAIL) en ≥65-70 años para cirugía mayor: fragilidad predice delirium, complicaciones y mortalidad mejor que la edad. Prevención de delirium (hasta 40% prevenible): evitar benzodiacepinas y anticolinérgicos, analgesia multimodal eficaz, lentes/audífonos disponibles, reorientación y movilización precoz, higiene de sueño, mantener PAM >65-70, profundidad anestésica monitorizada (evitar sobre-anestesia, considerar BIS). Polifarmacia: revisar y deprescribir. Documentar estado cognitivo basal preoperatorio (mini-cog)."
+      "contenido": "Tamizaje de fragilidad (Clinical Frailty Scale, FRAIL) en ≥65-70 años para cirugía mayor: fragilidad predice delirium, complicaciones y mortalidad mejor que la edad. Prevención de delirium (hasta 40% prevenible): evitar benzodiacepinas y anticolinérgicos, analgesia multimodal eficaz, lentes/audífonos disponibles, reorientación y movilización precoz, higiene de sueño, mantener PAM >65-70, profundidad anestésica monitorizada (evitar sobre-anestesia, considerar BIS). Polifarmacia: revisar y deprescribir. Documentar estado cognitivo basal preoperatorio (mini-cog).",
+      "fuente": "ASA/AGS Best Practices; ESAIC POD/POCD; Clinical Frailty Scale"
     },
     {
       "id": "embarazo_cirugia",
@@ -382,7 +404,8 @@
         "apendicectomia embarazo",
         "laparoscopia embarazo"
       ],
-      "contenido": "La cirugía necesaria no debe negarse por el embarazo; el momento óptimo electivo-diferible es el 2º trimestre. Principios: desplazamiento uterino izquierdo desde ~18-20 semanas, evitar hipotensión/hipoxemia/hipocapnia marcada (perfusión placentaria), considerar vía aérea difícil (edema, desaturación rápida) y estómago lleno desde ~16 semanas (profilaxis aspiración). Anestésicos habituales no son teratogénicos a dosis clínicas. Monitorización fetal: tonos pre y post; continua intraop si feto viable y es factible intervenir. Laparoscopia segura (presión 10-15 mmHg). Coordinar con obstetricia; tocolisis no profiláctica de rutina."
+      "contenido": "La cirugía necesaria no debe negarse por el embarazo; el momento óptimo electivo-diferible es el 2º trimestre. Principios: desplazamiento uterino izquierdo desde ~18-20 semanas, evitar hipotensión/hipoxemia/hipocapnia marcada (perfusión placentaria), considerar vía aérea difícil (edema, desaturación rápida) y estómago lleno desde ~16 semanas (profilaxis aspiración). Anestésicos habituales no son teratogénicos a dosis clínicas. Monitorización fetal: tonos pre y post; continua intraop si feto viable y es factible intervenir. Laparoscopia segura (presión 10-15 mmHg). Coordinar con obstetricia; tocolisis no profiláctica de rutina.",
+      "fuente": "ACOG/ASA — cirugía no obstétrica en el embarazo; guías SOAP"
     }
   ]
 }
