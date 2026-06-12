@@ -3394,9 +3394,12 @@ async function loadAriaKB(){
 
 // --- RAG ligero: arma contexto con las filas de las tablas de la app
 // que coinciden con la pregunta (coagulación, anticoagulantes, exámenes) ---
+// Palabras demasiado comunes para usarse como gatillo (generan falsos positivos)
+const _AI_STOPWORDS = new Set(['para','pero','como','cuando','cuanto','donde','porque','tiene','tienen','antes','despues','sobre','este','esta','estos','estas','paciente','pacientes','cirugia','cirugias','cirugía','dosis','manejo','hacer','hace','puedo','debo','seria','seguir','mejor','riesgo','caso','tipo','poco','mucho','algun','alguna','tener','quiero','saber','favor','ayuda','tabla','tablas','guia','guias','guía','guías']);
+
 function _aiBuildContext(question){
   const q = _gpNorm(question);
-  const words = q.split(/\s+/).filter(w => w.length >= 4);
+  const words = q.split(/\s+/).filter(w => w.length >= 4 && !_AI_STOPWORDS.has(w));
   if(words.length === 0) return '';
   const matches = [];
 
@@ -3406,7 +3409,7 @@ function _aiBuildContext(question){
       sec.drugs.forEach(d=>{
         const hay = _gpNorm(d.name + ' ' + (d.cat_full||''));
         if(words.some(w => hay.includes(w))){
-          matches.push(`[Coagulación·${sec.cat}] ${d.name} → Suspender: ${d.pre} | Reiniciar: ${d.post}`);
+          matches.push(`[Coagulación·${sec.cat} — FUENTE: ${d.cat_full||'ASRA 2018 / ESAIC 2022 / SACH'}] ${d.name} → Suspender: ${d.pre} | Reiniciar: ${d.post}`);
         }
       });
     });
@@ -3417,7 +3420,7 @@ function _aiBuildContext(question){
     ANTICOAG_TABLE.forEach(r=>{
       const hay = _gpNorm(r.farmaco + ' ' + r.grupo);
       if(words.some(w => hay.includes(w))){
-        matches.push(`[Periop·${r.grupo}] ${r.farmaco} → Suspender: ${r.suspender} | Reiniciar: ${r.reiniciar}`);
+        matches.push(`[Periop·${r.grupo} — FUENTE: ACC/AHA Periprocedural Antithrombotic; ESC 2022] ${r.farmaco} → Suspender: ${r.suspender} | Reiniciar: ${r.reiniciar}`);
       }
     });
   }catch(e){}
@@ -3427,7 +3430,7 @@ function _aiBuildContext(question){
     EXAM_PREOP_ESPECIFICOS.forEach(r=>{
       const hay = _gpNorm(r.cond + ' ' + r.pedir);
       if(words.some(w => hay.includes(w))){
-        matches.push(`[Exámenes] ${r.cond} → ${r.pedir}. ${r.nota||''}`);
+        matches.push(`[Exámenes preop — FUENTE: AHA/ACC 2024; ESC 2022; eval. preop. CUA] ${r.cond} → ${r.pedir}. ${r.nota||''}`);
       }
     });
   }catch(e){}
@@ -3439,7 +3442,7 @@ function _aiBuildContext(question){
       const kws = (e.keywords||[]).map(_gpNorm);
       const hayTitulo = _gpNorm(e.titulo||'');
       const match = kws.some(kw => kw && q.includes(kw)) || words.some(w => hayTitulo.includes(w));
-      if(match) matches.push('[Guía·' + (e.titulo||e.id) + '] ' + e.contenido);
+      if(match) matches.push('[Guía: ' + (e.titulo||e.id) + (e.fuente ? ' — FUENTE: ' + e.fuente : '') + '] ' + e.contenido);
     });
   }catch(e){}
 
@@ -3448,7 +3451,7 @@ function _aiBuildContext(question){
     try{
       matches.push('[RCRI] Factores: ' + RCRI_FACTORES.join(' · '));
       matches.push('[RCRI riesgo] ' + RCRI_RIESGO.map(r=>r.n+': '+r.riesgo).join(' · '));
-      matches.push('[Umbral] 4 METs = subir 1 piso de escalera / caminar 6 km/h sin síntomas. CF<4 METs + riesgo elevado → eval cardiológica; test de isquemia solo si cambia conducta (AHA/ACC 2024, ESC 2022).');
+      matches.push('[Umbral — FUENTE: AHA/ACC 2024; ESC 2022; Lee RCRI 1999] 4 METs = subir 1 piso de escalera / caminar 6 km/h sin síntomas. CF<4 METs + riesgo elevado → eval cardiológica; test de isquemia solo si cambia conducta.');
     }catch(e){}
   }
   return matches.slice(0, 25).join('\n');
@@ -3482,7 +3485,7 @@ function _aiRenderMessages(){
   if(!box) return;
   let html = `
     <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Respondo usando las tablas de la app como referencia.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
+      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Respondo usando las tablas y guías de la app (AHA/ACC, ESC, ASRA, ASA…) y <b>cito siempre la fuente</b>.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
     </div>`;
   _aiMessages.forEach(m=>{
     const cls = m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
