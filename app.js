@@ -721,6 +721,7 @@ function showView(name){
     document.querySelectorAll('#view-pediatria .calc-block').forEach(d => d.removeAttribute('open'));
   }
   if(name==='coagulacion'){ renderCoagulacion(); }
+  if(name==='regional'){ renderRegional(); }
   if(name==='intercambios') renderExchanges();
   if(name==='vacaciones') renderVacations();
   if(name==='estadisticas') renderStats();
@@ -3358,6 +3359,104 @@ function renderCoagulacion(){
 }
 function toggleCoagAcc(idx){
   const el = document.getElementById('coagAcc'+idx);
+  if(el) el.classList.toggle('open');
+}
+
+// ============================================================
+// ANESTESIA REGIONAL — Bloqueos en traumatología (enlaces NYSORA)
+// Todo el contenido técnico/video es de NYSORA® (acceso público).
+// La app solo enlaza; no aloja ni reproduce su material.
+// ============================================================
+const REGIONAL_DATA = [
+  {
+    region: 'Extremidad superior (plexo braquial)',
+    ico: '💪',
+    blocks: [
+      { name:'Bloqueo interescalénico', cirugias:'Hombro · húmero proximal · clavícula (con plexo cervical)', perlas:'De elección en cirugía de hombro. Riesgo de parálisis frénica (evitar en patología respiratoria severa). Volúmenes bajos (5–10 mL) reducen efectos adversos.', url:'https://www.nysora.com/techniques/upper-extremity/intescalene/ultrasound-guided-interscalene-brachial-plexus-block/', video:'https://www.nysora.com/techniques/ultrasound-guided-interscalene-brachial-plexus-block-video/' },
+      { name:'Bloqueo supraclavicular', cirugias:'Brazo · codo · antebrazo · mano', perlas:'La "espinal del brazo": bloqueo denso y rápido de todo el miembro bajo el hombro. Vigilar el ápex pleural (riesgo de neumotórax). Aguja en plano, ver el local rodeando el plexo.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/upper-extremity-regional-anesthesia-for-specific-surgical-procedures/anesthesia-and-analgesia-for-elbow-and-forearm-procedures/ultrasound-guided-supraclavicular-brachial-plexus-block/', video:'https://www.nysora.com/techniques/upper-extremity/ultrasound-guided-supraclavicular-brachial-plexus-block-video/' },
+      { name:'Bloqueo infraclavicular', cirugias:'Codo · antebrazo · mano', perlas:'Buena opción para catéter continuo. Menos riesgo de frénico que el interescalénico. Cordones alrededor de la arteria axilar (lateral, posterior, medial).', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/upper-extremity-regional-anesthesia-for-specific-surgical-procedures/ultrasound-guided-infraclavicular-brachial-plexus-block/', video:'' },
+      { name:'Bloqueo axilar', cirugias:'Antebrazo · muñeca · mano', perlas:'Superficial y seguro (sin riesgo de neumotórax ni frénico). Bloquear por separado mediano, ulnar, radial y musculocutáneo. Ideal para cirugía distal de antebrazo/mano.', url:'https://www.nysora.com/techniques/upper-extremity/axillary/ultrasound-guided-axillary-brachial-plexus-block/', video:'https://www.nysora.com/topics/educational-tools/videos/ultrasound-guided-axillary-brachial-plexus-block-2/' }
+    ]
+  },
+  {
+    region: 'Cadera y fémur',
+    ico: '🦴',
+    blocks: [
+      { name:'Bloqueo PENG (pericapsular)', cirugias:'Fractura de cadera · cirugía de cadera', perlas:'Analgesia de la cápsula anterior de la cadera conservando la fuerza del cuádriceps (motor-sparing). En fractura de cadera da mejor analgesia dinámica que la fascia ilíaca según ECA recientes.', url:'https://www.nysora.com/education-news/peng-block-or-sificb-rct-compares-dynamic-pain-relief-in-hip-fracture-patients/', video:'' },
+      { name:'Bloqueo de la fascia ilíaca', cirugias:'Fractura de cadera · fémur · analgesia prehospitalaria', perlas:'Una sola inyección cubre femoral + cutáneo femoral lateral (y a veces obturador). Muy útil como analgesia precoz en urgencias para fractura de cadera/fémur. Produce bloqueo motor del cuádriceps.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/lower-extremity-regional-anesthesia-for-specific-surgical-procedures/ultrasound-guided-fascia-iliaca-block/', video:'' },
+      { name:'Bloqueo femoral', cirugias:'Fémur · rótula · rodilla (cara anterior)', perlas:'Analgesia potente para fractura de fémur y cirugía de rodilla. Produce debilidad del cuádriceps → cuidado con caídas. Buen sitio para catéter.', url:'https://www.nysora.com/techniques/lower-extremity/ultrasound-guided-femoral-nerve-block/', video:'' },
+      { name:'Bloqueo cutáneo femoral lateral', cirugias:'Injertos de piel del muslo · complemento de cadera', perlas:'Puramente sensitivo (sin componente motor). Útil como complemento o para la cara lateral del muslo.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/lower-extremity-regional-anesthesia-for-specific-surgical-procedures/anesthesia-and-analgesia-for-hip-procedures/ultrasound-guided-lateral-femoral-cutaneous-nerve-block/', video:'' }
+    ]
+  },
+  {
+    region: 'Rodilla, pierna, tobillo y pie',
+    ico: '🦵',
+    blocks: [
+      { name:'Bloqueo del canal aductor (safeno)', cirugias:'Rodilla · cara medial de pierna y tobillo', perlas:'Analgesia de rodilla conservando la fuerza del cuádriceps (motor-sparing) → favorece movilización precoz y rehabilitación. Inyectar a nivel medio del muslo.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/lower-extremity-regional-anesthesia-for-specific-surgical-procedures/foot-and-anckle/ultrasound-guided-saphenous-subsartorius-adductor-canal-nerve-block/', video:'' },
+      { name:'Bloqueo ciático poplíteo', cirugias:'Tobillo · pie · tibia/peroné distal', perlas:'Clave en cirugía de tobillo y pie. Combinar con safeno/aductor para cobertura completa del tobillo. Buscar la división en tibial y peroneo común; inyección subparaneural.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/lower-extremity-regional-anesthesia-for-specific-surgical-procedures/foot-and-anckle/ultrasound-guided-popliteal-sciatic-block/', video:'https://www.nysora.com/topics/educational-tools/videos/ultrasound-guided-popliteal-block/' },
+      { name:'Bloqueo ciático (proximal/subglúteo)', cirugias:'Pierna · tobillo · pie (con componente posterior)', perlas:'Elegir el nivel según el sitio quirúrgico y la necesidad de cubrir el cutáneo femoral posterior. Más proximal = bloqueo motor más extenso.', url:'https://www.nysora.com/topics/regional-anesthesia-for-specific-surgical-procedures/lower-extremity-regional-anesthesia-for-specific-surgical-procedures/foot-and-anckle/ultrasound-guided-sciatic-nerve-block-2/', video:'' }
+    ]
+  },
+  {
+    region: 'Tronco y pared torácica',
+    ico: '🎯',
+    blocks: [
+      { name:'Bloqueo del erector espinal (ESP)', cirugias:'Fracturas costales · trauma de pared torácica · columna', perlas:'Muy útil en analgesia de fracturas costales múltiples (reduce opioides y mejora la mecánica ventilatoria). Inyección 20–30 mL en el plano del erector sobre la apófisis transversa. Técnica segura y de fácil aprendizaje.', url:'https://www.nysora.com/erector-spinae-plane-block/', video:'' }
+    ]
+  }
+];
+
+const REGIONAL_TRAUMA_LINK = 'https://www.nysora.com/topics/sub-specialties/trauma/regional-anesthesia-patients-trauma/';
+
+function renderRegional(){
+  const q = _gpNorm(document.getElementById('regSearch')?.value || '');
+  const cont = document.getElementById('regList');
+  if(!cont) return;
+  let html = '';
+  let total = 0;
+  REGIONAL_DATA.forEach((sec, si)=>{
+    const blocks = sec.blocks.filter(b=>{
+      if(!q) return true;
+      return _gpNorm(b.name + ' ' + b.cirugias + ' ' + b.perlas).includes(q);
+    });
+    if(blocks.length === 0) return;
+    total += blocks.length;
+    const open = q ? ' open' : '';
+    let inner = '';
+    blocks.forEach(b=>{
+      const videoBtn = b.video
+        ? `<a class="reg-link reg-link-video" href="${b.video}" target="_blank" rel="noopener">▶ Ver video (NYSORA)</a>`
+        : '';
+      inner += `
+        <div class="reg-block">
+          <div class="reg-block-name">${b.name}</div>
+          <div class="reg-block-cir"><span class="reg-block-tag">Indicación</span> ${b.cirugias}</div>
+          <div class="reg-block-perlas">${b.perlas}</div>
+          <div class="reg-links">
+            <a class="reg-link" href="${b.url}" target="_blank" rel="noopener">📖 Técnica (NYSORA)</a>
+            ${videoBtn}
+          </div>
+        </div>`;
+    });
+    html += `
+      <div class="reg-acc${open}" id="regAcc${si}">
+        <button type="button" class="reg-acc-head" onclick="toggleRegAcc(${si})">
+          <span class="reg-acc-ico">${sec.ico}</span>
+          <span class="reg-acc-title">${sec.region}</span>
+          <span class="reg-acc-meta">${blocks.length}</span>
+          <span class="reg-acc-chev">›</span>
+        </button>
+        <div class="reg-acc-body">${inner}</div>
+      </div>`;
+  });
+  if(q && total === 0){
+    html = `<div class="reg-empty">Sin resultados para esa búsqueda.<br><span style="font-size:12px;color:var(--muted)">Prueba con: hombro, codo, mano, cadera, fémur, rodilla, tobillo, costillas, PENG…</span></div>`;
+  }
+  html += `<a class="reg-trauma-link" href="${REGIONAL_TRAUMA_LINK}" target="_blank" rel="noopener">🩹 Guía NYSORA: Anestesia Regional en el paciente con trauma ›</a>`;
+  cont.innerHTML = html;
+}
+function toggleRegAcc(idx){
+  const el = document.getElementById('regAcc'+idx);
   if(el) el.classList.toggle('open');
 }
 

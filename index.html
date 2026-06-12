@@ -857,6 +857,37 @@ canvas{max-width:100%}
   .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
+/* ============ ANESTESIA REGIONAL (NYSORA) ============ */
+#view-regional .reg-search{margin:4px 0 14px;padding:12px;background:linear-gradient(135deg,#0f4435,#2e8b6b);border-radius:14px;box-shadow:0 5px 16px rgba(15,68,53,.28)}
+#view-regional .reg-search input{width:100%;padding:13px 14px;font-size:15px;border:none;border-radius:10px;box-shadow:inset 0 1px 3px rgba(0,0,0,.10);font-family:inherit}
+#view-regional .reg-search input:focus{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.45)}
+.reg-acc{background:#fff;border:1.5px solid var(--green-pale);border-radius:13px;margin:0 0 10px;overflow:hidden;box-shadow:0 2px 8px rgba(30,107,84,.08)}
+.reg-acc-head{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;background:linear-gradient(180deg,#fafffd,#f0faf5);border:none;cursor:pointer;font-family:inherit;text-align:left;color:inherit;transition:background .12s}
+.reg-acc-head:hover{background:#e9f6f0}
+.reg-acc-ico{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#0f4435,#2e8b6b);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.reg-acc-title{flex:1;font-weight:800;font-size:13.5px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.3}
+.reg-acc-meta{font-size:11px;color:var(--muted);font-weight:700;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:3px 8px}
+.reg-acc-chev{color:var(--green-forest);font-size:19px;font-weight:700;transition:transform .2s;flex-shrink:0}
+.reg-acc.open .reg-acc-chev{transform:rotate(90deg)}
+.reg-acc-body{display:none;padding:6px 12px 12px}
+.reg-acc.open .reg-acc-body{display:block;animation:gpAccFade .18s ease}
+.reg-block{padding:12px 0;border-top:1px solid #eef3f1}
+.reg-block:first-child{border-top:none}
+.reg-block-name{font-weight:800;font-size:14px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;margin-bottom:5px}
+.reg-block-cir{font-size:12.5px;color:var(--text);line-height:1.45;margin-bottom:6px}
+.reg-block-tag{display:inline-block;background:#e0f2ec;color:#0f4435;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:6px;margin-right:5px}
+.reg-block-perlas{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:9px;background:#fafbfc;border-left:3px solid #2e8b6b;border-radius:6px;padding:7px 10px}
+.reg-links{display:flex;gap:8px;flex-wrap:wrap}
+.reg-link{display:inline-flex;align-items:center;gap:5px;padding:8px 13px;border-radius:10px;font-size:12.5px;font-weight:700;text-decoration:none;background:#f0faf5;border:1.5px solid #bbf7d0;color:#0f4435;transition:all .15s}
+.reg-link:hover{background:#dff5ea;border-color:#2e8b6b}
+.reg-link-video{background:linear-gradient(135deg,#dc2626,#b91c1c);border-color:#dc2626;color:#fff;box-shadow:0 2px 6px rgba(220,38,38,.25)}
+.reg-link-video:hover{filter:brightness(1.08);background:linear-gradient(135deg,#dc2626,#b91c1c)}
+.reg-empty{padding:22px 14px;text-align:center;font-size:14px;color:var(--text);background:#fff;border:1.5px dashed var(--green-pale);border-radius:13px;line-height:1.6}
+.reg-trauma-link{display:block;margin-top:6px;padding:13px 14px;border-radius:12px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1.5px solid #93c5fd;color:#1e40af;font-weight:700;font-size:13px;text-decoration:none;text-align:center}
+.reg-trauma-link:hover{background:#dbeafe}
+.reg-credit{margin-top:14px;font-size:11px;color:var(--muted);line-height:1.5;padding:11px 12px;background:#fafbfc;border:1px solid var(--border);border-radius:10px}
+.reg-credit a{color:var(--primary);font-weight:700;text-decoration:none}
+
 /* ============ ASISTENTE IA ============ */
 /* Botón ARIA de cabecera (todas las pantallas) */
 .aria-btn{width:38px;height:38px;border-radius:50%;border:none;padding:0;cursor:pointer;background:transparent;flex-shrink:0;position:relative;animation:ariaGlow 3s ease-in-out infinite}
@@ -1725,7 +1756,7 @@ canvas{max-width:100%}
     <button class="card c11" onclick="showView('regional')">
       <div class="ico"><svg viewBox="0 0 24 24"><line class="reg-needle" x1="3" y1="3" x2="14" y2="14"/><circle class="reg-hub" cx="15" cy="15" r="1.8"/><path class="reg-wave" d="M17 9.5c1.6 1.6 1.6 4.5 0 6.1"/><path class="reg-wave" d="M19.8 6.5c3.4 3.5 3.4 8.5 0 12.1"/></svg></div>
       <h3>Anestesia Regional</h3>
-      <p>Próximamente: bloqueos, dosis y anatomía</p>
+      <p>Bloqueos de trauma + videos NYSORA</p>
     </button>
     <button class="card ai-entry-btn" onclick="openAiChat()" style="grid-column:span 2;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
       <div class="ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:12px;display:block"/></div>
@@ -1962,23 +1993,14 @@ canvas{max-width:100%}
 <!-- ANESTESIA REGIONAL (placeholder) -->
 <section class="view" id="view-regional">
   <div class="section">
-    <div style="text-align:center;padding:40px 14px">
-      <div style="font-size:64px;line-height:1;margin-bottom:14px">💉</div>
-      <h2 style="font-family:'Manrope',sans-serif;font-size:22px;color:var(--primary-dark);margin:0 0 8px">Anestesia Regional</h2>
-      <p style="color:var(--muted);font-size:14px;max-width:340px;margin:0 auto 20px;line-height:1.5">
-        Sección en desarrollo. Próximamente vas a poder consultar bloqueos por anatomía, dosis máximas, técnicas guiadas por ecografía y consideraciones por paciente.
-      </p>
-      <div style="background:#fafbfc;border:1px solid var(--border);border-radius:12px;padding:14px;max-width:380px;margin:0 auto;text-align:left">
-        <div style="font-size:12px;font-weight:700;color:var(--primary-dark);margin-bottom:8px">Contenidos previstos:</div>
-        <div style="font-size:12.5px;color:var(--text);line-height:1.8">
-          • Bloqueos de plexo (interescalénico, supraclavicular, infraclavicular, axilar)<br>
-          • Bloqueos de tronco (TAP, ESP, PECS, cuadrado lumbar)<br>
-          • Neuroaxial (epidural, intratecal, dosis y aditivos)<br>
-          • Dosis máximas de anestésicos locales por peso<br>
-          • Manejo de toxicidad sistémica (intralipid)<br>
-          • Consideraciones por paciente (ASRA + ESAIC + SACH)
-        </div>
-      </div>
+    <h3>💉 Anestesia Regional — Trauma / Traumatología</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 10px">
+      Bloqueos más usados en cirugía traumatológica, organizados por región. Cada uno enlaza a su técnica y video en <b>NYSORA</b> (se abre en el navegador).
+    </p>
+    <div class="reg-search"><input id="regSearch" placeholder="🔎 Buscar bloqueo o cirugía (ej. hombro, cadera, tobillo, PENG)…" oninput="renderRegional()" /></div>
+    <div id="regList"></div>
+    <div class="reg-credit">
+      Todo el contenido técnico y los videos pertenecen a <a href="https://www.nysora.com" target="_blank" rel="noopener">NYSORA®</a> (New York School of Regional Anesthesia). Esta app solo enlaza a su material oficial de acceso público; no lo aloja ni lo reproduce. Las dosis y técnicas son referencia — la decisión es del anestesiólogo a cargo.
     </div>
   </div>
 </section>
@@ -2125,6 +2147,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=49"></script>
+<script src="app.js?v=50"></script>
 </body>
 </html>
