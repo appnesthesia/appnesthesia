@@ -7,6 +7,7 @@
   "welcome": "Servicio de Anestesiología",
   "backendURL": "https://anestesia-app-backend.fernandorojasbravo.workers.dev",
   "backendToken": "appn_dcfbded7d55c4d99a95e4948a1653c39578e",
+  "aiURL": "https://appnesthesia-ia.fernandorojasbravo.workers.dev",
   "horarioEmbedURL": "https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc",
   "staff": [
     {
