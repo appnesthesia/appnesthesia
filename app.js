@@ -3362,6 +3362,185 @@ function toggleCoagAcc(idx){
 }
 
 // ============================================================
+// ASISTENTE DE IA (Cloudflare Workers AI vía Worker propio)
+// La URL viene de configs/<inst>.json → "aiURL". Si no está
+// configurada, los botones de IA se ocultan solos.
+// ============================================================
+let _aiMessages = [];   // historial del chat de esta sesión
+let _aiBusy = false;
+
+function getAiURL(){
+  if(INSTITUTION && INSTITUTION.aiURL) return String(INSTITUTION.aiURL).replace(/\/$/,'');
+  const local = localStorage.getItem('appnesthesia_ai_url');
+  if(local) return String(local).replace(/\/$/,'');
+  return null;
+}
+function aiAvailable(){ return !!getAiURL(); }
+
+// --- RAG ligero: arma contexto con las filas de las tablas de la app
+// que coinciden con la pregunta (coagulación, anticoagulantes, exámenes) ---
+function _aiBuildContext(question){
+  const q = _gpNorm(question);
+  const words = q.split(/\s+/).filter(w => w.length >= 4);
+  if(words.length === 0) return '';
+  const matches = [];
+
+  // 1) Tablas de coagulación neuroaxial (ASRA/ESAIC/SACH)
+  try{
+    COAGULACION_DATA.forEach(sec=>{
+      sec.drugs.forEach(d=>{
+        const hay = _gpNorm(d.name + ' ' + (d.cat_full||''));
+        if(words.some(w => hay.includes(w))){
+          matches.push(`[Coagulación·${sec.cat}] ${d.name} → Suspender: ${d.pre} | Reiniciar: ${d.post}`);
+        }
+      });
+    });
+  }catch(e){}
+
+  // 2) Tabla de anticoagulantes perioperatorios (Portal Preanestésico)
+  try{
+    ANTICOAG_TABLE.forEach(r=>{
+      const hay = _gpNorm(r.farmaco + ' ' + r.grupo);
+      if(words.some(w => hay.includes(w))){
+        matches.push(`[Periop·${r.grupo}] ${r.farmaco} → Suspender: ${r.suspender} | Reiniciar: ${r.reiniciar}`);
+      }
+    });
+  }catch(e){}
+
+  // 3) Exámenes específicos por comorbilidad
+  try{
+    EXAM_PREOP_ESPECIFICOS.forEach(r=>{
+      const hay = _gpNorm(r.cond + ' ' + r.pedir);
+      if(words.some(w => hay.includes(w))){
+        matches.push(`[Exámenes] ${r.cond} → ${r.pedir}. ${r.nota||''}`);
+      }
+    });
+  }catch(e){}
+
+  // 4) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
+  if(/riesgo|mets?|rcri|cardiolog|isquemia|esfuerzo|dobutamina/.test(q)){
+    try{
+      matches.push('[RCRI] Factores: ' + RCRI_FACTORES.join(' · '));
+      matches.push('[RCRI riesgo] ' + RCRI_RIESGO.map(r=>r.n+': '+r.riesgo).join(' · '));
+      matches.push('[Umbral] 4 METs = subir 1 piso de escalera / caminar 6 km/h sin síntomas. CF<4 METs + riesgo elevado → eval cardiológica; test de isquemia solo si cambia conducta (AHA/ACC 2024, ESC 2022).');
+    }catch(e){}
+  }
+  return matches.slice(0, 25).join('\n');
+}
+
+async function _aiCall(payload){
+  const base = getAiURL();
+  if(!base) throw new Error('IA no configurada');
+  const headers = {'Content-Type':'application/json'};
+  try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+  const r = await fetch(base + '/api/ai', { method:'POST', headers, body: JSON.stringify(payload) });
+  const data = await r.json().catch(()=>null);
+  if(!r.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
+  return data.answer;
+}
+
+// --- UI del chat ---
+function openAiChat(){
+  if(!aiAvailable()){ alert('El asistente de IA aún no está configurado.\n\nDespliega el Worker de la carpeta worker-ia y agrega "aiURL" en configs/andes.json.'); return; }
+  document.getElementById('aiChatOverlay').classList.remove('hidden');
+  _aiRenderMessages();
+  setTimeout(()=>{ try{ document.getElementById('aiChatInput').focus(); }catch(e){} }, 150);
+}
+function closeAiChat(){
+  document.getElementById('aiChatOverlay').classList.add('hidden');
+}
+function _aiEsc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _aiRenderMessages(){
+  const box = document.getElementById('aiChatMsgs');
+  if(!box) return;
+  let html = `
+    <div class="ai-msg ai-msg-bot">
+      <div class="ai-msg-bubble">👋 Soy el asistente de IA de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Uso las tablas de la app como referencia.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
+    </div>`;
+  _aiMessages.forEach(m=>{
+    const cls = m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
+    html += `<div class="ai-msg ${cls}"><div class="ai-msg-bubble">${_aiEsc(m.content).replace(/\n/g,'<br>')}</div></div>`;
+  });
+  if(_aiBusy){
+    html += `<div class="ai-msg ai-msg-bot"><div class="ai-msg-bubble ai-typing"><span></span><span></span><span></span></div></div>`;
+  }
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+async function aiSendMessage(){
+  if(_aiBusy) return;
+  const input = document.getElementById('aiChatInput');
+  const text = (input.value||'').trim();
+  if(!text) return;
+  input.value = '';
+  _aiMessages.push({role:'user', content:text});
+  _aiBusy = true;
+  _aiRenderMessages();
+  try{
+    const context = _aiBuildContext(text);
+    const answer = await _aiCall({ mode:'asistente', messages:_aiMessages, context });
+    _aiMessages.push({role:'assistant', content:answer});
+  }catch(e){
+    _aiMessages.push({role:'assistant', content:'❌ No pude responder: ' + (e.message||e) + '\nRevisa la conexión o que el Worker de IA esté desplegado.'});
+  }finally{
+    _aiBusy = false;
+    // Limitar historial para no crecer infinito
+    if(_aiMessages.length > 20) _aiMessages = _aiMessages.slice(-20);
+    _aiRenderMessages();
+  }
+}
+function aiChatKeydown(ev){
+  if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); aiSendMessage(); }
+}
+function aiClearChat(){
+  _aiMessages = [];
+  _aiRenderMessages();
+}
+// Mostrar/ocultar los botones de IA según configuración
+function updateAiButtons(){
+  const on = aiAvailable();
+  document.querySelectorAll('.ai-entry-btn').forEach(el=>{ el.style.display = on ? '' : 'none'; });
+}
+
+// --- Análisis IA de una solicitud de agendamiento (modo admin) ---
+async function aiAnalizarSolicitud(reqId){
+  if(!aiAvailable()){ alert('El asistente de IA aún no está configurado.'); return; }
+  const found = _agendFindRequest(reqId);
+  if(!found) return;
+  const r = found.req;
+  const sala = _agendGetSala(found.salaId);
+  const unidad = _agendGetUnidad(r.unidadCode);
+  // IMPORTANTE: NO enviar datos identificables (nombre, RUT, solicitante, teléfono, email)
+  const solicitud = {
+    sala: sala ? sala.name : found.salaId,
+    fecha: found.dateStr,
+    bloque_u_horario: (r.block ? ('Bloque ' + r.block) : ((typeof r.startMin==='number') ? (_agendMinToHHMM(r.startMin) + '–' + _agendMinToHHMM(r.endMin)) : '—')),
+    estado: r.estado,
+    es_extra: !!r.isExtra,
+    edad_paciente: r.edad || null,
+    procedimiento: r.procedimiento || '',
+    prioridad: r.prioridad || 'electiva',
+    antecedentes: r.notas || '',
+    unidad_solicitante: unidad ? unidad.name : (r.unidadCode||''),
+    accesos_lado: r.accesosLado || undefined,
+    accesos_urgencia: r.accesosUrgencia || undefined,
+    accesos_hallazgos: r.accesosHallazgos || undefined,
+    accesos_coagulacion: r.accesosCoagulacion || undefined
+  };
+  const cont = document.getElementById('aiVisadoResult');
+  if(cont){
+    cont.style.display = '';
+    cont.innerHTML = '<div class="ai-visado-loading">🤖 Analizando solicitud…</div>';
+  }
+  try{
+    const answer = await _aiCall({ mode:'visado', solicitud });
+    if(cont) cont.innerHTML = '<div class="ai-visado-card"><div class="ai-visado-title">🤖 Análisis IA</div><div class="ai-visado-body">' + _aiEsc(answer).replace(/\n/g,'<br>') + '</div></div>';
+  }catch(e){
+    if(cont) cont.innerHTML = '<div class="ai-visado-card error">❌ No se pudo analizar: ' + _aiEsc(e.message||String(e)) + '</div>';
+  }
+}
+
+// ============================================================
 // SERVICE WORKER (PWA)
 // ============================================================
 if('serviceWorker' in navigator){
@@ -3433,6 +3612,7 @@ function updateInstitutionUI(){
   if(elHome) elHome.textContent = nm;
   const elEq = document.getElementById('instNameEquipo');
   if(elEq) elEq.textContent = INSTITUTION.name + (INSTITUTION.city?' · '+INSTITUTION.city:'');
+  try{ updateAiButtons(); }catch(e){}
 }
 
 function renderInstitutionPicker(institutions){
@@ -3998,6 +4178,7 @@ function openGuiasModule(){
   if(mod) mod.classList.add('hidden');
   const g = document.getElementById('guiasScreen');
   if(g) g.classList.remove('hidden');
+  try{ updateAiButtons(); }catch(e){}
   // Estado inicial: buscador limpio, bloque por defecto visible, home grid visible, sub-vistas cerradas.
   const inp = document.getElementById('gpSearchInput');
   if(inp){ inp.value=''; setTimeout(() => inp.focus(), 50); }
@@ -6908,19 +7089,24 @@ function agendOpenDetalle(reqId){
     : '—';
   let actionsHtml = '';
   const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:#fff;color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
+  const btnIA = (typeof aiAvailable === 'function' && aiAvailable())
+    ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #a5b4fc;color:#4338ca;font-weight:700">🤖 Analizar con IA</button></div><div id="aiVisadoResult" style="display:none"></div>`
+    : '';
   if(AGEND_STATE.mode === 'admin' && req.estado === 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
         <button type="button" class="agend-action-btn aprobar" onclick="agendVisarSolicitud('${req.id}','aprobada')">✓ Aprobar</button>
         <button type="button" class="agend-action-btn rechazar" onclick="agendVisarSolicitud('${req.id}','rechazada')">✗ Rechazar</button>
       </div>
-      <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>`;
+      <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>
+      ${btnIA}`;
   } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
         <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:#fff;color:var(--muted)">Revertir a pendiente</button>
         ${btnEliminar}
-      </div>`;
+      </div>
+      ${btnIA}`;
   }
   const extraBadge = req.isExtra ? ` <span class="agend-extra-pill">EXTRA</span>` : '';
   const horarioRow = isAmPmReq

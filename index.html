@@ -857,6 +857,43 @@ canvas{max-width:100%}
   .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
+/* ============ ASISTENTE IA ============ */
+.ai-chat-overlay{position:fixed;inset:0;background:rgba(8,28,21,.55);backdrop-filter:blur(3px);z-index:11000;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:640px){.ai-chat-overlay{align-items:center}}
+.ai-chat-overlay.hidden{display:none!important}
+.ai-chat-box{background:#fff;width:100%;max-width:560px;height:86vh;max-height:720px;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.25)}
+@media(min-width:640px){.ai-chat-box{border-radius:18px;height:80vh}}
+.ai-chat-head{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;flex-shrink:0}
+.ai-chat-head-ico{width:36px;height:36px;border-radius:11px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:18px}
+.ai-chat-head-title{flex:1;font-weight:800;font-size:15px;font-family:'Manrope','Inter',sans-serif;line-height:1.2}
+.ai-chat-head-sub{font-size:10.5px;font-weight:600;opacity:.85;margin-top:1px}
+.ai-chat-clear,.ai-chat-close{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:9px;font-size:17px;cursor:pointer;font-family:inherit;line-height:1}
+.ai-chat-clear:hover,.ai-chat-close:hover{background:rgba(255,255,255,.28)}
+.ai-chat-msgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(180deg,#fafafe,#f4f4fb)}
+.ai-msg{display:flex}
+.ai-msg-user{justify-content:flex-end}
+.ai-msg-bubble{max-width:85%;padding:10px 13px;border-radius:14px;font-size:13.5px;line-height:1.55;white-space:normal;overflow-wrap:anywhere}
+.ai-msg-user .ai-msg-bubble{background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;border-bottom-right-radius:4px}
+.ai-msg-bot .ai-msg-bubble{background:#fff;border:1.5px solid #e0e7ff;color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(79,70,229,.08)}
+.ai-disclaimer{display:block;margin-top:8px;font-size:11px;color:#92400e;background:#fffbeb;border-radius:7px;padding:6px 8px}
+.ai-typing{display:inline-flex;gap:4px;align-items:center;padding:13px 16px}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:aiBlink 1.2s infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aiBlink{0%,80%,100%{opacity:.3;transform:scale(.85)}40%{opacity:1;transform:scale(1)}}
+.ai-chat-inputrow{display:flex;gap:8px;padding:10px 12px;border-top:1.5px solid #e0e7ff;background:#fff;flex-shrink:0;align-items:flex-end}
+.ai-chat-input{flex:1;border:1.5px solid #c7d2fe;border-radius:12px;padding:11px 12px;font-size:14px;font-family:inherit;resize:none;max-height:110px;line-height:1.4}
+.ai-chat-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.ai-chat-send{width:44px;height:44px;border-radius:12px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(79,70,229,.30)}
+.ai-chat-send:hover{filter:brightness(1.08)}
+.ai-chat-send:active{transform:translateY(1px)}
+/* Análisis IA en visado */
+.ai-visado-loading{margin:10px 0;padding:12px;border-radius:11px;background:#eef2ff;border:1.5px dashed #a5b4fc;color:#4338ca;font-size:13px;font-weight:600;text-align:center}
+.ai-visado-card{margin:10px 0;border:1.5px solid #c7d2fe;border-radius:13px;overflow:hidden;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.10)}
+.ai-visado-card.error{padding:12px;color:#b91c1c;background:#fef2f2;border-color:#fca5a5;font-size:13px}
+.ai-visado-title{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-weight:800;font-size:13px;padding:9px 13px;font-family:'Manrope','Inter',sans-serif}
+.ai-visado-body{padding:12px 13px;font-size:13px;line-height:1.6;color:var(--text)}
+
 /* ============ AGENDAMIENTO DE PROCEDIMIENTOS (full-screen overlay) ============ */
 .agend-screen{position:fixed;inset:0;background:linear-gradient(180deg,#f0faf5 0%,#e6f4ee 100%);z-index:9999;display:flex;flex-direction:column;font-family:'Inter',-apple-system,system-ui,sans-serif}
 .agend-screen.hidden{display:none!important}
@@ -1243,6 +1280,11 @@ canvas{max-width:100%}
             <div class="gp-portal-card-ico"><span>❤️</span></div>
             <h3 class="gp-portal-card-title">Riesgo Cardiovascular</h3>
             <p class="gp-portal-card-desc">RCRI, METs y derivación a Cardiología</p>
+          </button>
+          <button type="button" class="gp-portal-card ai-entry-btn" onclick="openAiChat()" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
+            <div class="gp-portal-card-ico" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)"><span>🤖</span></div>
+            <h3 class="gp-portal-card-title">Asistente IA</h3>
+            <p class="gp-portal-card-desc">Pregunta en lenguaje natural — responde con las tablas de la app</p>
           </button>
         </div>
       </div>
@@ -1662,6 +1704,11 @@ canvas{max-width:100%}
       <h3>Anestesia Regional</h3>
       <p>Próximamente: bloqueos, dosis y anatomía</p>
     </button>
+    <button class="card ai-entry-btn" onclick="openAiChat()" style="grid-column:span 2;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
+      <div class="ico" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center"><span style="font-size:20px">🤖</span></div>
+      <h3>Asistente IA</h3>
+      <p>Consultas sobre fármacos, exámenes y riesgo CV — usa las tablas de la app</p>
+    </button>
   </div>
   <footer class="app-credit">
     <div class="app-credit-name">Appnesthesia</div>
@@ -2030,6 +2077,23 @@ canvas{max-width:100%}
 </section>
 
 </main>
+
+<!-- CHAT ASISTENTE IA -->
+<div id="aiChatOverlay" class="ai-chat-overlay hidden">
+  <div class="ai-chat-box">
+    <div class="ai-chat-head">
+      <div class="ai-chat-head-ico">🤖</div>
+      <div class="ai-chat-head-title">Asistente IA<div class="ai-chat-head-sub">Llama 3.3 · Cloudflare Workers AI</div></div>
+      <button type="button" class="ai-chat-clear" onclick="aiClearChat()" title="Nueva conversación">↺</button>
+      <button type="button" class="ai-chat-close" onclick="closeAiChat()" title="Cerrar">×</button>
+    </div>
+    <div id="aiChatMsgs" class="ai-chat-msgs"></div>
+    <div class="ai-chat-inputrow">
+      <textarea id="aiChatInput" class="ai-chat-input" rows="1" placeholder="Ej: ¿Cuándo suspendo rivaroxabán para una espinal?" onkeydown="aiChatKeydown(event)"></textarea>
+      <button type="button" class="ai-chat-send" onclick="aiSendMessage()">➤</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL GENÉRICO -->
 <div class="modal" id="modal">
