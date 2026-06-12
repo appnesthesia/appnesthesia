@@ -174,6 +174,21 @@ const BACKEND_TOKEN_LS_KEY = 'appnesthesia_backend_token';
 const LOCAL_ONLY_KEYS = new Set(['isAdmin','currentUserId','notifShown']);
 let _syncTimer = null;
 let _syncStatus = 'idle';
+// Caché de PINs vistos en la nube (para nunca borrarlos en pushes sin fetch previo)
+const _remotePinCache = { staff: {}, admin: null };
+function _updateRemotePinCache(remote){
+  if(!remote || remote._empty) return;
+  (remote.staff||[]).forEach(s=>{ if(s && s.id && s.pinHash) _remotePinCache.staff[s.id] = s.pinHash; });
+  if(remote.adminPinHash) _remotePinCache.admin = remote.adminPinHash;
+}
+function _mergePinsFromCache(payload){
+  if(Array.isArray(payload.staff)){
+    payload.staff = payload.staff.map(s=>
+      (s && s.id && !s.pinHash && _remotePinCache.staff[s.id]) ? {...s, pinHash: _remotePinCache.staff[s.id]} : s);
+  }
+  if(!payload.adminPinHash && _remotePinCache.admin) payload.adminPinHash = _remotePinCache.admin;
+  return payload;
+}
 let _lastRemoteUpdatedAt = null;
 let _isApplyingRemote = false;
 let _pendingPush = false;       // hay cambios locales no enviados aún
@@ -320,6 +335,7 @@ async function fetchRemoteState(){
     const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
     if(!r.ok){ _setSyncStatus('error'); return null; }
     const data = await r.json();
+    _updateRemotePinCache(data);
     _setSyncStatus('synced');
     return data;
   }catch(e){
@@ -395,8 +411,23 @@ async function pushRemoteState(){
       payload.exchanges = _mergeById(remote.exchanges, state.exchanges);
     }
 
+    // PINs: NUNCA borrar un pinHash que ya está guardado en la nube.
+    // (El push del admin manda su staff local; si su dispositivo aún no
+    // recibió el PIN que otro usuario subió, lo borraría sin esto.)
+    if(remote) _updateRemotePinCache(remote);
+    if(remote && !remote._empty){
+      if(Array.isArray(payload.staff) && Array.isArray(remote.staff)){
+        const remotePinById = {};
+        remote.staff.forEach(s=>{ if(s && s.id && s.pinHash) remotePinById[s.id] = s.pinHash; });
+        payload.staff = payload.staff.map(s=>
+          (s && s.id && !s.pinHash && remotePinById[s.id]) ? {...s, pinHash: remotePinById[s.id]} : s);
+      }
+      if(!payload.adminPinHash && remote.adminPinHash) payload.adminPinHash = remote.adminPinHash;
+    }
+    _mergePinsFromCache(payload);
+
     // Defensa extra: asegurar que NUNCA se suben campos privados por dispositivo
-    // del staff (pinHash, preferences, activityLog) — quedan solo en cada teléfono.
+    // del staff (preferences, activityLog) — quedan solo en cada teléfono.
     if(Array.isArray(payload.staff)) payload.staff = _stripDevicePrivateStaff(payload.staff);
     if(payload.adminUser && typeof payload.adminUser === 'object'){
       const a = {...payload.adminUser};
@@ -473,6 +504,8 @@ function _flushSyncNow(){
       // regular cuando volvamos a abrir la app.
       payload = { vacations: state.vacations || [], exchanges: state.exchanges || [] };
     }
+    // Nunca borrar PINs ya registrados en la nube (caché de la última lectura)
+    _mergePinsFromCache(payload);
     if(Array.isArray(payload.staff)) payload.staff = _stripDevicePrivateStaff(payload.staff);
     if(payload.adminUser && typeof payload.adminUser === 'object'){
       const a = {...payload.adminUser};
@@ -695,7 +728,7 @@ function showView(name){
   if(name==='protocolos') renderProtocols();
   if(name==='mipanel') renderMiPanel();
   if(name==='eventos') renderEventos();
-  if(name==='home') updateEventBadge();
+  if(name==='home'){ updateEventBadge(); try{ updateAgendAdminNotice(); }catch(e){} }
   if(name==='reloj') relojInit();
   window.scrollTo(0,0);
 }
@@ -711,7 +744,10 @@ async function toggleAdmin(){
     toast && toast('Modo usuario');
     return;
   }
-  // Activar admin: requiere PIN
+  // Activar admin: requiere PIN (revisando primero si ya existe uno en la nube)
+  if(adminSetupNeeded()){
+    try{ await _syncAdminPinFromCloud(); }catch(e){}
+  }
   if(adminSetupNeeded()){
     const ok = await promptSetAdminPin();
     if(!ok) return;
@@ -721,6 +757,7 @@ async function toggleAdmin(){
   state.isAdmin = true;
   save(); updateAdminUI();
   toast && toast('Modo admin activado');
+  try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
 }
 function updateAdminUI(){
   const btn = document.getElementById('adminBtn');
@@ -1120,6 +1157,9 @@ function resetStaffList(){
         jornadasBorradas: typeof o.jornadasBorradas==='number'?o.jornadasBorradas:d.jornadasBorradas,
         equipoTMT: !!o.equipoTMT, equipoCardio: !!o.equipoCardio, equipoPediatria: !!o.equipoPediatria,
         rolCoordinacion: !!o.rolCoordinacion, noFondoComun: !!o.noFondoComun, role: o.role || d.role,
+        // Conservar PIN y datos personales del usuario al restaurar el listado
+        pinHash: o.pinHash || null,
+        preferences: o.preferences, activityLog: o.activityLog,
       };
     }
     return d;
@@ -3274,15 +3314,36 @@ function renderCoagulacion(){
   const q = (document.getElementById('coagSearch')?.value||'').toLowerCase().trim();
   const container = document.getElementById('coagList');
   let html = '';
-  COAGULACION_DATA.forEach(sec=>{
+  let totalMatches = 0;
+  let seccionesConMatch = 0;
+  COAGULACION_DATA.forEach((sec, idx)=>{
     const drugs = sec.drugs.filter(d=>!q || d.name.toLowerCase().includes(q) || d.pre.toLowerCase().includes(q) || d.post.toLowerCase().includes(q) || (d.cat_full||'').toLowerCase().includes(q));
     if(drugs.length===0) return;
-    html += `<div class="med-section"><h4>${sec.cat}</h4><div class="med-table-wrap"><table class="med-table"><thead><tr><th>Fármaco</th><th>Suspender ANTES</th><th>Reiniciar DESPUÉS</th></tr></thead><tbody>`;
+    totalMatches += drugs.length;
+    seccionesConMatch++;
+    // Con búsqueda activa los grupos se abren solos; sin búsqueda quedan plegados
+    const open = q ? ' open' : '';
+    let tabla = `<div class="med-table-wrap"><table class="med-table"><thead><tr><th>Fármaco</th><th>Suspender ANTES</th><th>Reiniciar DESPUÉS</th></tr></thead><tbody>`;
     drugs.forEach(d=>{
-      html += `<tr><td class="drug">${d.name}<div class="note">${d.cat_full||''}</div></td><td class="dose">${d.pre}</td><td class="dose">${d.post}</td></tr>`;
+      tabla += `<tr><td class="drug">${d.name}<div class="note">${d.cat_full||''}</div></td><td class="dose">${d.pre}</td><td class="dose">${d.post}</td></tr>`;
     });
-    html += '</tbody></table></div></div>';
+    tabla += '</tbody></table></div>';
+    html += `
+      <div class="coag-acc${open}" id="coagAcc${idx}">
+        <button type="button" class="coag-acc-head" onclick="toggleCoagAcc(${idx})">
+          <span class="coag-acc-ico">🩸</span>
+          <span class="coag-acc-title">${sec.cat}</span>
+          <span class="coag-acc-meta">${drugs.length} fármaco${drugs.length!==1?'s':''}</span>
+          <span class="coag-acc-chev">›</span>
+        </button>
+        <div class="coag-acc-body">${tabla}</div>
+      </div>`;
   });
+  if(q && totalMatches === 0){
+    html += `<div class="coag-empty">😕 Sin resultados para "<b>${q.replace(/</g,'&lt;')}</b>".<br><span style="font-size:12px;color:var(--muted)">Prueba con el nombre genérico (ej: enoxaparina, dabigatrán, clopidogrel…)</span></div>`;
+  } else if(q){
+    html = `<div class="coag-result-count">${totalMatches} fármaco${totalMatches!==1?'s':''} en ${seccionesConMatch} grupo${seccionesConMatch!==1?'s':''}</div>` + html;
+  }
   html += `<div class="med-bibliography" style="margin-top:14px">
     <b>Bibliografía consultada</b>
     <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.55">
@@ -3294,6 +3355,10 @@ function renderCoagulacion(){
     <div style="font-size:11.5px;margin-top:8px;opacity:.85">Los tiempos asumen función renal y hepática normales. Ajustar en insuficiencia renal (especialmente DOAC, HBPM y fondaparinux), edad avanzada, peso extremo o riesgo individual de sangrado. Decisión final: anestesiólogo a cargo del caso.</div>
   </div>`;
   container.innerHTML = html;
+}
+function toggleCoagAcc(idx){
+  const el = document.getElementById('coagAcc'+idx);
+  if(el) el.classList.toggle('open');
 }
 
 // ============================================================
@@ -4455,10 +4520,11 @@ const RCRI_LABELS = [
   'Creatinina sérica > 2 mg/dL'
 ];
 
-function calcRCRI(flags){
-  // flags: array de 6 booleanos
+function calcRCRI(flags, cf){
+  // flags: array de 6 booleanos · cf: '>=4METs' | '<4METs' | 'desconocida'
   const items = RCRI_LABELS.map((l,i)=>({ label:l, checked: !!flags[i] }));
   const score = items.filter(x=>x.checked).length;
+  const cfBaja = (cf === '<4METs' || cf === 'desconocida');
   let riesgoPct, categoria, badgeClass;
   if(score===0){ riesgoPct='0,4 %'; categoria='Muy bajo';   badgeClass='ok'; }
   else if(score===1){ riesgoPct='0,9 %'; categoria='Bajo';     badgeClass='ok'; }
@@ -4485,7 +4551,19 @@ function calcRCRI(flags){
     recs.estatinas   = 'Iniciar/optimizar estatina perioperatoria si no hay contraindicación.';
     recs.interconsulta = 'Interconsulta a Cardiología obligatoria antes de cirugía electiva. Coordinar manejo post-op en intermedio/UCI según contexto.';
   }
-  return { score, items, riesgoPct, categoria, badgeClass, recs };
+
+  // Ajuste por capacidad funcional (AHA/ACC 2024 · ESC 2022)
+  if(cf === '>=4METs'){
+    recs.cf = 'CF ≥ 4 METs sin síntomas → proceder sin estudios de isquemia adicionales (independiente del puntaje, salvo condición cardíaca activa).';
+  } else if(cfBaja && score >= 2){
+    recs.cf = 'CF < 4 METs (o no evaluable) + RCRI ≥ 2 → derivar a EVALUACIÓN CARDIOLÓGICA preoperatoria. Considerar test de isquemia (eco estrés con dobutamina · test de esfuerzo · perfusión miocárdica) SOLO si el resultado cambiará la conducta (revascularización, cambio de técnica o suspensión).';
+    recs.interconsulta = 'Interconsulta a Cardiología recomendada: CF < 4 METs con RCRI ≥ 2. ' + recs.interconsulta;
+  } else if(cfBaja && score === 1){
+    recs.cf = 'CF < 4 METs con 1 factor RCRI → primera línea: ECG + NT-proBNP. Test de isquemia solo si síntomas, biomarcadores alterados o cirugía de alto riesgo (ESC 2022). Considerar cuestionario DASI para objetivar la CF (AHA/ACC 2024).';
+  } else if(cfBaja){
+    recs.cf = 'CF < 4 METs sin factores RCRI → no requiere estudios de isquemia de rutina. Considerar DASI / NT-proBNP según edad y tipo de cirugía.';
+  }
+  return { score, items, riesgoPct, categoria, badgeClass, recs, cf };
 }
 
 function _gpRcriResumenTexto(r){
@@ -4497,6 +4575,7 @@ function _gpRcriResumenTexto(r){
     'Factores presentes:',
     (checkedList || '  (ninguno)'),
     '',
+    (r.recs.cf ? `Capacidad funcional: ${r.recs.cf}` : null),
     `Conducta: ${r.recs.conducta}`,
     `Biomarcadores: ${r.recs.biomarc}`,
     `Beta-bloqueo: ${r.recs.betaBloqueo}`,
@@ -4504,7 +4583,7 @@ function _gpRcriResumenTexto(r){
     `Interconsulta: ${r.recs.interconsulta}`,
     '',
     'Generado por Appnesthesia · Portal Preanestésico'
-  ].join('\n');
+  ].filter(x=>x!==null).join('\n');
 }
 
 window.calcularRCRI = function(){
@@ -4512,7 +4591,8 @@ window.calcularRCRI = function(){
     const el = document.getElementById('rcriChk'+i);
     return el ? !!el.checked : false;
   });
-  const r = calcRCRI(flags);
+  const cfEl = document.getElementById('rcriCf');
+  const r = calcRCRI(flags, cfEl ? cfEl.value : 'desconocida');
   const out = document.getElementById('rcriResultado');
   if(!out) return;
   const flagsList = r.items.filter(x=>x.checked).map(x=>`<li>${_gpEsc(x.label)}</li>`).join('') || '<li><em>Ningún factor seleccionado</em></li>';
@@ -4530,6 +4610,7 @@ window.calcularRCRI = function(){
         <ul>${flagsList}</ul>
       </div>
       <div class="gp-calc-recs">
+        ${r.recs.cf ? `<div class="gp-calc-rec gp-calc-rec-cf"><strong>Capacidad funcional:</strong> ${_gpEsc(r.recs.cf)}</div>` : ''}
         <div class="gp-calc-rec"><strong>Conducta:</strong> ${_gpEsc(r.recs.conducta)}</div>
         <div class="gp-calc-rec"><strong>Biomarcadores:</strong> ${_gpEsc(r.recs.biomarc)}</div>
         <div class="gp-calc-rec"><strong>Beta-bloqueo:</strong> ${_gpEsc(r.recs.betaBloqueo)}</div>
@@ -4547,6 +4628,8 @@ window.resetRCRI = function(){
     const el = document.getElementById('rcriChk'+i);
     if(el) el.checked = false;
   }
+  const cfEl = document.getElementById('rcriCf');
+  if(cfEl) cfEl.selectedIndex = 0;
   const out = document.getElementById('rcriResultado');
   if(out) out.innerHTML = '';
 };
@@ -4647,8 +4730,30 @@ function calcExamenesPreop(input){
     out.pedir.push('Considerar NT-proBNP (2B) · troponinas según contexto');
   }
 
+  // === Evaluación cardiovascular por capacidad funcional ===
+  // (AHA/ACC 2024 Perioperative Guideline · ESC 2022 Non-cardiac Surgery)
+  const cfBaja = (cf === '<4METs' || cf === 'desconocida');
+  const factoresCV = ['CardioIsq','ICC','ACV_previo','DM','IRC'].filter(has).length;
+
+  if(cfBaja && (riesgoQx === 'intermedio' || riesgoQx === 'alto')){
+    if(factoresCV >= 1 || asa >= 3){
+      out.interconsultas.push('Evaluación cardiológica preoperatoria (CF < 4 METs o desconocida + factores de riesgo CV en cirugía de riesgo ' + (riesgoQx==='alto'?'alto':'intermedio') + ')');
+      out.pedir.push('Considerar estudio de isquemia: test de esfuerzo · eco estrés con dobutamina · perfusión miocárdica (2B — solo si el resultado cambiará la conducta)');
+      out.pedir.push('ECG de 12 derivaciones + NT-proBNP como primera línea de estratificación (ESC 2022)');
+      out.notas.push('AHA/ACC 2024 y ESC 2022: con CF < 4 METs y riesgo elevado, el estudio de isquemia se justifica solo si modificará el manejo (revascularización, cambio de técnica anestésico-quirúrgica o suspensión).');
+    } else {
+      out.notas.push('CF < 4 METs sin otros factores de riesgo CV: considerar ECG + NT-proBNP como primera línea antes que test de isquemia (ESC 2022).');
+    }
+  }
+  if(cf === 'desconocida'){
+    out.notas.push('Capacidad funcional desconocida: puede objetivarse con cuestionario DASI (>34 puntos ≈ CF adecuada) antes de solicitar estudios (AHA/ACC 2024).');
+  }
+  if(cf === '>=4METs'){
+    out.notas.push('CF ≥ 4 METs sin síntomas → no se requieren estudios de isquemia adicionales, independiente del riesgo quirúrgico (salvo condición cardíaca activa).');
+  }
+
   // Angio-TAC coronario: alto riesgo + CF baja
-  if(riesgoQx === 'alto' && (cf === '<4METs' || cf === 'desconocida')){
+  if(riesgoQx === 'alto' && cfBaja){
     out.pedir.push('Considerar Angio-TAC coronario (2B)');
     out.interconsultas.push('Considerar derivación a Cardiología (CF < 4 METs en cirugía de alto riesgo)');
   }
@@ -4885,7 +4990,7 @@ function renderGuiasExamenes(){
     { ico:'🩺', title:'Específicos por comorbilidad / situación', meta:`${EXAM_PREOP_ESPECIFICOS.length}`, html: especificos, open: false },
     { ico:'⏳', title:'Tiempos de espera tras eventos CV', meta:`${EXAM_PREOP_DIFERIR.length}`, html: diferir, open: false },
     { ico:'📝', title:'Recomendaciones generales', html: recoms, open: false }
-  ]) + `<p class="gp-foot-note">Referencia: Actualizaciones en evaluación preoperatoria · Dr. Fernando Rojas, CUA (2026) · ESAIC/ESA Guidelines 2024 · ACC/AHA Perioperative Guidelines.</p>`;
+  ]) + `<p class="gp-foot-note">Referencia: Actualizaciones en evaluación preoperatoria · Dr. Fernando Rojas, CUA (2026) · Thompson A et al. <em>2024 AHA/ACC Guideline on Perioperative Cardiovascular Management for Noncardiac Surgery</em>. Circulation 2024 · Halvorsen S et al. <em>2022 ESC Guidelines on cardiovascular assessment and management of patients undergoing non-cardiac surgery</em>. Eur Heart J 2022 · ESAIC Guidelines.</p>`;
   cont.innerHTML = html;
 }
 
@@ -4968,6 +5073,14 @@ function _renderRcriCalcCard(){
   });
   html += `
       </div>
+      <div class="gp-calc-section-title">Capacidad funcional (METs)</div>
+      <label class="gp-calc-field" style="display:block">
+        <select id="rcriCf" style="width:100%">
+          <option value="desconocida">Desconocida / no evaluable</option>
+          <option value="<4METs">&lt; 4 METs (no sube 1 piso de escalera sin síntomas)</option>
+          <option value=">=4METs">≥ 4 METs (sube 1 piso de escalera / camina 6 km/h sin síntomas)</option>
+        </select>
+      </label>
       <div class="gp-calc-actions">
         <button type="submit" class="gp-calc-btn primary">🧮 Calcular puntaje y conducta</button>
         <button type="button" class="gp-calc-btn secondary" onclick="window.resetRCRI()">↺ Limpiar</button>
@@ -4983,7 +5096,7 @@ function renderGuiasRiesgoCv(){
 
   const intro = `
     <div class="gp-callout" style="margin-bottom:14px">
-      <strong>❤️ Objetivo:</strong> identificar pacientes que requieren <strong>optimización médica</strong> o <strong>evaluación cardiológica</strong> antes de cirugía no cardíaca. Basado en <em>ACC/AHA 2014 Guideline on Perioperative Cardiovascular Evaluation for Noncardiac Surgery (Fleisher et al)</em>.
+      <strong>❤️ Objetivo:</strong> identificar pacientes que requieren <strong>optimización médica</strong> o <strong>evaluación cardiológica</strong> antes de cirugía no cardíaca. Basado en <em>2024 AHA/ACC Guideline on Perioperative Cardiovascular Management for Noncardiac Surgery</em> y <em>2022 ESC Guidelines on Non-cardiac Surgery</em>.
     </div>
     <div class="gp-callout info" style="margin-bottom:14px">
       <strong>🧮 Calculadora RCRI disponible.</strong> Usa el botón <strong>«Abrir calculadora RCRI»</strong> (abajo a la derecha) para calcular el puntaje y la conducta sugerida.
@@ -5042,7 +5155,7 @@ function renderGuiasRiesgoCv(){
     { ico:'🏃', title:'Capacidad funcional — escala METs', meta:`${METS_TABLE.length}`, html: mets, open: false },
     { ico:'📊', title:'Tabla de referencia · RCRI', meta:`${RCRI_RIESGO.length}`, html: rcriRef, open: false },
     { ico:'❤️', title:'¿Cuándo derivar a Cardiología?', html: derivar, open: false }
-  ]) + `<p class="gp-foot-note">Referencia: Fleisher LA et al. <em>2014 ACC/AHA Guideline on Perioperative Cardiovascular Evaluation and Management of Patients Undergoing Noncardiac Surgery</em>. J Am Coll Cardiol. 2014;64(22):e77-e137. · Lee TH et al. <em>Revised Cardiac Risk Index</em>. Circulation 1999;100:1043-9.</p>`;
+  ]) + `<p class="gp-foot-note">Referencia: Thompson A et al. <em>2024 AHA/ACC Guideline on Perioperative Cardiovascular Management for Noncardiac Surgery</em>. Circulation 2024;150:e351-e442 · Halvorsen S et al. <em>2022 ESC Guidelines on non-cardiac surgery</em>. Eur Heart J 2022;43:3826-3924 · Lee TH et al. <em>Revised Cardiac Risk Index</em>. Circulation 1999;100:1043-9.</p>`;
 
   cont.innerHTML = html;
 }
@@ -5055,15 +5168,17 @@ function renderGuiasRiesgoCv(){
 // ============================================================
 
 // --- Catálogos ---
+// salaId: sala a la que entra DIRECTO la unidad tras identificarse.
+// Si es null (Pediatría / Otra unidad), se muestra el listado completo de salas.
 const AGEND_UNIDADES = [
-  { code:'endo_dig',  name:'Endoscopía Digestiva', ico:'🔬' },
-  { code:'radio',     name:'Imagenología',         ico:'🩻' },
-  { code:'accesos',   name:'Accesos Vasculares',   ico:'💉' },
-  { code:'odonto',    name:'Odontología',          ico:'🦷' },
-  { code:'neuro',     name:'Neurología',           ico:'🧠' },
-  { code:'onco',      name:'Oncología / Hemato',   ico:'🎗️' },
-  { code:'pedia',     name:'Pediatría',            ico:'🧒' },
-  { code:'otra',      name:'Otra unidad',          ico:'➕' }
+  { code:'endo_dig',  name:'Endoscopía Digestiva', ico:'🔬', salaId:'endoscopia' },
+  { code:'radio',     name:'Imagenología',         ico:'🩻', salaId:'imagenologia' },
+  { code:'accesos',   name:'Accesos Vasculares',   ico:'💉', salaId:'accesos_vasculares' },
+  { code:'odonto',    name:'Odontología',          ico:'🦷', salaId:'dental' },
+  { code:'neuro',     name:'Neurología',           ico:'🧠', salaId:'neurologia' },
+  { code:'onco',      name:'Oncología / Hemato',   ico:'🎗️', salaId:'oncohemato' },
+  { code:'pedia',     name:'Pediatría',            ico:'🧒', salaId:null },
+  { code:'otra',      name:'Otra unidad',          ico:'➕', salaId:null }
 ];
 const AGEND_DEFAULT_PIN = '1234';
 
@@ -5083,7 +5198,7 @@ const AGEND_DEFAULT_PIN = '1234';
 // usesAmPmOnly: la sala no usa horarios precisos sino bloques AM/PM.
 //   En este modo el formulario muestra un selector AM/PM, no selectores de
 //   hora; en el storage el slot se guarda con startMin/endMin que cubren
-//   el bloque completo (AM = 08:00–13:00, PM = 13:00–20:00). Estas salas
+//   el bloque completo (AM = 08:00–14:00, PM = 14:00–20:00). Estas salas
 //   NO bloquean a otras (no toman al anestesiólogo en un horario preciso)
 //   y NO son bloqueadas por cross-blocks (su disponibilidad es flexible).
 //
@@ -5181,8 +5296,8 @@ const AGEND_SALAS = [
 
 // --- Bloques AM / PM (para salas con usesAmPmOnly) ---
 const AGEND_AM_START_MIN = 8 * 60;   // 08:00
-const AGEND_AM_END_MIN   = 13 * 60;  // 13:00
-const AGEND_PM_START_MIN = 13 * 60;  // 13:00
+const AGEND_AM_END_MIN   = 14 * 60;  // 14:00
+const AGEND_PM_START_MIN = 14 * 60;  // 14:00
 const AGEND_PM_END_MIN   = 20 * 60;  // 20:00
 
 function _agendIsAmPmSala(salaId){
@@ -5197,13 +5312,13 @@ function _agendBlockRange(block){
 function _agendBlockOfSlot(slot){
   if(!slot) return null;
   if(slot.block === 'AM' || slot.block === 'PM') return slot.block;
-  // heurística: si el inicio está antes de las 13:00 → AM, si no PM
+  // heurística: si el inicio está antes de las 14:00 → AM, si no PM
   if(typeof slot.startMin === 'number') return slot.startMin < AGEND_PM_START_MIN ? 'AM' : 'PM';
   return null;
 }
 function _agendBlockLabel(block){
-  if(block === 'PM') return 'PM (13:00–20:00)';
-  return 'AM (08:00–13:00)';
+  if(block === 'PM') return 'PM (14:00–20:00)';
+  return 'AM (08:00–14:00)';
 }
 
 const AGEND_SLOT_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19]; // legacy
@@ -5247,6 +5362,158 @@ function agendLoadSession(){
 function agendSaveSession(sess){
   if(sess) localStorage.setItem(AGEND_SESSION_LS_KEY, JSON.stringify(sess));
   else localStorage.removeItem(AGEND_SESSION_LS_KEY);
+}
+
+// ============================================================
+// SYNC DE AGENDAMIENTO CON LA NUBE
+// Usa el mismo Worker/KV del backend, pero con un id de estado aparte
+// ('<institucion>-agend') para no mezclarse con el estado principal.
+// Así las solicitudes creadas en cualquier dispositivo llegan a todos.
+// ============================================================
+let _agendSyncTimer = null;
+let _agendSyncing = false;
+
+function _agendRemoteId(){ return INSTITUTION ? (INSTITUTION.id + '-agend') : null; }
+function _agendReqTs(r){ return r ? (r.updatedAt || r.visadoAt || r.createdAt || 0) : 0; }
+
+// Fusiona dos estructuras {salaId:{dateStr:[solicitudes]}} por id de solicitud.
+// Gana la versión con timestamp más reciente. Las eliminaciones se propagan
+// mediante "tombstones" ({id, deleted:true}) que se purgan a los 90 días.
+function _agendMergeData(remoteData, localData){
+  const out = {};
+  const cutoff = Date.now() - 90*24*3600*1000;
+  const salas = new Set([...Object.keys(remoteData||{}), ...Object.keys(localData||{})]);
+  salas.forEach(salaId=>{
+    const rD = (remoteData||{})[salaId] || {};
+    const lD = (localData||{})[salaId] || {};
+    const fechas = new Set([...Object.keys(rD), ...Object.keys(lD)]);
+    const dias = {};
+    fechas.forEach(d=>{
+      const map = {};
+      const put = raw => {
+        const arr = Array.isArray(raw) ? raw : _agendMigrateDayEntry(raw);
+        (arr||[]).forEach(r=>{
+          if(!r || !r.id) return;
+          const ex = map[r.id];
+          if(!ex || _agendReqTs(r) >= _agendReqTs(ex)) map[r.id] = r;
+        });
+      };
+      put(rD[d]); put(lD[d]);
+      const arr = Object.values(map).filter(r => !(r.deleted && (r.deletedAt||0) < cutoff));
+      if(arr.length) dias[d] = arr.sort((a,b)=>(a.startMin||0)-(b.startMin||0));
+    });
+    if(Object.keys(dias).length) out[salaId] = dias;
+  });
+  return out;
+}
+
+// Lee la nube, fusiona con lo local, guarda local y sube el resultado.
+async function agendSyncNow(){
+  const base = getBackendURL();
+  const id = _agendRemoteId();
+  if(!base || !id || _agendSyncing) return false;
+  _agendSyncing = true;
+  try{
+    let remoteData = {};
+    try{
+      const r = await fetch(base + '/api/state/' + encodeURIComponent(id), {cache:'no-store'});
+      if(r.ok){
+        const remote = await r.json();
+        if(remote && !remote._empty && remote.data) remoteData = remote.data;
+      }
+    }catch(e){ /* sin conexión: merge con {} no rompe nada */ return false; }
+    const merged = _agendMergeData(remoteData, agendLoadData());
+    agendSaveData(merged);
+    const token = getBackendToken();
+    if(token){
+      await fetch(base + '/api/state/' + encodeURIComponent(id), {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ data: merged })
+      }).catch(()=>{});
+    }
+    return true;
+  }catch(e){ console.warn('agendSyncNow', e); return false; }
+  finally{ _agendSyncing = false; }
+}
+
+// Push con debounce tras una mutación local (crear/visar/eliminar).
+function agendScheduleSync(onDone){
+  if(_agendSyncTimer) clearTimeout(_agendSyncTimer);
+  _agendSyncTimer = setTimeout(()=>{
+    _agendSyncTimer = null;
+    agendSyncNow().then(()=>{ if(typeof onDone === 'function') onDone(); });
+  }, 800);
+}
+
+// ============================================================
+// NOTIFICACIONES DE NUEVAS SOLICITUDES (solo administrador)
+// ============================================================
+const AGEND_ADMIN_SEEN_LS_KEY = 'appx_agend_admin_seen_v1';
+function _agendAdminSeenTs(){
+  try{ return parseInt(localStorage.getItem(AGEND_ADMIN_SEEN_LS_KEY)||'0',10) || 0; }
+  catch(e){ return 0; }
+}
+function agendMarkAdminSeen(){
+  try{ localStorage.setItem(AGEND_ADMIN_SEEN_LS_KEY, String(Date.now())); }catch(e){}
+  updateAgendAdminNotice();
+}
+// Solicitudes pendientes creadas después de la última revisión del admin
+function _agendNewForAdmin(){
+  const seen = _agendAdminSeenTs();
+  return _agendAllRequests().filter(r => r.estado === 'pendiente' && !r.deleted && (r.createdAt||0) > seen);
+}
+// Pinta el aviso en el home (solo admin) + badge en el selector de módulos
+function updateAgendAdminNotice(){
+  const isAdmin = state && state.isAdmin;
+  const nuevas = isAdmin ? _agendNewForAdmin() : [];
+  const pendientes = isAdmin ? _agendAllRequests().filter(r => r.estado === 'pendiente' && !r.deleted) : [];
+  // Banner arriba del home
+  const banner = document.getElementById('agendAdminNotice');
+  if(banner){
+    if(isAdmin && nuevas.length > 0){
+      banner.style.display = 'flex';
+      document.getElementById('agendAdminNoticeText').textContent =
+        nuevas.length === 1
+          ? 'Hay 1 nueva solicitud de agendamiento por visar'
+          : 'Hay ' + nuevas.length + ' nuevas solicitudes de agendamiento por visar';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  // Badge en el botón del módulo Agendamiento
+  const b = document.getElementById('agendModBadge');
+  if(b){
+    if(isAdmin && pendientes.length > 0){
+      b.textContent = pendientes.length;
+      b.style.display = 'inline-block';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+}
+// Chequeo periódico: baja las solicitudes de la nube y avisa si hay nuevas.
+// Se llama al iniciar sesión admin y cada 3 minutos mientras la app esté abierta.
+let _agendAdminPollTimer = null;
+async function checkAgendNewForAdmin(){
+  if(!state || !state.isAdmin) return;
+  await agendSyncNow();
+  const nuevas = _agendNewForAdmin();
+  updateAgendAdminNotice();
+  if(nuevas.length > 0){
+    // Notificación del sistema (si la app está abierta y hay permiso)
+    const tag = 'agend-new-' + nuevas.length;
+    if(!window._agendLastNotifTag || window._agendLastNotifTag !== tag){
+      window._agendLastNotifTag = tag;
+      notify('📋 Solicitudes de agendamiento',
+        nuevas.length === 1 ? 'Hay 1 nueva solicitud por visar' : 'Hay ' + nuevas.length + ' nuevas solicitudes por visar',
+        'agend-new');
+    }
+  }
+}
+function startAgendAdminPolling(){
+  if(_agendAdminPollTimer) clearInterval(_agendAdminPollTimer);
+  _agendAdminPollTimer = setInterval(()=>{ try{ checkAgendNewForAdmin(); }catch(e){} }, 3*60*1000);
 }
 
 // --- Helpers de fecha ---
@@ -5340,8 +5607,9 @@ function _agendEnsureMigratedAndSave(){
 function _agendGetDaySlots(salaId, dateStr){
   const data = agendLoadData();
   const raw = ((data[salaId]||{})[dateStr]);
-  if(Array.isArray(raw)) return raw.slice().sort((a,b) => a.startMin - b.startMin);
-  return _agendMigrateDayEntry(raw);
+  const arr = Array.isArray(raw) ? raw.slice() : _agendMigrateDayEntry(raw);
+  // Excluir tombstones (solicitudes eliminadas que se conservan solo para sync)
+  return (arr||[]).filter(r => r && !r.deleted).sort((a,b) => a.startMin - b.startMin);
 }
 function _agendCountDay(salaId, dateStr){
   const slots = _agendGetDaySlots(salaId, dateStr);
@@ -5362,6 +5630,7 @@ function _agendAllRequests(){
         ? data[salaId][dateStr]
         : _agendMigrateDayEntry(data[salaId][dateStr]);
       arr.forEach(r => {
+        if(r && r.deleted) return; // tombstone de solicitud eliminada
         out.push({ salaId, dateStr, ...r });
       });
     });
@@ -5376,7 +5645,7 @@ function _agendFindRequest(reqId){
         ? data[salaId][dateStr]
         : _agendMigrateDayEntry(data[salaId][dateStr]);
       for(let i=0; i<arr.length; i++){
-        if(arr[i] && arr[i].id === reqId){
+        if(arr[i] && arr[i].id === reqId && !arr[i].deleted){
           return { salaId, dateStr, index: i, req: arr[i] };
         }
       }
@@ -5606,6 +5875,17 @@ function openAgendamientoModule(){
   // Migrar al vuelo cualquier data en formato antiguo (hora-keyed) a la nueva
   // estructura de array con startMin/endMin. Idempotente.
   try { _agendEnsureMigratedAndSave(); } catch(e){ console.warn('migración v38 falló', e); }
+  // Bajar las solicitudes de la nube y refrescar la vista activa al terminar
+  try {
+    agendSyncNow().then(()=>{
+      const v = AGEND_STATE.view;
+      try{
+        if(v === 'calendario') agendRenderCalendario();
+        else if(v === 'dia' && AGEND_STATE.selectedDate) agendOpenDia(AGEND_STATE.selectedDate);
+        else if(v === 'overview') agendOverviewTab(AGEND_STATE.overviewTab);
+      }catch(e){}
+    });
+  } catch(e){}
   AGEND_STATE.navStack = [];
   AGEND_STATE.mode = null;
   AGEND_STATE.unidadCode = null;
@@ -5620,7 +5900,7 @@ function openAgendamientoModule(){
     AGEND_STATE.solicitanteNombre = sess.nombre || '';
     AGEND_STATE.solicitanteTel = sess.tel || '';
     AGEND_STATE.solicitanteEmail = sess.email || '';
-    agendShowSalasView();
+    agendEntrarASalaDeUnidad();
     return;
   }
   // Sin sesión → landing
@@ -5678,7 +5958,19 @@ function agendUnidadDoLogin(){
   agendSaveSession({ tipo:'unidad', unidadCode:code, nombre:nom, tel, email });
   // Limpiar navStack porque venimos de un login
   AGEND_STATE.navStack = [];
-  agendShowSalasView();
+  agendEntrarASalaDeUnidad();
+}
+
+// Tras identificarse, la unidad entra DIRECTO a su sala asociada (si tiene una).
+// "Volver" desde el calendario lleva al listado de salas por si necesita otra.
+function agendEntrarASalaDeUnidad(){
+  const u = _agendGetUnidad(AGEND_STATE.unidadCode);
+  if(AGEND_STATE.mode === 'unidad' && u && u.salaId && _agendGetSala(u.salaId)){
+    agendShowSalasView();        // queda como base del stack para "Volver"
+    agendOpenSala(u.salaId);     // y entra directo al calendario de SU sala
+  } else {
+    agendShowSalasView();
+  }
 }
 function agendLogoutUnidad(){
   if(!confirm('¿Cerrar la sesión de tu unidad?')) return;
@@ -5710,7 +6002,10 @@ async function agendGoToAdmin(){
     return;
   }
 
-  // 2) Si NO hay PIN de admin configurado todavía → hay que configurarlo desde la app principal
+  // 2) Si NO hay PIN de admin configurado todavía → revisar primero la nube
+  if(typeof adminSetupNeeded === 'function' && adminSetupNeeded()){
+    try{ await _syncAdminPinFromCloud(); }catch(e){}
+  }
   if(typeof adminSetupNeeded === 'function' && adminSetupNeeded()){
     alert('Aún no hay un PIN de Administrador configurado.\n\nEntra a la pantalla principal → Staff → Administrador para crearlo (4 dígitos). Después puedes volver a "Visar Solicitudes" y desbloquearlo desde aquí.');
     return;
@@ -6096,7 +6391,7 @@ function _agendRenderSlotsAmPm(cont, sala, salaId, dateStr){
   const showCtaAM = AGEND_STATE.mode === 'unidad';
   const showCtaPM = AGEND_STATE.mode === 'unidad';
   // Bloque AM
-  html += `<div class="agend-day-section">Bloque AM <span class="agend-ampm-pill">08:00–13:00</span></div>`;
+  html += `<div class="agend-day-section">Bloque AM <span class="agend-ampm-pill">08:00–14:00</span></div>`;
   if(ofAM.length) ofAM.forEach(r => html += renderReq(r));
   else html += `<div class="agend-day-closed-note" style="opacity:.75">Sin solicitudes en el bloque AM.</div>`;
   if(showCtaAM){
@@ -6109,7 +6404,7 @@ function _agendRenderSlotsAmPm(cont, sala, salaId, dateStr){
       </button>`;
   }
   // Bloque PM
-  html += `<div class="agend-day-section">Bloque PM <span class="agend-ampm-pill">13:00–20:00</span></div>`;
+  html += `<div class="agend-day-section">Bloque PM <span class="agend-ampm-pill">14:00–20:00</span></div>`;
   if(ofPM.length) ofPM.forEach(r => html += renderReq(r));
   else html += `<div class="agend-day-closed-note" style="opacity:.75">Sin solicitudes en el bloque PM.</div>`;
   if(showCtaPM){
@@ -6513,9 +6808,11 @@ function agendSubmitSolicitud(ev){
     const vasc = document.getElementById('afAccesosVasc'); if(vasc) req.accesosHallazgos = vasc.value.trim();
     const coag = document.getElementById('afAccesosCoag'); if(coag) req.accesosCoagulacion = coag.value.trim();
   }
+  req.updatedAt = Date.now();
   data[salaId][dateStr].push(req);
   data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
+  agendScheduleSync(); // subir la nueva solicitud a la nube
   // Limpiar flag Extra
   AGEND_STATE.formIsExtra = false;
   alert(isExtra
@@ -6610,21 +6907,24 @@ function agendOpenDetalle(reqId){
     ? `${req.visadoBy} · ${new Date(req.visadoAt).toLocaleString('es-CL')}${req.comentarioVisado?`<br><em>"${_gpEsc(req.comentarioVisado)}"</em>`:''}`
     : '—';
   let actionsHtml = '';
+  const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:#fff;color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
   if(AGEND_STATE.mode === 'admin' && req.estado === 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
         <button type="button" class="agend-action-btn aprobar" onclick="agendVisarSolicitud('${req.id}','aprobada')">✓ Aprobar</button>
         <button type="button" class="agend-action-btn rechazar" onclick="agendVisarSolicitud('${req.id}','rechazada')">✗ Rechazar</button>
-      </div>`;
+      </div>
+      <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>`;
   } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
         <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:#fff;color:var(--muted)">Revertir a pendiente</button>
+        ${btnEliminar}
       </div>`;
   }
   const extraBadge = req.isExtra ? ` <span class="agend-extra-pill">EXTRA</span>` : '';
   const horarioRow = isAmPmReq
-    ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Bloque</div><div class="agend-detalle-v">${reqBlock||'—'} <span class="agend-ampm-pill">${reqBlock==='PM'?'13:00–20:00':'08:00–13:00'}</span></div></div>`
+    ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Bloque</div><div class="agend-detalle-v">${reqBlock||'—'} <span class="agend-ampm-pill">${reqBlock==='PM'?'14:00–20:00':'08:00–14:00'}</span></div></div>`
     : `<div class="agend-detalle-row"><div class="agend-detalle-k">Horario</div><div class="agend-detalle-v">${(typeof req.startMin==='number'&&typeof req.endMin==='number')?_agendFmtRange(req.startMin,req.endMin):'—'}</div></div>`;
   // Bloque opcional con campos extras de Accesos Vasculares
   const accesosRows = (sala && sala.id === 'accesos_vasculares')
@@ -6686,13 +6986,44 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   slot.estado = nuevoEstado;
   slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
   slot.visadoAt = Date.now();
+  slot.updatedAt = Date.now();
   slot.comentarioVisado = comentario;
   agendSaveData(data);
+  agendScheduleSync(); // propagar el visado a la nube
   // Notificación por email al solicitante (todas las salas EXCEPTO Endoscopía)
   if(nuevoEstado === 'aprobada' && found.salaId !== 'endoscopia'){
     _agendOfrecerMailtoConfirmacion(slot, found.salaId, found.dateStr);
   }
   agendOpenDetalle(reqId);
+}
+
+// Elimina definitivamente una solicitud (solo modo Admin).
+// Deja un tombstone para que la eliminación se propague a otros dispositivos.
+function agendEliminarSolicitud(reqId){
+  if(AGEND_STATE.mode !== 'admin'){ alert('Solo el modo Administrador puede eliminar solicitudes.'); return; }
+  const found = _agendFindRequest(reqId);
+  if(!found) return;
+  const r = found.req;
+  if(!confirm('¿Eliminar definitivamente esta solicitud?\n\nPaciente: ' + (r.paciente||'—') + '\nEstado: ' + (r.estado||'—') + '\n\nEsta acción no se puede deshacer.')) return;
+  const data = agendLoadData();
+  if(!Array.isArray(data[found.salaId][found.dateStr])){
+    data[found.salaId][found.dateStr] = _agendMigrateDayEntry(data[found.salaId][found.dateStr]);
+  }
+  const arr = data[found.salaId][found.dateStr];
+  const idx = arr.findIndex(x => x && x.id === reqId);
+  if(idx < 0) return;
+  arr[idx] = { id: reqId, deleted: true, deletedAt: Date.now(), updatedAt: Date.now() };
+  agendSaveData(data);
+  agendScheduleSync();
+  toast && toast('Solicitud eliminada');
+  // Volver a la vista anterior y refrescarla
+  agendBack();
+  const v = AGEND_STATE.view;
+  try{
+    if(v === 'overview') agendOverviewTab(AGEND_STATE.overviewTab);
+    else if(v === 'dia' && AGEND_STATE.selectedDate) agendOpenDia(AGEND_STATE.selectedDate);
+    else if(v === 'calendario') agendRenderCalendario();
+  }catch(e){}
 }
 
 // Abre el cliente de correo del navegador con un mensaje pre-llenado para
@@ -6711,7 +7042,7 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   const isAmPm = !!(sala && sala.usesAmPmOnly);
   const block = _agendBlockOfSlot(req);
   const horarioTxt = isAmPm
-    ? (block === 'PM' ? 'Bloque PM (aprox. 13:00–20:00)' : 'Bloque AM (aprox. 08:00–13:00)')
+    ? (block === 'PM' ? 'Bloque PM (aprox. 14:00–20:00)' : 'Bloque AM (aprox. 08:00–14:00)')
     : ((typeof req.startMin === 'number' && typeof req.endMin === 'number')
         ? `Horario ${_agendFmtRange(req.startMin, req.endMin)}`
         : 'Horario por confirmar');
@@ -6768,6 +7099,10 @@ function agendShowOverview(tab){
   _agendShowView('overview', true);
   _agendRefreshChromeForView('overview');
   agendOverviewTab(AGEND_STATE.overviewTab);
+  // El admin ya revisó la bandeja → resetear contador de "nuevas"
+  try{ agendMarkAdminSeen(); }catch(e){}
+  // Refrescar desde la nube por si llegaron solicitudes nuevas
+  try{ agendSyncNow().then(()=>{ if(AGEND_STATE.view==='overview') agendOverviewTab(AGEND_STATE.overviewTab); }); }catch(e){}
 }
 function agendOverviewTab(tab){
   AGEND_STATE.overviewTab = tab;
@@ -7352,6 +7687,34 @@ function pinError(msg){
   setTimeout(()=>{ _pinBuffer=''; renderPinDisplay(); }, 350);
 }
 
+// --- PINs en la nube ---
+// Consulta el estado remoto y devuelve los PINs registrados (mejor esfuerzo).
+// Se usa ANTES de ofrecer "primer ingreso": si el PIN ya existe en la nube,
+// el dispositivo nuevo debe pedirlo, no permitir crear uno nuevo.
+async function _fetchRemotePins(){
+  const base = getBackendURL();
+  if(!base || !INSTITUTION) return null;
+  try{
+    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+    if(!r.ok) return null;
+    const remote = await r.json();
+    if(!remote || remote._empty) return null;
+    const staffPins = {};
+    (remote.staff||[]).forEach(s=>{ if(s && s.id && s.pinHash) staffPins[s.id] = s.pinHash; });
+    return { staffPins, adminPinHash: remote.adminPinHash || null };
+  }catch(e){ return null; }
+}
+
+// Si este dispositivo no tiene el PIN de admin pero la nube sí → adoptarlo.
+async function _syncAdminPinFromCloud(){
+  if(state && state.adminPinHash) return;
+  const pins = await _fetchRemotePins();
+  if(pins && pins.adminPinHash){
+    state.adminPinHash = pins.adminPinHash;
+    saveRaw();
+  }
+}
+
 // --- Admin PIN ---
 function adminSetupNeeded(){ return !state || !state.adminPinHash; }
 async function promptSetAdminPin(){
@@ -7489,6 +7852,10 @@ function openStaffPicker(){
 function renderStaffPickerList(){ try{ renderInlineUserList(); }catch(e){} }
 
 async function selectAdmin(){
+  // Antes de tratar como "primera vez", revisar si el PIN ya existe en la nube
+  if(adminSetupNeeded()){
+    try{ await _syncAdminPinFromCloud(); }catch(e){}
+  }
   // Primera vez: configurar PIN admin
   if(adminSetupNeeded()){
     const ok = await promptSetAdminPin();
@@ -7510,6 +7877,14 @@ async function selectAdmin(){
   showHome();
   try{ updateEventBadge(); }catch(e){}
   try{ checkReminders(); }catch(e){}
+  // Aviso de nuevas solicitudes de agendamiento (solo admin) + polling
+  try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
+  // Pedir permiso de notificaciones para los avisos de solicitudes
+  try{
+    if(notifSupported() && Notification.permission === 'default'){
+      setTimeout(()=>{ try{ requestNotifPermission(); }catch(e){} }, 1500);
+    }
+  }catch(e){}
 }
 function showUserPicker(){
   renderUserPicker();
@@ -7523,6 +7898,17 @@ async function selectUser(userId){
   const u = state.staff.find(s=>s.id===userId);
   if(!u) return;
   ensureUserDefaults(u);
+  // Antes de tratar como "primer ingreso", revisar si este usuario YA tiene
+  // un PIN registrado en la nube (configurado desde otro dispositivo).
+  if(!u.pinHash){
+    try{
+      const pins = await _fetchRemotePins();
+      if(pins && pins.staffPins[u.id]){
+        u.pinHash = pins.staffPins[u.id];
+        saveRaw();
+      }
+    }catch(e){}
+  }
   let ok;
   if(!u.pinHash){
     ok = await promptSetupUserPin(u);
