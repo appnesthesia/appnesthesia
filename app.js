@@ -3455,7 +3455,7 @@ function _aiRenderMessages(){
   if(!box) return;
   let html = `
     <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-bubble">👋 Soy el asistente de IA de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Uso las tablas de la app como referencia.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
+      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Respondo usando las tablas de la app como referencia.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
     </div>`;
   _aiMessages.forEach(m=>{
     const cls = m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
@@ -3530,11 +3530,11 @@ async function aiAnalizarSolicitud(reqId){
   const cont = document.getElementById('aiVisadoResult');
   if(cont){
     cont.style.display = '';
-    cont.innerHTML = '<div class="ai-visado-loading">🤖 Analizando solicitud…</div>';
+    cont.innerHTML = '<div class="ai-visado-loading">🤖 ARIA está analizando la solicitud…</div>';
   }
   try{
     const answer = await _aiCall({ mode:'visado', solicitud });
-    if(cont) cont.innerHTML = '<div class="ai-visado-card"><div class="ai-visado-title">🤖 Análisis IA</div><div class="ai-visado-body">' + _aiEsc(answer).replace(/\n/g,'<br>') + '</div></div>';
+    if(cont) cont.innerHTML = '<div class="ai-visado-card"><div class="ai-visado-title">🤖 Análisis de ARIA</div><div class="ai-visado-body">' + _aiEsc(answer).replace(/\n/g,'<br>') + '</div></div>';
   }catch(e){
     if(cont) cont.innerHTML = '<div class="ai-visado-card error">❌ No se pudo analizar: ' + _aiEsc(e.message||String(e)) + '</div>';
   }
@@ -7090,7 +7090,7 @@ function agendOpenDetalle(reqId){
   let actionsHtml = '';
   const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:#fff;color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
   const btnIA = (typeof aiAvailable === 'function' && aiAvailable())
-    ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #a5b4fc;color:#4338ca;font-weight:700">🤖 Analizar con IA</button></div><div id="aiVisadoResult" style="display:none"></div>`
+    ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #a5b4fc;color:#4338ca;font-weight:700">🤖 Analizar con ARIA</button></div><div id="aiVisadoResult" style="display:none"></div>`
     : '';
   if(AGEND_STATE.mode === 'admin' && req.estado === 'pendiente'){
     actionsHtml = `
