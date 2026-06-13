@@ -3822,11 +3822,74 @@ function _aiBuildContext(question){
   return matches.slice(0, 25).join('\n');
 }
 
+// --- Turnstile (anti-bots) — opcional, gatillado por INSTITUTION.turnstileSiteKey ---
+function _turnstileSiteKey(){
+  return (INSTITUTION && INSTITUTION.turnstileSiteKey) || '';
+}
+let _tsScriptLoading = null;
+function _loadTurnstileScript(){
+  if(window.turnstile) return Promise.resolve();
+  if(_tsScriptLoading) return _tsScriptLoading;
+  _tsScriptLoading = new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    s.async = true; s.defer = true;
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error('No se pudo cargar Turnstile'));
+    document.head.appendChild(s);
+  });
+  return _tsScriptLoading;
+}
+let _tsWidgetId = null;
+// Obtiene un token fresco de Turnstile (un solo uso). Devuelve '' si no está configurado.
+async function _getTurnstileToken(){
+  const siteKey = _turnstileSiteKey();
+  if(!siteKey) return '';
+  try{
+    await _loadTurnstileScript();
+    // Contenedor oculto reutilizable
+    let cont = document.getElementById('tsContainer');
+    if(!cont){
+      cont = document.createElement('div');
+      cont.id = 'tsContainer';
+      cont.style.cssText = 'position:fixed;bottom:0;left:0;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none';
+      document.body.appendChild(cont);
+    }
+    return await new Promise((resolve)=>{
+      let done = false;
+      const finish = (tok)=>{ if(!done){ done = true; resolve(tok||''); } };
+      const opts = {
+        sitekey: siteKey,
+        appearance: 'interaction-only',
+        callback: (token)=>finish(token),
+        'error-callback': ()=>finish(''),
+        'timeout-callback': ()=>finish('')
+      };
+      try{
+        if(_tsWidgetId !== null){
+          window.turnstile.reset(_tsWidgetId);
+          window.turnstile.execute(_tsWidgetId, opts);
+        } else {
+          _tsWidgetId = window.turnstile.render('#tsContainer', opts);
+          window.turnstile.execute(_tsWidgetId, opts);
+        }
+      }catch(e){ finish(''); }
+      // Salvaguarda: no bloquear más de 8 s
+      setTimeout(()=>finish(''), 8000);
+    });
+  }catch(e){ return ''; }
+}
+
 async function _aiCall(payload){
   const base = getAiURL();
   if(!base) throw new Error('IA no configurada');
   const headers = {'Content-Type':'application/json'};
   try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+  // Adjuntar token de Turnstile si la institución lo tiene configurado
+  try{
+    const ts = await _getTurnstileToken();
+    if(ts) payload = {...payload, turnstileToken: ts};
+  }catch(e){}
   const r = await fetch(base + '/api/ai', { method:'POST', headers, body: JSON.stringify(payload) });
   const data = await r.json().catch(()=>null);
   if(!r.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
