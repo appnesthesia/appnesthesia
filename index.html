@@ -857,6 +857,46 @@ canvas{max-width:100%}
   .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
+/* ============ ASRA 2025 — Buscador neuroaxial ============ */
+.asra-block{background:linear-gradient(180deg,#f5f8ff,#eef2ff);border:1.5px solid #c7d2fe;border-radius:16px;padding:14px;margin:4px 0 16px;box-shadow:0 3px 12px rgba(79,70,229,.10)}
+.asra-block-head{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+.asra-badge{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:11px;font-weight:800;letter-spacing:.4px;padding:4px 10px;border-radius:8px;white-space:nowrap}
+.asra-block-title{font-weight:800;font-size:14.5px;color:#312e81;font-family:'Manrope','Inter',sans-serif}
+.asra-block-sub{font-size:12.5px;color:#4338ca;line-height:1.5;margin:0 0 11px}
+.asra-block-sub b{color:#312e81}
+.asra-search{margin:0 0 12px}
+.asra-search input{width:100%;padding:13px 14px;font-size:15px;border:1.5px solid #a5b4fc;border-radius:11px;font-family:inherit;background:#fff;box-shadow:inset 0 1px 3px rgba(49,46,129,.06)}
+.asra-search input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+.asra-count{font-size:12.5px;font-weight:700;color:#3730a3;background:#e0e7ff;border:1.5px solid #c7d2fe;border-radius:10px;padding:8px 12px;margin-bottom:10px}
+.asra-acc{background:#fff;border:1.5px solid #c7d2fe;border-radius:12px;margin:0 0 9px;overflow:hidden}
+.asra-acc-head{display:flex;align-items:center;gap:10px;width:100%;padding:12px 13px;background:linear-gradient(180deg,#fbfcff,#f1f3ff);border:none;cursor:pointer;font-family:inherit;text-align:left;color:inherit}
+.asra-acc-head:hover{background:#eef2ff}
+.asra-acc-ico{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.asra-acc-title{flex:1;font-weight:800;font-size:13px;color:#312e81;font-family:'Manrope','Inter',sans-serif;line-height:1.3}
+.asra-acc-meta{font-size:11px;color:#4338ca;font-weight:700;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:8px;padding:3px 8px}
+.asra-acc-chev{color:#6366f1;font-size:19px;font-weight:700;transition:transform .2s;flex-shrink:0}
+.asra-acc.open .asra-acc-chev{transform:rotate(90deg)}
+.asra-acc-body{display:none;padding:8px 12px 12px}
+.asra-acc.open .asra-acc-body{display:block;animation:gpAccFade .18s ease}
+.asra-card{border:1px solid #e0e7ff;border-radius:11px;padding:11px 12px;margin:8px 0;background:#fafbff}
+.asra-card-name{font-weight:800;font-size:13.5px;color:#312e81;font-family:'Manrope','Inter',sans-serif;margin-bottom:8px;line-height:1.35}
+.asra-rows{display:flex;flex-direction:column;gap:7px}
+.asra-row{display:grid;grid-template-columns:1fr;gap:2px;padding:7px 9px;border-radius:8px;background:#fff;border-left:3px solid #818cf8}
+.asra-k{font-size:11px;font-weight:800;color:#4338ca;text-transform:uppercase;letter-spacing:.3px}
+.asra-v{font-size:13px;color:var(--text);line-height:1.5}
+.asra-row:nth-child(1){border-left-color:#dc2626}
+.asra-row:nth-child(2){border-left-color:#d97706}
+.asra-row:nth-child(3){border-left-color:#16a34a}
+.asra-src{margin-top:9px;font-size:11px;color:#6366f1;font-style:italic}
+.asra-empty{padding:20px 14px;text-align:center;font-size:14px;color:var(--text);background:#fff;border:1.5px dashed #c7d2fe;border-radius:12px;line-height:1.6}
+.asra-src-note{margin-top:10px;font-size:11px;color:#6366f1;line-height:1.5;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #e0e7ff}
+.asra-legacy{margin-top:8px;border:1px solid var(--border);border-radius:12px;background:#fafbfc;padding:0 12px}
+.asra-legacy summary{cursor:pointer;padding:13px 2px;font-weight:700;font-size:13px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;list-style:none}
+.asra-legacy summary::-webkit-details-marker{display:none}
+.asra-legacy summary:before{content:'▸ ';color:var(--green-forest)}
+.asra-legacy[open] summary:before{content:'▾ '}
+.asra-legacy[open]{padding-bottom:12px}
+
 /* ============ ANESTESIA REGIONAL (NYSORA) ============ */
 #view-regional .reg-search{margin:4px 0 14px;padding:12px;background:linear-gradient(135deg,#0f4435,#2e8b6b);border-radius:14px;box-shadow:0 5px 16px rgba(15,68,53,.28)}
 #view-regional .reg-search input{width:100%;padding:13px 14px;font-size:15px;border:none;border-radius:10px;box-shadow:inset 0 1px 3px rgba(0,0,0,.10);font-family:inherit}
@@ -1993,7 +2033,21 @@ canvas{max-width:100%}
 <!-- ANESTESIA REGIONAL (placeholder) -->
 <section class="view" id="view-regional">
   <div class="section">
-    <h3>💉 Anestesia Regional — Trauma / Traumatología</h3>
+    <h3>💉 Anestesia Regional</h3>
+
+    <!-- BUSCADOR ASRA 2025 — seguridad neuroaxial -->
+    <div class="asra-block">
+      <div class="asra-block-head">
+        <span class="asra-badge">ASRA 2025 · 5ª ed</span>
+        <span class="asra-block-title">Anticoagulación y bloqueo neuroaxial</span>
+      </div>
+      <p class="asra-block-sub">Antes de una espinal, peridural o bloqueo profundo: busca el fármaco y revisa cuándo <b>puncionar</b>, <b>retirar el catéter</b>, <b>reiniciar</b> la anticoagulación y si el catéter <b>se puede mantener</b>.</p>
+      <div class="asra-search"><input id="asra_reg_search" placeholder="🔎 enoxaparina, rivaroxabán, warfarina, clopidogrel…" oninput="renderASRANeuraxial('reg')" /></div>
+      <div id="asra_reg_list"></div>
+      <div class="asra-src-note">Fuente: ASRA Pain Medicine, 5ª edición (Reg Anesth Pain Med 2025). Asume función renal/hepática normal; ajustar individualmente. Referencia de apoyo — la decisión es del anestesiólogo a cargo.</div>
+    </div>
+
+    <h3 style="margin-top:22px">🦴 Bloqueos en traumatología</h3>
     <p style="color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 10px">
       Bloqueos más usados en cirugía traumatológica, organizados por región. Cada uno enlaza a su técnica y video en <b>NYSORA</b> (se abre en el navegador).
     </p>
@@ -2112,12 +2166,27 @@ canvas{max-width:100%}
 <section class="view" id="view-coagulacion">
   <div class="section">
     <h3>🩸 Coagulación — Anestesia Neuroaxial</h3>
-    <div class="med-disclaimer">
-      <div><b>Referencia clínica.</b> Tiempos de suspensión y reinicio para <b>anestesia neuroaxial</b> (espinal y peridural) y <b>bloqueos perineurales profundos</b>, según <b>ASRA 2018</b>, <b>ESAIC 2022</b> y recomendaciones de la <b>Sociedad Chilena de Anestesiología</b>. Asumen función renal y hepática normal; ajustar individualmente.</div>
+
+    <!-- BUSCADOR ASRA 2025 (destacado) -->
+    <div class="asra-block">
+      <div class="asra-block-head">
+        <span class="asra-badge">ASRA 2025 · 5ª ed</span>
+        <span class="asra-block-title">Buscador neuroaxial — anticoagulación</span>
+      </div>
+      <p class="asra-block-sub">Busca un fármaco y obtén los 4 tiempos clave: cuándo <b>puncionar</b>, <b>retirar el catéter</b>, <b>reiniciar</b> y si el catéter <b>se puede mantener</b>.</p>
+      <div class="asra-search"><input id="asra_coag_search" placeholder="🔎 enoxaparina, rivaroxabán, warfarina, clopidogrel…" oninput="renderASRANeuraxial('coag')" /></div>
+      <div id="asra_coag_list"></div>
     </div>
-    <div class="med-search"><input id="coagSearch" placeholder="🔎 Busca el fármaco aquí (enoxaparina, dabigatrán, AAS…)" oninput="renderCoagulacion()" /></div>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5">Toca un grupo para desplegar su tabla, o usa el buscador para encontrar un fármaco directamente.</p>
-    <div id="coagList"></div>
+
+    <details class="asra-legacy">
+      <summary>📚 Ver también tablas detalladas (ASRA 2018 / ESAIC 2022 / SACH)</summary>
+      <div class="med-disclaimer" style="margin-top:10px">
+        <div><b>Referencia clínica.</b> Tiempos según <b>ASRA 2018</b>, <b>ESAIC 2022</b> y <b>Sociedad Chilena de Anestesiología</b>. Asumen función renal y hepática normal; ajustar individualmente.</div>
+      </div>
+      <div class="med-search"><input id="coagSearch" placeholder="🔎 Busca el fármaco aquí (enoxaparina, dabigatrán, AAS…)" oninput="renderCoagulacion()" /></div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5">Toca un grupo para desplegar su tabla, o usa el buscador para encontrar un fármaco directamente.</p>
+      <div id="coagList"></div>
+    </details>
   </div>
 </section>
 
@@ -2147,6 +2216,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=50"></script>
+<script src="app.js?v=51"></script>
 </body>
 </html>

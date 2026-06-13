@@ -720,8 +720,8 @@ function showView(name){
     // Asegura que todos los acordeones de cálculos (Vía aérea, etc.) estén cerrados por defecto
     document.querySelectorAll('#view-pediatria .calc-block').forEach(d => d.removeAttribute('open'));
   }
-  if(name==='coagulacion'){ renderCoagulacion(); }
-  if(name==='regional'){ renderRegional(); }
+  if(name==='coagulacion'){ renderCoagulacion(); try{ renderASRANeuraxial('coag'); }catch(e){} }
+  if(name==='regional'){ renderRegional(); try{ renderASRANeuraxial('reg'); }catch(e){} }
   if(name==='intercambios') renderExchanges();
   if(name==='vacaciones') renderVacations();
   if(name==='estadisticas') renderStats();
@@ -3363,6 +3363,257 @@ function toggleCoagAcc(idx){
 }
 
 // ============================================================
+// ASRA 2025 (5ª edición) — Anticoagulación y ANESTESIA NEUROAXIAL
+// Tiempos para: punción neuroaxial / bloqueo profundo, retiro de catéter,
+// reinicio de la anticoagulación y mantención de catéter.
+// Fuente: ASRA Pain Medicine, Regional Anesthesia in the Patient Receiving
+// Antithrombotic or Thrombolytic Therapy, 5ª ed (Reg Anesth Pain Med 2025).
+// Asume función renal/hepática normal — ajustar individualmente.
+// REFERENCIA DE APOYO: la decisión final es del anestesiólogo a cargo.
+// ============================================================
+const ASRA_NEURAXIAL_2025 = [
+  { grupo:'Heparina no fraccionada (HNF)', drugs:[
+    { name:'HNF subcutánea — dosis baja (≤5000 U c/8–12 h)',
+      aliases:['hnf','heparina no fraccionada','heparina sc','heparina subcutanea','heparina profilactica','5000'],
+      puncion:'Sin contraindicación si ≤5000 U cada 12 h. Si es cada 8 h o dosis total >10.000 U/día: esperar 4–6 h y aPTT normal.',
+      cateter:'Retirar idealmente en la hora valle (justo antes de la siguiente dosis), 4–6 h tras la última si es dosis alta.',
+      reinicio:'1 h después de la punción o del retiro del catéter.',
+      mantencion:'El catéter puede mantenerse con dosis baja BID.',
+      monitoreo:'Recuento plaquetario si >4 días de heparina (riesgo de TIH).',
+      fuente:'ASRA 2025 (5ª ed) — HNF SC dosis baja' },
+    { name:'HNF intravenosa — terapéutica',
+      aliases:['hnf iv','heparina iv','heparina intravenosa','heparina terapeutica','bomba de heparina'],
+      puncion:'Suspender 4–6 h antes y confirmar aPTT normal (o anti-Xa normal).',
+      cateter:'Retirar 4–6 h tras la última dosis con aPTT normal.',
+      reinicio:'≥1 h después de la punción o del retiro del catéter. Reanudar infusión sin bolo si es posible.',
+      mantencion:'Evitar mantener catéter con infusión activa; si se mantiene, vigilancia neurológica estricta.',
+      monitoreo:'aPTT / anti-Xa. Plaquetas si >4 días (TIH).',
+      fuente:'ASRA 2025 (5ª ed) — HNF IV terapéutica' }
+  ]},
+  { grupo:'Heparina de bajo peso molecular (HBPM)', drugs:[
+    { name:'HBPM dosis BAJA / profiláctica (enoxaparina 40 mg/d; dalteparina 5000 U; tinzaparina 4500 U)',
+      aliases:['hbpm','enoxaparina','clexane','dalteparina','tinzaparina','nadroparina','fragmin','heparina bajo peso','profilactica','low dose'],
+      puncion:'12 h tras la última dosis.',
+      cateter:'Retirar ≥12 h tras la última dosis y ≥4 h antes de la siguiente. Con dosis 1×/día el catéter puede mantenerse; con dosis 2×/día retirar el catéter ANTES de iniciar la HBPM.',
+      reinicio:'≥4 h tras la punción o el retiro del catéter (algunos centros 6–8 h si punción traumática).',
+      mantencion:'Mantenible solo con esquema de dosis única diaria.',
+      monitoreo:'Anti-Xa no rutinario; útil en ERC, obesidad o embarazo.',
+      fuente:'ASRA 2025 (5ª ed) — HBPM "dosis baja"' },
+    { name:'HBPM dosis ALTA / terapéutica (enoxaparina 1 mg/kg c/12 h o 1,5 mg/kg/d)',
+      aliases:['hbpm terapeutica','enoxaparina terapeutica','enoxaparina 1 mg','high dose','dosis alta'],
+      puncion:'24 h tras la última dosis.',
+      cateter:'NO mantener catéter con dosis terapéutica. Retirar el catéter antes de iniciar el esquema terapéutico.',
+      reinicio:'≥4 h tras el retiro del catéter; la primera dosis terapéutica ≥24 h tras la punción si fue atraumática.',
+      mantencion:'No.',
+      monitoreo:'Anti-Xa según contexto (ERC/obesidad).',
+      fuente:'ASRA 2025 (5ª ed) — HBPM "dosis alta"' }
+  ]},
+  { grupo:'Anticoagulantes orales (warfarina)', drugs:[
+    { name:'Warfarina / Acenocumarol (AVK)',
+      aliases:['warfarina','coumadin','acenocumarol','neosintron','neosintrón','avk','cumarinico','inr'],
+      puncion:'Suspender ~5 días antes (acenocumarol 3 días) y confirmar INR ≤1.4 (normalizado).',
+      cateter:'Retirar solo con INR <1.5. Vigilar si el INR está subiendo durante el reinicio.',
+      reinicio:'Puede reiniciarse la misma noche del procedimiento; controlar INR si hay catéter.',
+      mantencion:'Catéter solo mientras el INR sea <1.5; vigilancia neurológica.',
+      monitoreo:'INR.',
+      fuente:'ASRA 2025 (5ª ed) — AVK' }
+  ]},
+  { grupo:'Anticoagulantes orales directos (DOAC)', drugs:[
+    { name:'Rivaroxabán (Xarelto)',
+      aliases:['rivaroxaban','xarelto','doac','noac','anti xa','anti-xa'],
+      puncion:'72 h. Alternativa individualizada: 22–26 h si se documenta nivel residual <30 ng/mL o anti-Xa ≤0,1 UI/mL.',
+      cateter:'Suspender 72 h antes del retiro (o nivel residual aceptable). No mantener catéter con DOAC activo.',
+      reinicio:'6 h tras la punción o el retiro del catéter, si fue atraumática.',
+      mantencion:'No.',
+      monitoreo:'Nivel residual / anti-Xa calibrado (novedad 2025): <30 ng/mL o anti-Xa ≤0,1 UI/mL aceptable.',
+      fuente:'ASRA 2025 (5ª ed) — DOAC anti-Xa' },
+    { name:'Apixabán (Eliquis)',
+      aliases:['apixaban','eliquis','doac','noac','anti xa'],
+      puncion:'72 h. Alternativa: nivel residual <30 ng/mL o anti-Xa ≤0,1 UI/mL.',
+      cateter:'Suspender 72 h antes del retiro. No mantener catéter con DOAC activo.',
+      reinicio:'6 h tras la punción o el retiro del catéter.',
+      mantencion:'No.',
+      monitoreo:'Anti-Xa calibrado para apixabán; reducir dosis en <60 kg o ERC.',
+      fuente:'ASRA 2025 (5ª ed) — DOAC anti-Xa' },
+    { name:'Edoxabán (Lixiana)',
+      aliases:['edoxaban','lixiana','doac','noac'],
+      puncion:'72 h (o nivel residual aceptable).',
+      cateter:'Suspender 72 h antes del retiro.',
+      reinicio:'6 h tras la punción o el retiro del catéter.',
+      mantencion:'No.',
+      monitoreo:'Anti-Xa calibrado.',
+      fuente:'ASRA 2025 (5ª ed) — DOAC anti-Xa' },
+    { name:'Dabigatrán (Pradaxa)',
+      aliases:['dabigatran','pradaxa','doac','noac','inhibidor trombina'],
+      puncion:'72 h si ClCr ≥80. Prolongar en ERC: ClCr 50–80 → ~96 h; 30–50 → ~120 h. O nivel residual <30 ng/mL.',
+      cateter:'Si por error queda catéter in situ: suspender ≥48 h o nivel <30 ng/mL antes de retirarlo.',
+      reinicio:'6 h tras la punción o el retiro del catéter.',
+      mantencion:'No.',
+      monitoreo:'Tiempo de trombina diluido / ecarina. Reversor: idarucizumab (Praxbind).',
+      fuente:'ASRA 2025 (5ª ed) — dabigatrán (ajuste por ClCr)' }
+  ]},
+  { grupo:'Antiagregantes plaquetarios', drugs:[
+    { name:'AAS / Aspirina (monoterapia)',
+      aliases:['aas','aspirina','acido acetilsalicilico','ácido acetilsalicílico','antiagregante'],
+      puncion:'Sin contraindicación para neuroaxial en monoterapia (a cualquier dosis).',
+      cateter:'Sin restricción específica.',
+      reinicio:'Sin restricción.',
+      mantencion:'Catéter mantenible.',
+      monitoreo:'Cautela si se combina con otros antitrombóticos.',
+      fuente:'ASRA 2025 (5ª ed) — AINE/AAS' },
+    { name:'AINEs (ibuprofeno, ketorolaco, etc.)',
+      aliases:['aine','aines','ibuprofeno','ketorolaco','naproxeno','diclofenaco','antiinflamatorio'],
+      puncion:'Sin contraindicación en monoterapia.',
+      cateter:'Sin restricción específica.',
+      reinicio:'Sin restricción.',
+      mantencion:'Catéter mantenible.',
+      monitoreo:'Riesgo aumenta al combinar con otros antitrombóticos.',
+      fuente:'ASRA 2025 (5ª ed) — AINE' },
+    { name:'Clopidogrel (Plavix)',
+      aliases:['clopidogrel','plavix','tienopiridina','antiagregante'],
+      puncion:'5–7 días.',
+      cateter:'Catéter mantenible 1–2 días SOLO si no se administró dosis de carga; idealmente retirar antes.',
+      reinicio:'24 h postprocedimiento si hemostasia adecuada.',
+      mantencion:'Limitada (1–2 días sin dosis de carga).',
+      monitoreo:'—',
+      fuente:'ASRA 2025 (5ª ed) — tienopiridinas' },
+    { name:'Prasugrel (Effient)',
+      aliases:['prasugrel','effient','tienopiridina'],
+      puncion:'7–10 días.',
+      cateter:'NO mantener catéter (inicio de acción rápido).',
+      reinicio:'24 h postprocedimiento.',
+      mantencion:'No.',
+      monitoreo:'—',
+      fuente:'ASRA 2025 (5ª ed) — tienopiridinas' },
+    { name:'Ticagrelor (Brilinta)',
+      aliases:['ticagrelor','brilinta','antiagregante'],
+      puncion:'5 días.',
+      cateter:'NO mantener catéter (inicio de acción rápido).',
+      reinicio:'24 h postprocedimiento.',
+      mantencion:'No.',
+      monitoreo:'—',
+      fuente:'ASRA 2025 (5ª ed)' },
+    { name:'Ticlopidina',
+      aliases:['ticlopidina','tienopiridina'],
+      puncion:'10 días.',
+      cateter:'No mantener.',
+      reinicio:'24 h postprocedimiento.',
+      mantencion:'No.',
+      monitoreo:'—',
+      fuente:'ASRA 2025 (5ª ed) — tienopiridinas' },
+    { name:'Cangrelor (IV)',
+      aliases:['cangrelor','antiagregante iv'],
+      puncion:'3 h.',
+      cateter:'Suspender 3 h antes del retiro.',
+      reinicio:'Tras hemostasia.',
+      mantencion:'No.',
+      monitoreo:'Vida media muy corta (~3–6 min).',
+      fuente:'ASRA 2025 (5ª ed)' },
+    { name:'Inhibidores GP IIb/IIIa (abciximab, eptifibatida, tirofibán)',
+      aliases:['abciximab','eptifibatida','tirofiban','gp iib','iib iiia','inhibidor glicoproteina'],
+      puncion:'Abciximab 24–48 h; eptifibatida/tirofibán 4–8 h (hasta normalizar función plaquetaria).',
+      cateter:'No realizar neuroaxial hasta recuperar función plaquetaria.',
+      reinicio:'Según contexto, con hemostasia.',
+      mantencion:'No.',
+      monitoreo:'Contraindicado en las primeras 4 semanas postcirugía.',
+      fuente:'ASRA 2025 (5ª ed)' },
+    { name:'Dipiridamol / Cilostazol',
+      aliases:['dipiridamol','aggrenox','cilostazol','pletal'],
+      puncion:'Dipiridamol de liberación prolongada: 24 h. Cilostazol: 2 días (~42 h).',
+      cateter:'Retirar antes de reiniciar.',
+      reinicio:'Tras hemostasia; cilostazol 24 h.',
+      mantencion:'Precaución.',
+      monitoreo:'—',
+      fuente:'ASRA 2025 (5ª ed)' }
+  ]},
+  { grupo:'Pentasacáridos y trombolíticos', drugs:[
+    { name:'Fondaparinux (Arixtra) — dosis baja 2,5 mg/d',
+      aliases:['fondaparinux','arixtra','pentasacarido','pentasacárido'],
+      puncion:'36 h (jóvenes) a 42 h (ancianos) con función renal normal. Punción única atraumática.',
+      cateter:'Evitar técnicas con catéter; preferir punción única.',
+      reinicio:'6–12 h postprocedimiento.',
+      mantencion:'No se recomienda catéter.',
+      monitoreo:'Anti-Xa específico; prolongar en ERC.',
+      fuente:'ASRA 2025 (5ª ed) — fondaparinux' },
+    { name:'Trombolíticos (alteplasa, tenecteplasa, estreptoquinasa)',
+      aliases:['tromboliticos','trombolíticos','alteplasa','tenecteplasa','estreptoquinasa','fibrinolitico','fibrinolítico','tpa'],
+      puncion:'CONTRAINDICADO. Evitar neuroaxial ≥10 días tras su uso; idealmente no realizar.',
+      cateter:'No realizar/retirar bajo efecto trombolítico; si ocurrió exposición inadvertida, vigilancia neurológica y medir fibrinógeno.',
+      reinicio:'Individualizar con el equipo tratante.',
+      mantencion:'No.',
+      monitoreo:'Fibrinógeno; vigilancia neurológica frecuente (cada 2 h).',
+      fuente:'ASRA 2025 (5ª ed) — trombolíticos' }
+  ]},
+  { grupo:'Herbáceos y suplementos', drugs:[
+    { name:'Ajo · Ginkgo · Ginseng ("las 3 G")',
+      aliases:['ajo','ginkgo','ginseng','herbaceos','herbáceos','suplementos','hierbas'],
+      puncion:'Sin restricción para neuroaxial en monoterapia (no requieren suspensión obligatoria).',
+      cateter:'Sin restricción específica.',
+      reinicio:'Sin restricción.',
+      mantencion:'Catéter mantenible.',
+      monitoreo:'Cautela si se combinan con antitrombóticos.',
+      fuente:'ASRA 2025 (5ª ed) — herbáceos' }
+  ]}
+];
+
+// Render reutilizable del buscador neuroaxial ASRA 2025.
+// prefix = identificador único de la instancia (ej. 'coag' o 'reg') para no
+// chocar IDs cuando se muestra en dos vistas distintas.
+function renderASRANeuraxial(prefix){
+  const input = document.getElementById('asra_'+prefix+'_search');
+  const cont  = document.getElementById('asra_'+prefix+'_list');
+  if(!cont) return;
+  const q = _gpNorm(input ? input.value : '');
+  let html = '';
+  let total = 0, grupos = 0;
+  ASRA_NEURAXIAL_2025.forEach((sec, si)=>{
+    const drugs = sec.drugs.filter(d=>{
+      if(!q) return true;
+      const hay = _gpNorm(d.name + ' ' + sec.grupo + ' ' + (d.aliases||[]).join(' '));
+      return hay.includes(q);
+    });
+    if(drugs.length === 0) return;
+    total += drugs.length; grupos++;
+    const open = q ? ' open' : '';
+    let inner = '';
+    drugs.forEach(d=>{
+      inner += `
+        <div class="asra-card">
+          <div class="asra-card-name">${d.name}</div>
+          <div class="asra-rows">
+            <div class="asra-row"><div class="asra-k">🩸 Punción neuroaxial / bloqueo profundo</div><div class="asra-v">${d.puncion||'—'}</div></div>
+            <div class="asra-row"><div class="asra-k">🧵 Retiro de catéter</div><div class="asra-v">${d.cateter||'—'}</div></div>
+            <div class="asra-row"><div class="asra-k">🔁 Reiniciar anticoagulación</div><div class="asra-v">${d.reinicio||'—'}</div></div>
+            ${d.mantencion?`<div class="asra-row"><div class="asra-k">📌 Mantención de catéter</div><div class="asra-v">${d.mantencion}</div></div>`:''}
+            ${d.monitoreo?`<div class="asra-row"><div class="asra-k">🔬 Monitoreo / nota</div><div class="asra-v">${d.monitoreo}</div></div>`:''}
+          </div>
+          <div class="asra-src">${d.fuente||'ASRA 2025 (5ª ed)'}</div>
+        </div>`;
+    });
+    html += `
+      <div class="asra-acc${open}" id="asra_${prefix}_acc${si}">
+        <button type="button" class="asra-acc-head" onclick="toggleAsraAcc('${prefix}',${si})">
+          <span class="asra-acc-ico">💉</span>
+          <span class="asra-acc-title">${sec.grupo}</span>
+          <span class="asra-acc-meta">${drugs.length}</span>
+          <span class="asra-acc-chev">›</span>
+        </button>
+        <div class="asra-acc-body">${inner}</div>
+      </div>`;
+  });
+  if(q && total === 0){
+    html = `<div class="asra-empty">Sin resultados para "<b>${(input?input.value:'').replace(/</g,'&lt;')}</b>".<br><span style="font-size:12px;color:var(--muted)">Prueba: enoxaparina, rivaroxabán, clopidogrel, warfarina, fondaparinux…</span></div>`;
+  } else if(q){
+    html = `<div class="asra-count">${total} fármaco${total!==1?'s':''} en ${grupos} grupo${grupos!==1?'s':''}</div>` + html;
+  }
+  cont.innerHTML = html;
+}
+function toggleAsraAcc(prefix, idx){
+  const el = document.getElementById('asra_'+prefix+'_acc'+idx);
+  if(el) el.classList.toggle('open');
+}
+
+// ============================================================
 // ANESTESIA REGIONAL — Bloqueos en traumatología (enlaces NYSORA)
 // Todo el contenido técnico/video es de NYSORA® (acceso público).
 // La app solo enlaza; no aloja ni reproduce su material.
@@ -3509,6 +3760,18 @@ function _aiBuildContext(question){
         const hay = _gpNorm(d.name + ' ' + (d.cat_full||''));
         if(words.some(w => hay.includes(w))){
           matches.push(`[Coagulación·${sec.cat} — FUENTE: ${d.cat_full||'ASRA 2018 / ESAIC 2022 / SACH'}] ${d.name} → Suspender: ${d.pre} | Reiniciar: ${d.post}`);
+        }
+      });
+    });
+  }catch(e){}
+
+  // 1b) Tabla NEUROAXIAL ASRA 2025 (punción / catéter / reinicio)
+  try{
+    ASRA_NEURAXIAL_2025.forEach(sec=>{
+      sec.drugs.forEach(d=>{
+        const hay = _gpNorm(d.name + ' ' + sec.grupo + ' ' + (d.aliases||[]).join(' '));
+        if(words.some(w => hay.includes(w))){
+          matches.push(`[Neuroaxial·${sec.grupo} — FUENTE: ${d.fuente||'ASRA 2025 (5ª ed)'}] ${d.name} → Punción/bloqueo: ${d.puncion} | Retiro de catéter: ${d.cateter} | Reinicio: ${d.reinicio}${d.mantencion?' | Mantención catéter: '+d.mantencion:''}`);
         }
       });
     });
