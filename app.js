@@ -233,10 +233,10 @@ function _renderSyncIndicator(){
     disabled:['Sin backend','#dc2626',''],
   };
   const [label,color,extra] = map[_syncStatus] || ['', '#94a3b8',''];
-  // Mostrar SIEMPRE al admin (diagnóstico). A usuarios normales solo cuando hay actividad real.
+  // SOLO el administrador ve el indicador de sincronización y la config del token.
+  // A los usuarios normales NUNCA se les muestra (es una herramienta técnica).
   const isAdmin = state && state.isAdmin;
-  const interesting = ['syncing','synced','unauthorized','error'].includes(_syncStatus);
-  if(!label || (!isAdmin && !interesting)){ el.style.display = 'none'; return; }
+  if(!isAdmin || !label){ el.style.display = 'none'; return; }
   el.style.display = '';
   el.innerHTML = `<span class="sync-dot ${extra}" style="background:${color}"></span><span class="sync-lbl">${label}</span>`;
 }
@@ -369,7 +369,7 @@ async function pushRemoteState(){
   const token = getBackendToken();
   if(!token){
     _setSyncStatus('unauthorized');
-    if(!window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
+    if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
     return;
   }
   try{
@@ -443,7 +443,7 @@ async function pushRemoteState(){
     });
     if(r.status === 401){
       _setSyncStatus('unauthorized');
-      if(!window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
+      if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
       return;
     }
     if(!r.ok){ _setSyncStatus('error'); return; }
@@ -605,6 +605,9 @@ async function bootSync(){
 }
 
 function promptBackendToken(){
+  // Herramienta exclusiva del administrador. Un usuario normal nunca debe ver
+  // ni el token ni la URL del backend.
+  if(!(state && state.isAdmin)) return;
   const cur = getBackendToken();
   const urlFromInst = (INSTITUTION && INSTITUTION.backendURL) || '';
   const urlFromLocal = localStorage.getItem('appnesthesia_backend_url') || '';
@@ -5921,8 +5924,53 @@ const AGEND_STATE = {
 };
 
 // --- Persistencia ---
+// Convierte un nombre a iniciales con puntos. "Juan Pérez" → "J. P."
+// Si ya parece iniciales (corto, con puntos/mayúsculas), lo deja casi igual.
+function _agendIniciales(texto){
+  const t = String(texto||'').trim();
+  if(!t) return '';
+  // Tomar la primera letra de cada palabra (máx 3), en mayúscula, con puntos.
+  const parts = t.split(/[\s.]+/).filter(Boolean).slice(0,3);
+  const ini = parts.map(p => (p[0]||'').toUpperCase()).filter(Boolean);
+  if(ini.length === 0) return '';
+  return ini.join('. ') + '.';
+}
+
+// Saneador de privacidad: garantiza que ninguna solicitud guarde nombre
+// completo ni RUT. Convierte 'paciente' a iniciales y elimina 'rut'.
+// Idempotente: si ya está minimizado no cambia nada.
+function _agendSanitizeReq(r){
+  if(!r || typeof r !== 'object' || r.deleted) return r;
+  let changed = false;
+  // RUT: nunca debe persistir
+  if(r.rut){ delete r.rut; changed = true; }
+  // paciente: si tiene espacios o más de 8 caracteres, parece nombre → iniciales
+  if(typeof r.paciente === 'string' && /\s/.test(r.paciente.trim()) && r.paciente.trim().length > 4){
+    const ini = _agendIniciales(r.paciente);
+    if(ini && ini !== r.paciente){ r.paciente = ini; changed = true; }
+  } else if(typeof r.paciente === 'string' && r.paciente.trim().length > 8){
+    r.paciente = r.paciente.trim().slice(0,8); changed = true;
+  }
+  if(changed) r.updatedAt = Date.now();
+  return r;
+}
+// Recorre toda la estructura {sala:{fecha:[req]}} y sanea cada solicitud.
+function _agendSanitizeAll(data){
+  if(!data || typeof data !== 'object') return data;
+  Object.keys(data).forEach(salaId=>{
+    const dias = data[salaId]; if(!dias || typeof dias !== 'object') return;
+    Object.keys(dias).forEach(d=>{
+      if(Array.isArray(dias[d])) dias[d].forEach(_agendSanitizeReq);
+    });
+  });
+  return data;
+}
+
 function agendLoadData(){
-  try{ return JSON.parse(localStorage.getItem(AGEND_DATA_LS_KEY) || '{}'); }
+  try{
+    const data = JSON.parse(localStorage.getItem(AGEND_DATA_LS_KEY) || '{}');
+    return _agendSanitizeAll(data); // limpia identificadores antiguos al leer
+  }
   catch(e){ return {}; }
 }
 function agendSaveData(data){
@@ -5996,7 +6044,9 @@ async function agendSyncNow(){
         if(remote && !remote._empty && remote.data) remoteData = remote.data;
       }
     }catch(e){ /* sin conexión: merge con {} no rompe nada */ return false; }
-    const merged = _agendMergeData(remoteData, agendLoadData());
+    // Sanear lo que viene de la nube (puede traer nombres/RUT antiguos) antes de fusionar
+    _agendSanitizeAll(remoteData);
+    const merged = _agendSanitizeAll(_agendMergeData(remoteData, agendLoadData()));
     agendSaveData(merged);
     const token = getBackendToken();
     if(token){
@@ -7271,9 +7321,11 @@ function agendSubmitSolicitud(ev){
   const isAmPm = !!(sala && sala.usesAmPmOnly);
   const tieneCatalogo = !!(sala && Array.isArray(sala.procedimientosCatalogo) && sala.procedimientosCatalogo.length);
 
-  const paciente = document.getElementById('afPaciente').value.trim();
+  // Minimización de datos: por más que escriban un nombre, solo se guardan
+  // iniciales. El RUT no se almacena ni se transmite (privacidad / Ley 19.628).
+  const paciente = _agendIniciales(document.getElementById('afPaciente').value.trim());
   const edad = document.getElementById('afEdad').value.trim();
-  const rut = document.getElementById('afRut').value.trim();
+  const rut = '';
   const notas = document.getElementById('afNotas').value.trim();
   const prio = document.getElementById('afPrioridad').value;
 

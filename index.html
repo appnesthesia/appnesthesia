@@ -55,11 +55,19 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .welcome{margin-bottom:18px}
 .welcome h2{font-size:22px;margin:0 0 4px;font-weight:700;color:var(--primary-dark)}
 .welcome p{margin:0;color:var(--muted);font-size:14px}
-.app-credit{margin-top:28px;padding:18px 12px 10px;text-align:center;border-top:1px solid var(--border);color:var(--muted)}
-.app-credit-name{font-weight:700;color:var(--primary-dark);letter-spacing:.3px;font-size:14px}
-.app-credit-by{font-size:12px;margin-top:4px;opacity:.92}
+.app-credit{margin:26px auto 30px;padding:22px 16px 4px;max-width:420px;text-align:center;color:var(--muted);position:relative}
+.app-credit:before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:46px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--green-sage),transparent)}
+.app-credit-name{font-family:'Manrope','Inter',sans-serif;font-weight:800;color:var(--primary-dark);letter-spacing:1.2px;font-size:15px;text-transform:uppercase}
+.app-credit-by{font-size:12px;margin-top:6px;opacity:.85}
 .app-credit-by b{color:var(--primary-dark);font-weight:600}
-.app-credit-copy{font-size:11px;margin-top:6px;opacity:.7;letter-spacing:.2px}
+.app-credit-copy{font-size:11px;margin-top:8px;opacity:.65;letter-spacing:.3px}
+.app-credit-links{margin-top:12px;font-size:11.5px;display:flex;gap:9px;justify-content:center;align-items:center;flex-wrap:wrap}
+.app-credit-links a{color:var(--green-forest);text-decoration:none;font-weight:600;letter-spacing:.2px}
+.app-credit-links a:hover{text-decoration:underline}
+.app-credit-links span{opacity:.35}
+.mini-credit{margin-top:18px;text-align:center;font-size:10.5px;color:var(--muted);line-height:1.7;opacity:.8;letter-spacing:.2px}
+.mini-credit a{color:var(--green-forest);text-decoration:none;font-weight:600}
+.mini-credit a:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(min-width:600px){.grid{grid-template-columns:repeat(2,1fr)}}
 .grid-section-title{
@@ -1313,6 +1321,10 @@ canvas{max-width:100%}
     <div class="mod-actions">
       <button class="btn" onclick="cambiarInstitucionFromModules()">‹ Cambiar institución</button>
     </div>
+    <div class="mini-credit">
+      © 2026 Appnesthesia · Dr. Fernando Rojas — Todos los derechos reservados<br>
+      <a href="privacy.html" target="_blank" rel="noopener">Privacidad</a> · <a href="terms.html" target="_blank" rel="noopener">Términos</a>
+    </div>
   </div>
 </div>
 
@@ -1381,6 +1393,7 @@ canvas{max-width:100%}
         </div>
       </div>
 
+      <div class="mini-credit" id="gpHomeCredit">© 2026 Appnesthesia · Dr. Fernando Rojas — Todos los derechos reservados<br><a href="privacy.html" target="_blank" rel="noopener">Privacidad</a> · <a href="terms.html" target="_blank" rel="noopener">Términos</a></div>
       <!-- SUB-VISTAS: una activa a la vez (full content por sección) -->
       <div id="gpConsulta" class="gp-section-view">
         <div class="gp-section-view-head">
@@ -1506,6 +1519,7 @@ canvas{max-width:100%}
           <div class="agend-cta-arrow">›</div>
         </button>
       </div>
+      <div class="mini-credit">© 2026 Appnesthesia · Dr. Fernando Rojas — Todos los derechos reservados<br><a href="privacy.html" target="_blank" rel="noopener">Privacidad</a> · <a href="terms.html" target="_blank" rel="noopener">Términos</a></div>
     </div>
 
     <!-- Vista: Login Unidad solicitante -->
@@ -1591,18 +1605,17 @@ canvas{max-width:100%}
           </div>
         </div>
         <div id="afRangoHint" class="agend-form-hint"></div>
-        <label>Nombre del paciente *</label>
-        <input type="text" id="afPaciente" required autocomplete="off" />
+        <label>Iniciales del paciente *</label>
+        <input type="text" id="afPaciente" required autocomplete="off" maxlength="8" placeholder="Ej: J. P." />
+        <div class="agend-form-hint" style="color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin:5px 0 10px;font-size:11.5px;line-height:1.45">🔒 Por privacidad de datos, ingresa <b>solo las iniciales</b> del paciente (no el nombre completo ni el RUT). Es suficiente para coordinar el agendamiento.</div>
         <div class="row2">
           <div>
             <label>Edad</label>
             <input type="number" id="afEdad" min="0" max="120" />
           </div>
-          <div>
-            <label>RUT</label>
-            <input type="text" id="afRut" placeholder="12.345.678-9" autocomplete="off" />
-          </div>
+          <div></div>
         </div>
+        <input type="hidden" id="afRut" value="" />
         <!-- Procedimiento: input libre (default) -->
         <div id="afProcLibreBlock">
           <label>Procedimiento solicitado *</label>
@@ -1804,11 +1817,6 @@ canvas{max-width:100%}
       <p>El asistente de inteligencia artificial de Appnesthesia — consulta fármacos, exámenes y riesgo CV con las tablas de la app</p>
     </button>
   </div>
-  <footer class="app-credit">
-    <div class="app-credit-name">Appnesthesia</div>
-    <div class="app-credit-by">Developed by <b>Dr. Fernando Rojas</b></div>
-    <div class="app-credit-copy">© 2026 — Todos los derechos reservados</div>
-  </footer>
 </section>
 
 <!-- CALENDARIO -->
@@ -2190,6 +2198,17 @@ canvas{max-width:100%}
   </div>
 </section>
 
+
+<footer class="app-credit">
+  <div class="app-credit-name">Appnesthesia</div>
+  <div class="app-credit-by">Desarrollada por <b>Dr. Fernando Rojas</b></div>
+  <div class="app-credit-copy">© 2026 Dr. Fernando Rojas · Todos los derechos reservados</div>
+  <div class="app-credit-links">
+    <a href="privacy.html" target="_blank" rel="noopener">Política de Privacidad</a>
+    <span>·</span>
+    <a href="terms.html" target="_blank" rel="noopener">Términos y Condiciones</a>
+  </div>
+</footer>
 </main>
 
 <!-- CHAT ASISTENTE IA -->
@@ -2216,6 +2235,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=51"></script>
+<script src="app.js?v=54"></script>
 </body>
 </html>
