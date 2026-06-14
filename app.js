@@ -732,7 +732,7 @@ function showView(name){
   if(name==='protocolos') renderProtocols();
   if(name==='mipanel') renderMiPanel();
   if(name==='eventos') renderEventos();
-  if(name==='home'){ updateEventBadge(); try{ updateAgendAdminNotice(); }catch(e){} }
+  if(name==='home'){ updateEventBadge(); try{ updateAgendAdminNotice(); }catch(e){} try{ updatePushBtn(); }catch(e){} }
   if(name==='reloj') relojInit();
   window.scrollTo(0,0);
 }
@@ -773,6 +773,7 @@ function updateAdminUI(){
   document.querySelector('header .role')?.remove();
   // Refrescar indicador de sync (visibilidad depende de isAdmin)
   try{ _renderSyncIndicator(); }catch(e){}
+  try{ updatePushBtn(); }catch(e){}
 }
 
 // ============================================================
@@ -3729,6 +3730,109 @@ function getAiURL(){
   return null;
 }
 function aiAvailable(){ return !!getAiURL(); }
+
+// ============================================================
+// NOTIFICACIONES PUSH REALES (Web Push vía Worker appnesthesia-push)
+// pushURL y vapidPublicKey vienen de configs/<inst>.json.
+// Si no están configuradas, todo queda inactivo sin romper nada.
+// ============================================================
+function getPushURL(){
+  if(INSTITUTION && INSTITUTION.pushURL) return String(INSTITUTION.pushURL).replace(/\/$/,'');
+  return null;
+}
+function getVapidPublic(){
+  return (INSTITUTION && INSTITUTION.vapidPublicKey) || '';
+}
+function pushAvailable(){
+  return !!(getPushURL() && getVapidPublic() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
+}
+function _urlB64ToUint8(base64){
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+// Suscribe ESTE dispositivo para recibir avisos de agendamiento (lo usa el admin).
+async function enablePushNotifications(interactive){
+  if(!pushAvailable()){
+    if(interactive) alert('Las notificaciones push aún no están configuradas en la app.');
+    return false;
+  }
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      if(interactive) alert('Para recibir avisos, permite las notificaciones.\n\nEn iPhone: primero agrega la app a la pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí.');
+      return false;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlB64ToUint8(getVapidPublic())
+      });
+    }
+    const headers = {'Content-Type':'application/json'};
+    try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+    const r = await fetch(getPushURL() + '/api/subscribe', { method:'POST', headers, body: JSON.stringify(sub) });
+    const data = await r.json().catch(()=>null);
+    if(r.ok && data && data.ok){
+      try{ localStorage.setItem('appnesthesia_push_on','1'); }catch(e){}
+      if(interactive) alert('✅ Listo. Recibirás un aviso en este dispositivo cuando llegue una nueva solicitud de agendamiento.');
+      updatePushBtn();
+      return true;
+    }
+    if(interactive) alert('No se pudo activar el aviso: ' + ((data&&data.error)||('HTTP '+r.status)));
+    return false;
+  }catch(e){
+    if(interactive) alert('No se pudo activar el aviso: ' + (e.message||e));
+    return false;
+  }
+}
+async function disablePushNotifications(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      const headers = {'Content-Type':'application/json'};
+      try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+      try{ await fetch(getPushURL() + '/api/unsubscribe', { method:'POST', headers, body: JSON.stringify(sub) }); }catch(e){}
+      await sub.unsubscribe();
+    }
+  }catch(e){}
+  try{ localStorage.removeItem('appnesthesia_push_on'); }catch(e){}
+  updatePushBtn();
+}
+// Dispara el envío de la push a los admin suscritos (al crear una solicitud).
+function notifyAdminsOfNewRequest(){
+  const base = getPushURL();
+  if(!base) return;
+  const headers = {'Content-Type':'application/json'};
+  try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+  try{
+    fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo:'agend-nueva' }) }).catch(()=>{});
+  }catch(e){}
+}
+// Muestra/actualiza el botón de activar avisos (solo admin)
+function updatePushBtn(){
+  const btn = document.getElementById('pushToggleBtn');
+  if(!btn) return;
+  const isAdmin = state && state.isAdmin;
+  if(!isAdmin || !pushAvailable()){ btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  let on = false;
+  try{ on = localStorage.getItem('appnesthesia_push_on')==='1'; }catch(e){}
+  btn.textContent = on ? '🔔 Avisos activados en este dispositivo' : '🔕 Activar avisos de agendamiento';
+  btn.classList.toggle('on', on);
+}
+function togglePushFromBtn(){
+  let on = false;
+  try{ on = localStorage.getItem('appnesthesia_push_on')==='1'; }catch(e){}
+  if(on) disablePushNotifications();
+  else enablePushNotifications(true);
+}
 
 // --- Base de conocimiento de ARIA (configs/aria-conocimiento.json) ---
 // Guías y resúmenes que el equipo agrega; ARIA los usa como contexto.
@@ -7502,6 +7606,7 @@ function agendSubmitSolicitud(ev){
   data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
   agendScheduleSync(); // subir la nueva solicitud a la nube
+  notifyAdminsOfNewRequest(); // push real al admin (si está configurado)
   // Limpiar flag Extra
   AGEND_STATE.formIsExtra = false;
   alert(isExtra

@@ -7,7 +7,7 @@
 //   - skipWaiting + clients.claim → reemplaza al SW anterior sin esperar
 //     a que el usuario cierre todas las pestañas.
 
-const CACHE = 'anestesia-v55';
+const CACHE = 'anestesia-v56';
 const ASSETS = [
   './',
   './index.html',
@@ -86,4 +86,45 @@ self.addEventListener('fetch', e => {
 // Permite forzar refresco desde la app si se necesita
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// ============================================================
+// NOTIFICACIONES PUSH
+// El envío es SIN payload (no viaja info de paciente). Mostramos un
+// aviso genérico; el admin abre la app para ver el detalle.
+// ============================================================
+self.addEventListener('push', e => {
+  let titulo = '📋 Appnesthesia';
+  let cuerpo = 'Nueva solicitud de agendamiento. Toca para revisar.';
+  // Si en el futuro se envía payload, se usa; si no, queda el genérico.
+  try {
+    if (e.data) {
+      const d = e.data.json();
+      if (d && d.title) titulo = d.title;
+      if (d && d.body) cuerpo = d.body;
+    }
+  } catch (err) { /* sin payload → genérico */ }
+  e.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: cuerpo,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'agend-nueva',
+      renotify: true,
+      data: { url: './' }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cl => {
+      for (const c of cl) {
+        if ('focus' in c) { c.focus(); return; }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });

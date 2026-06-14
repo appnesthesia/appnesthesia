@@ -68,6 +68,9 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .mini-credit{margin-top:18px;text-align:center;font-size:10.5px;color:var(--muted);line-height:1.7;opacity:.8;letter-spacing:.2px}
 .mini-credit a{color:var(--green-forest);text-decoration:none;font-weight:600}
 .mini-credit a:hover{text-decoration:underline}
+.push-toggle-btn{width:100%;margin:0 0 12px;padding:11px 14px;border-radius:12px;border:1.5px solid #c7d2fe;background:linear-gradient(135deg,#eef2ff,#e0e7ff);color:#3730a3;font-weight:700;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+.push-toggle-btn:hover{border-color:#818cf8;background:#e0e7ff}
+.push-toggle-btn.on{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-color:#86efac;color:#15803d}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(min-width:600px){.grid{grid-template-columns:repeat(2,1fr)}}
 .grid-section-title{
@@ -1739,6 +1742,7 @@ canvas{max-width:100%}
     </div>
     <span style="color:#ea580c;font-size:18px;font-weight:700">›</span>
   </div>
+  <button type="button" id="pushToggleBtn" class="push-toggle-btn" style="display:none" onclick="togglePushFromBtn()">🔕 Activar avisos de agendamiento</button>
   <div class="grid">
     <button class="card c2" onclick="showView('mipanel')" style="grid-column:span 2">
       <div class="ico"><svg viewBox="0 0 24 24"><circle class="shield-body" cx="12" cy="8" r="4"/><path class="shield-body" d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div>
@@ -2235,6 +2239,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>
