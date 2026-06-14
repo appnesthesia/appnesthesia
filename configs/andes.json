@@ -8,6 +8,8 @@
   "backendURL": "https://anestesia-app-backend.fernandorojasbravo.workers.dev",
   "backendToken": "pollo1902",
   "aiURL": "https://appnesthesia-ia.fernandorojasbravo.workers.dev",
+  "pushURL": "https://appnesthesia-push.fernandorojasbravo.workers.dev",
+  "vapidPublicKey": "BLJucKzmwttsEwTq0z1N2EEQtZ4GdGpxVnIWw9Jun3Q4txfAF74M17gWmjiELUiygrP83meCEyYziqaLAQbnj1o",
   "turnstileSiteKey": "",
   "horarioEmbedURL": "https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc",
   "staff": [
