@@ -724,7 +724,7 @@ function showView(name){
     document.querySelectorAll('#view-pediatria .calc-block').forEach(d => d.removeAttribute('open'));
   }
   if(name==='coagulacion'){ renderCoagulacion(); try{ renderASRANeuraxial('coag'); }catch(e){} }
-  if(name==='regional'){ renderRegional(); try{ renderASRANeuraxial('reg'); }catch(e){} }
+  if(name==='regional'){ _regSel=null; renderRegional(); try{ renderASRANeuraxial('reg'); }catch(e){} }
   if(name==='intercambios') renderExchanges();
   if(name==='vacaciones') renderVacations();
   if(name==='estadisticas') renderStats();
@@ -3663,57 +3663,98 @@ const REGIONAL_DATA = [
 
 const REGIONAL_TRAUMA_LINK = 'https://www.nysora.com/topics/sub-specialties/trauma/regional-anesthesia-patients-trauma/';
 
+let _regSel = null; // región seleccionada (índice) o null = grilla de zonas
+
+// Ilustración SVG de la zona del cuerpo, con la región resaltada.
+function _regBodySVG(idx){
+  const base = '#d3d1de', hi = '#6b5fa0';
+  const c = on => on ? hi : base;
+  const arms = idx===0, thigh = idx===1, lower = idx===2, torso = idx===3;
+  return `<svg viewBox="0 0 48 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="24" cy="10" r="6.5" fill="${base}"/>
+    <line x1="24" y1="18" x2="24" y2="46" stroke="${c(torso)}" stroke-width="15" stroke-linecap="round"/>
+    <line x1="23" y1="24" x2="9"  y2="45" stroke="${c(arms)}"  stroke-width="6"  stroke-linecap="round"/>
+    <line x1="25" y1="24" x2="39" y2="45" stroke="${c(arms)}"  stroke-width="6"  stroke-linecap="round"/>
+    <line x1="22" y1="46" x2="18" y2="66" stroke="${c(thigh)}" stroke-width="7.5" stroke-linecap="round"/>
+    <line x1="26" y1="46" x2="30" y2="66" stroke="${c(thigh)}" stroke-width="7.5" stroke-linecap="round"/>
+    <line x1="18" y1="66" x2="17" y2="88" stroke="${c(lower)}" stroke-width="6"  stroke-linecap="round"/>
+    <line x1="30" y1="66" x2="31" y2="88" stroke="${c(lower)}" stroke-width="6"  stroke-linecap="round"/>
+  </svg>`;
+}
+
+function _regBlockCardHTML(b){
+  const videoBtn = b.video
+    ? `<a class="reg-link reg-link-video" href="${b.video}" target="_blank" rel="noopener">▶ Ver video (NYSORA)</a>`
+    : '';
+  return `
+    <div class="reg-block">
+      <div class="reg-block-name">${b.name}</div>
+      <div class="reg-block-cir"><span class="reg-block-tag">Indicación</span> ${b.cirugias}</div>
+      <div class="reg-block-perlas">${b.perlas}</div>
+      <div class="reg-links">
+        <a class="reg-link" href="${b.url}" target="_blank" rel="noopener">📖 Técnica (NYSORA)</a>
+        ${videoBtn}
+      </div>
+    </div>`;
+}
+
 function renderRegional(){
   const q = _gpNorm(document.getElementById('regSearch')?.value || '');
   const cont = document.getElementById('regList');
   if(!cont) return;
   let html = '';
-  let total = 0;
-  REGIONAL_DATA.forEach((sec, si)=>{
-    const blocks = sec.blocks.filter(b=>{
-      if(!q) return true;
-      return _gpNorm(b.name + ' ' + b.cirugias + ' ' + b.perlas).includes(q);
+
+  // 1) BÚSQUEDA activa → lista plana de coincidencias (todas las zonas)
+  if(q){
+    let total = 0;
+    REGIONAL_DATA.forEach(sec=>{
+      const blocks = sec.blocks.filter(b => _gpNorm(b.name+' '+b.cirugias+' '+b.perlas).includes(q));
+      if(!blocks.length) return;
+      total += blocks.length;
+      html += `<div class="reg-zona-titulo">${sec.ico} ${sec.region}</div>` + blocks.map(_regBlockCardHTML).join('');
     });
-    if(blocks.length === 0) return;
-    total += blocks.length;
-    const open = q ? ' open' : '';
-    let inner = '';
-    blocks.forEach(b=>{
-      const videoBtn = b.video
-        ? `<a class="reg-link reg-link-video" href="${b.video}" target="_blank" rel="noopener">▶ Ver video (NYSORA)</a>`
-        : '';
-      inner += `
-        <div class="reg-block">
-          <div class="reg-block-name">${b.name}</div>
-          <div class="reg-block-cir"><span class="reg-block-tag">Indicación</span> ${b.cirugias}</div>
-          <div class="reg-block-perlas">${b.perlas}</div>
-          <div class="reg-links">
-            <a class="reg-link" href="${b.url}" target="_blank" rel="noopener">📖 Técnica (NYSORA)</a>
-            ${videoBtn}
-          </div>
-        </div>`;
-    });
-    html += `
-      <div class="reg-acc${open}" id="regAcc${si}">
-        <button type="button" class="reg-acc-head" onclick="toggleRegAcc(${si})">
-          <span class="reg-acc-ico">${sec.ico}</span>
-          <span class="reg-acc-title">${sec.region}</span>
-          <span class="reg-acc-meta">${blocks.length}</span>
-          <span class="reg-acc-chev">›</span>
-        </button>
-        <div class="reg-acc-body">${inner}</div>
-      </div>`;
-  });
-  if(q && total === 0){
-    html = `<div class="reg-empty">Sin resultados para esa búsqueda.<br><span style="font-size:12px;color:var(--muted)">Prueba con: hombro, codo, mano, cadera, fémur, rodilla, tobillo, costillas, PENG…</span></div>`;
+    if(total === 0){
+      html = `<div class="reg-empty">Sin resultados.<br><span style="font-size:12px;color:var(--muted)">Prueba: hombro, codo, mano, cadera, fémur, rodilla, tobillo, costillas, PENG…</span></div>`;
+    }
+    cont.innerHTML = html + `<a class="reg-trauma-link" href="${REGIONAL_TRAUMA_LINK}" target="_blank" rel="noopener">🩹 Guía NYSORA: trauma ›</a>`;
+    return;
   }
+
+  // 2) REGIÓN seleccionada → detalle con botón Volver
+  if(_regSel !== null && REGIONAL_DATA[_regSel]){
+    const sec = REGIONAL_DATA[_regSel];
+    html += `<button type="button" class="reg-back" onclick="regBackToGrid()">‹ Volver a las zonas</button>`;
+    html += `<div class="reg-detalle-head"><div class="reg-detalle-fig">${_regBodySVG(_regSel)}</div><div class="reg-detalle-tit">${sec.region}</div></div>`;
+    html += sec.blocks.map(_regBlockCardHTML).join('');
+    html += `<a class="reg-trauma-link" href="${REGIONAL_TRAUMA_LINK}" target="_blank" rel="noopener">🩹 Guía NYSORA: trauma ›</a>`;
+    cont.innerHTML = html;
+    return;
+  }
+
+  // 3) GRILLA de zonas (botones con imagen del cuerpo)
+  html += `<div class="reg-zona-grid">`;
+  REGIONAL_DATA.forEach((sec, si)=>{
+    html += `
+      <button type="button" class="reg-zona-card" onclick="regSelectRegion(${si})">
+        <div class="reg-zona-fig">${_regBodySVG(si)}</div>
+        <div class="reg-zona-name">${sec.region}</div>
+        <div class="reg-zona-count">${sec.blocks.length} bloqueo${sec.blocks.length!==1?'s':''}</div>
+      </button>`;
+  });
+  html += `</div>`;
   html += `<a class="reg-trauma-link" href="${REGIONAL_TRAUMA_LINK}" target="_blank" rel="noopener">🩹 Guía NYSORA: Anestesia Regional en el paciente con trauma ›</a>`;
   cont.innerHTML = html;
 }
-function toggleRegAcc(idx){
-  const el = document.getElementById('regAcc'+idx);
-  if(el) el.classList.toggle('open');
+function regSelectRegion(idx){
+  _regSel = idx;
+  renderRegional();
+  try{ document.getElementById('view-regional').scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){}
 }
+function regBackToGrid(){
+  _regSel = null;
+  renderRegional();
+}
+function toggleRegAcc(idx){ /* compat */ }
 
 // ============================================================
 // ASISTENTE DE IA (Cloudflare Workers AI vía Worker propio)
@@ -6017,23 +6058,22 @@ const AGEND_SALAS = [
     schedule: {
       3:{start:'08:00', end:'14:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: [],
+    // Comparten un solo anestesiólogo → se bloquean entre sí (cola)
+    blockedByOtherSalas: ['accesos_vasculares','neurologia','oncohemato','dental','fuera_sala'],
     allowsExtra: true,
     allowsParallelExtra: false
   },
   {
     id:'accesos_vasculares', name:'Accesos Vasculares', ico:'💉', color:'#0D9488',
     desc:'PICC, MidLine, CVC, catéter de diálisis transitorio, vía venosa periférica',
-    // Disponible de lunes a sábado, ambos bloques AM y PM
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: [],
+    blockedByOtherSalas: ['imagenologia','neurologia','oncohemato','dental','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false,
-    usesAmPmOnly: true,
     procedimientosCatalogo: [
       'Vía Venosa Periférica',
       'PICC Line',
@@ -6050,7 +6090,7 @@ const AGEND_SALAS = [
     id:'dental', name:'Dental', ico:'🦷', color:'#F59E0B',
     desc:'Sedación dental',
     schedule: { 6:{start:'08:00', end:'14:00'} },
-    blockedByOtherSalas: [],
+    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','oncohemato','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false
   },
@@ -6060,9 +6100,9 @@ const AGEND_SALAS = [
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
-      5:{start:'08:00', end:'20:00'}
+      5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['endoscopia','imagenologia'],
+    blockedByOtherSalas: ['accesos_vasculares','imagenologia','oncohemato','dental','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false
   },
@@ -6072,10 +6112,22 @@ const AGEND_SALAS = [
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
-      5:{start:'08:00', end:'20:00'}
+      5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['endoscopia','imagenologia'],
+    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','dental','fuera_sala'],
     allowsExtra: false,
+    allowsParallelExtra: false
+  },
+  {
+    id:'fuera_sala', name:'Fuera de Sala', ico:'📍', color:'#64748B',
+    desc:'Procedimientos fuera de pabellón / otras unidades — indica fecha y horario preferible',
+    schedule: {
+      1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
+      3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
+      5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
+    },
+    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','oncohemato','dental'],
+    allowsExtra: true,
     allowsParallelExtra: false
   },
   {

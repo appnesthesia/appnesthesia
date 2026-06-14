@@ -68,8 +68,8 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .mini-credit{margin-top:18px;text-align:center;font-size:10.5px;color:var(--muted);line-height:1.7;opacity:.8;letter-spacing:.2px}
 .mini-credit a{color:var(--green-forest);text-decoration:none;font-weight:600}
 .mini-credit a:hover{text-decoration:underline}
-.push-toggle-btn{width:100%;margin:0 0 12px;padding:11px 14px;border-radius:12px;border:1.5px solid #c7d2fe;background:linear-gradient(135deg,#eef2ff,#e0e7ff);color:#3730a3;font-weight:700;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
-.push-toggle-btn:hover{border-color:#818cf8;background:#e0e7ff}
+.push-toggle-btn{width:100%;margin:0 0 12px;padding:11px 14px;border-radius:12px;border:1.5px solid #d8d3e7;background:linear-gradient(135deg,#f1eff7,#ece9f4);color:#4b4475;font-weight:700;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+.push-toggle-btn:hover{border-color:#9d93c0;background:#ece9f4}
 .push-toggle-btn.on{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-color:#86efac;color:#15803d}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(min-width:600px){.grid{grid-template-columns:repeat(2,1fr)}}
@@ -140,7 +140,7 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .card.c10 .ico svg .evt-star{fill:#fbbf24;stroke:#fff;stroke-width:1}
 .card.c11 .ico svg .reg-needle{stroke:#e5e7eb;stroke-width:2.4;stroke-linecap:round;fill:none}
 .card.c11 .ico svg .reg-hub{fill:#dc2626;stroke:#fff;stroke-width:1.2}
-.card.c11 .ico svg .reg-wave{stroke:#bfdbfe;stroke-width:2;fill:none;stroke-linecap:round;opacity:.95}
+.card.c11 .ico svg .reg-wave{stroke:#d8d3e7;stroke-width:2;fill:none;stroke-linecap:round;opacity:.95}
 
 /* SVG colorizados por temática */
 /* Calendario (c1) — Horario en línea */
@@ -148,7 +148,7 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .card.c1 .ico svg .cal-header{fill:#dc2626;stroke:none}
 .card.c1 .ico svg .cal-ring{stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round}
 .card.c1 .ico svg .cal-dot1{fill:#16a34a;stroke:none}
-.card.c1 .ico svg .cal-dot2{fill:#2563eb;stroke:none}
+.card.c1 .ico svg .cal-dot2{fill:#6b5fa0;stroke:none}
 .card.c1 .ico svg .cal-dot3{fill:#f59e0b;stroke:none}
 
 /* Ranking podio (c2) — Índice de Permanencia */
@@ -742,7 +742,7 @@ canvas{max-width:100%}
 .gp-callout strong{font-weight:700}
 .gp-callout.danger{background:#fef2f2;border-left-color:#dc2626;color:#7f1d1d}
 .gp-callout.warning{background:#fffbeb;border-left-color:#d97706;color:#78350f}
-.gp-callout.info{background:#eff6ff;border-left-color:#2563eb;color:#1e3a8a}
+.gp-callout.info{background:#eff6ff;border-left-color:#6b5fa0;color:#423c63}
 
 /* Algoritmo AHA/ACC */
 .gp-algoritmo{counter-reset:step;list-style:none;padding:0;margin:8px 0 12px;display:flex;flex-direction:column;gap:8px}
@@ -826,7 +826,7 @@ canvas{max-width:100%}
 
 .gp-calc-recs{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
 .gp-calc-rec{padding:10px 12px;background:#fafffd;border-left:4px solid var(--green-forest);border-radius:8px;font-size:13px;line-height:1.55;color:var(--text)}
-.gp-calc-rec-cf{background:#eff6ff;border-left-color:#2563eb}
+.gp-calc-rec-cf{background:#eff6ff;border-left-color:#6b5fa0}
 .gp-calc-rec-cf strong{color:#1d4ed8}
 .gp-calc-rec strong{color:var(--primary-dark);font-weight:700;margin-right:4px}
 
@@ -840,7 +840,7 @@ canvas{max-width:100%}
 .gp-calc-block.pedir strong{color:#15803d}
 .gp-calc-block.danger{background:#fef2f2;border-left-color:#dc2626;color:#7f1d1d}
 .gp-calc-block.danger strong{color:#b91c1c}
-.gp-calc-block.info{background:#eff6ff;border-left-color:#2563eb;color:#1e3a8a}
+.gp-calc-block.info{background:#eff6ff;border-left-color:#6b5fa0;color:#423c63}
 .gp-calc-block.info strong{color:#1d4ed8}
 .gp-calc-block.evitar{background:#f8fafc;border-left-color:#94a3b8;color:#475569}
 .gp-calc-block.nota{background:#fffbeb;border-left-color:#d97706;color:#78350f}
@@ -869,44 +869,60 @@ canvas{max-width:100%}
 }
 
 /* ============ ASRA 2025 — Buscador neuroaxial ============ */
-.asra-block{background:linear-gradient(180deg,#f5f8ff,#eef2ff);border:1.5px solid #c7d2fe;border-radius:16px;padding:14px;margin:4px 0 16px;box-shadow:0 3px 12px rgba(79,70,229,.10)}
+.asra-block{background:linear-gradient(180deg,#f7f6fb,#f1eff7);border:1.5px solid #d8d3e7;border-radius:16px;padding:14px;margin:4px 0 16px;box-shadow:0 3px 12px rgba(107,95,160,.10)}
 .asra-block-head{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
-.asra-badge{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:11px;font-weight:800;letter-spacing:.4px;padding:4px 10px;border-radius:8px;white-space:nowrap}
-.asra-block-title{font-weight:800;font-size:14.5px;color:#312e81;font-family:'Manrope','Inter',sans-serif}
-.asra-block-sub{font-size:12.5px;color:#4338ca;line-height:1.5;margin:0 0 11px}
-.asra-block-sub b{color:#312e81}
+.asra-badge{background:linear-gradient(135deg,#6b5fa0,#5f5391);color:#fff;font-size:11px;font-weight:800;letter-spacing:.4px;padding:4px 10px;border-radius:8px;white-space:nowrap}
+.asra-block-title{font-weight:800;font-size:14.5px;color:#423c63;font-family:'Manrope','Inter',sans-serif}
+.asra-block-sub{font-size:12.5px;color:#564d83;line-height:1.5;margin:0 0 11px}
+.asra-block-sub b{color:#423c63}
 .asra-search{margin:0 0 12px}
-.asra-search input{width:100%;padding:13px 14px;font-size:15px;border:1.5px solid #a5b4fc;border-radius:11px;font-family:inherit;background:#fff;box-shadow:inset 0 1px 3px rgba(49,46,129,.06)}
-.asra-search input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
-.asra-count{font-size:12.5px;font-weight:700;color:#3730a3;background:#e0e7ff;border:1.5px solid #c7d2fe;border-radius:10px;padding:8px 12px;margin-bottom:10px}
-.asra-acc{background:#fff;border:1.5px solid #c7d2fe;border-radius:12px;margin:0 0 9px;overflow:hidden}
-.asra-acc-head{display:flex;align-items:center;gap:10px;width:100%;padding:12px 13px;background:linear-gradient(180deg,#fbfcff,#f1f3ff);border:none;cursor:pointer;font-family:inherit;text-align:left;color:inherit}
-.asra-acc-head:hover{background:#eef2ff}
-.asra-acc-ico{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.asra-acc-title{flex:1;font-weight:800;font-size:13px;color:#312e81;font-family:'Manrope','Inter',sans-serif;line-height:1.3}
-.asra-acc-meta{font-size:11px;color:#4338ca;font-weight:700;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:8px;padding:3px 8px}
-.asra-acc-chev{color:#6366f1;font-size:19px;font-weight:700;transition:transform .2s;flex-shrink:0}
+.asra-search input{width:100%;padding:13px 14px;font-size:15px;border:1.5px solid #c5bfdc;border-radius:11px;font-family:inherit;background:#fff;box-shadow:inset 0 1px 3px rgba(66,60,99,.06)}
+.asra-search input:focus{outline:none;border-color:#7d72ab;box-shadow:0 0 0 3px rgba(125,114,171,.18)}
+.asra-count{font-size:12.5px;font-weight:700;color:#4b4475;background:#ece9f4;border:1.5px solid #d8d3e7;border-radius:10px;padding:8px 12px;margin-bottom:10px}
+.asra-acc{background:#fff;border:1.5px solid #d8d3e7;border-radius:12px;margin:0 0 9px;overflow:hidden}
+.asra-acc-head{display:flex;align-items:center;gap:10px;width:100%;padding:12px 13px;background:linear-gradient(180deg,#fcfbfe,#f2f0f8);border:none;cursor:pointer;font-family:inherit;text-align:left;color:inherit}
+.asra-acc-head:hover{background:#f1eff7}
+.asra-acc-ico{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6b5fa0,#5f5391);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.asra-acc-title{flex:1;font-weight:800;font-size:13px;color:#423c63;font-family:'Manrope','Inter',sans-serif;line-height:1.3}
+.asra-acc-meta{font-size:11px;color:#564d83;font-weight:700;background:#ece9f4;border:1px solid #d8d3e7;border-radius:8px;padding:3px 8px}
+.asra-acc-chev{color:#7d72ab;font-size:19px;font-weight:700;transition:transform .2s;flex-shrink:0}
 .asra-acc.open .asra-acc-chev{transform:rotate(90deg)}
 .asra-acc-body{display:none;padding:8px 12px 12px}
 .asra-acc.open .asra-acc-body{display:block;animation:gpAccFade .18s ease}
-.asra-card{border:1px solid #e0e7ff;border-radius:11px;padding:11px 12px;margin:8px 0;background:#fafbff}
-.asra-card-name{font-weight:800;font-size:13.5px;color:#312e81;font-family:'Manrope','Inter',sans-serif;margin-bottom:8px;line-height:1.35}
+.asra-card{border:1px solid #ece9f4;border-radius:11px;padding:11px 12px;margin:8px 0;background:#f9f8fc}
+.asra-card-name{font-weight:800;font-size:13.5px;color:#423c63;font-family:'Manrope','Inter',sans-serif;margin-bottom:8px;line-height:1.35}
 .asra-rows{display:flex;flex-direction:column;gap:7px}
-.asra-row{display:grid;grid-template-columns:1fr;gap:2px;padding:7px 9px;border-radius:8px;background:#fff;border-left:3px solid #818cf8}
-.asra-k{font-size:11px;font-weight:800;color:#4338ca;text-transform:uppercase;letter-spacing:.3px}
+.asra-row{display:grid;grid-template-columns:1fr;gap:2px;padding:7px 9px;border-radius:8px;background:#fff;border-left:3px solid #9d93c0}
+.asra-k{font-size:11px;font-weight:800;color:#564d83;text-transform:uppercase;letter-spacing:.3px}
 .asra-v{font-size:13px;color:var(--text);line-height:1.5}
 .asra-row:nth-child(1){border-left-color:#dc2626}
 .asra-row:nth-child(2){border-left-color:#d97706}
 .asra-row:nth-child(3){border-left-color:#16a34a}
-.asra-src{margin-top:9px;font-size:11px;color:#6366f1;font-style:italic}
-.asra-empty{padding:20px 14px;text-align:center;font-size:14px;color:var(--text);background:#fff;border:1.5px dashed #c7d2fe;border-radius:12px;line-height:1.6}
-.asra-src-note{margin-top:10px;font-size:11px;color:#6366f1;line-height:1.5;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #e0e7ff}
+.asra-src{margin-top:9px;font-size:11px;color:#7d72ab;font-style:italic}
+.asra-empty{padding:20px 14px;text-align:center;font-size:14px;color:var(--text);background:#fff;border:1.5px dashed #d8d3e7;border-radius:12px;line-height:1.6}
+.asra-src-note{margin-top:10px;font-size:11px;color:#7d72ab;line-height:1.5;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ece9f4}
 .asra-legacy{margin-top:8px;border:1px solid var(--border);border-radius:12px;background:#fafbfc;padding:0 12px}
 .asra-legacy summary{cursor:pointer;padding:13px 2px;font-weight:700;font-size:13px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;list-style:none}
 .asra-legacy summary::-webkit-details-marker{display:none}
 .asra-legacy summary:before{content:'▸ ';color:var(--green-forest)}
 .asra-legacy[open] summary:before{content:'▾ '}
 .asra-legacy[open]{padding-bottom:12px}
+
+/* ===== Regional · grilla de zonas del cuerpo ===== */
+.reg-zona-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:4px 0 14px}
+.reg-zona-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;background:linear-gradient(180deg,#fafffd,#f1f8f4);border:1.5px solid var(--green-pale);border-radius:15px;cursor:pointer;font-family:inherit;transition:all .15s}
+.reg-zona-card:hover{border-color:var(--green-forest);transform:translateY(-2px);box-shadow:0 8px 18px -6px rgba(15,68,53,.20)}
+.reg-zona-card:active{transform:scale(.98)}
+.reg-zona-fig{width:54px;height:auto}
+.reg-zona-fig svg{width:54px;height:108px}
+.reg-zona-name{font-weight:800;font-size:12.5px;color:var(--primary-dark);text-align:center;line-height:1.25;font-family:'Manrope','Inter',sans-serif}
+.reg-zona-count{font-size:11px;color:var(--muted);font-weight:600}
+.reg-back{background:transparent;border:none;color:var(--green-forest);font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;padding:4px 0 10px}
+.reg-detalle-head{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 12px;background:linear-gradient(135deg,#f0faf5,#e6f4ee);border-radius:13px;border:1px solid var(--green-pale)}
+.reg-detalle-fig{width:34px;flex-shrink:0}
+.reg-detalle-fig svg{width:34px;height:68px}
+.reg-detalle-tit{font-weight:800;font-size:15px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.25}
+.reg-zona-titulo{font-weight:800;font-size:13px;color:var(--primary-dark);margin:14px 0 8px;font-family:'Manrope','Inter',sans-serif}
 
 /* ============ ANESTESIA REGIONAL (NYSORA) ============ */
 #view-regional .reg-search{margin:4px 0 14px;padding:12px;background:linear-gradient(135deg,#0f4435,#2e8b6b);border-radius:14px;box-shadow:0 5px 16px rgba(15,68,53,.28)}
@@ -934,33 +950,33 @@ canvas{max-width:100%}
 .reg-link-video{background:linear-gradient(135deg,#dc2626,#b91c1c);border-color:#dc2626;color:#fff;box-shadow:0 2px 6px rgba(220,38,38,.25)}
 .reg-link-video:hover{filter:brightness(1.08);background:linear-gradient(135deg,#dc2626,#b91c1c)}
 .reg-empty{padding:22px 14px;text-align:center;font-size:14px;color:var(--text);background:#fff;border:1.5px dashed var(--green-pale);border-radius:13px;line-height:1.6}
-.reg-trauma-link{display:block;margin-top:6px;padding:13px 14px;border-radius:12px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1.5px solid #93c5fd;color:#1e40af;font-weight:700;font-size:13px;text-decoration:none;text-align:center}
-.reg-trauma-link:hover{background:#dbeafe}
+.reg-trauma-link{display:block;margin-top:6px;padding:13px 14px;border-radius:12px;background:linear-gradient(135deg,#eff6ff,#e7e4f1);border:1.5px solid #c5bfdc;color:#4b4475;font-weight:700;font-size:13px;text-decoration:none;text-align:center}
+.reg-trauma-link:hover{background:#e7e4f1}
 .reg-credit{margin-top:14px;font-size:11px;color:var(--muted);line-height:1.5;padding:11px 12px;background:#fafbfc;border:1px solid var(--border);border-radius:10px}
 .reg-credit a{color:var(--primary);font-weight:700;text-decoration:none}
 
 /* ============ ASISTENTE IA ============ */
 /* Botón ARIA de cabecera (todas las pantallas) */
 .aria-btn{width:38px;height:38px;border-radius:50%;border:none;padding:0;cursor:pointer;background:transparent;flex-shrink:0;position:relative;animation:ariaGlow 3s ease-in-out infinite}
-.aria-btn img{width:100%;height:100%;border-radius:50%;display:block;box-shadow:0 2px 8px rgba(124,58,237,.40)}
+.aria-btn img{width:100%;height:100%;border-radius:50%;display:block;box-shadow:0 2px 8px rgba(107,95,160,.40)}
 .aria-btn:hover{transform:scale(1.08)}
 .aria-btn:active{transform:scale(.96)}
-@keyframes ariaGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(124,58,237,0))}50%{filter:drop-shadow(0 0 7px rgba(139,92,246,.55))}}
+@keyframes ariaGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(107,95,160,0))}50%{filter:drop-shadow(0 0 7px rgba(133,121,173,.55))}}
 /* Pill ARIA en el selector de módulos */
-.aria-pill{display:flex;align-items:center;gap:11px;width:100%;margin-top:12px;padding:11px 13px;border-radius:14px;border:1.5px solid #c4b5fd;background:linear-gradient(135deg,#f5f3ff,#ede9fe);cursor:pointer;font-family:inherit;text-align:left;transition:all .15s}
-.aria-pill:hover{border-color:#8b5cf6;background:linear-gradient(135deg,#ede9fe,#ddd6fe);transform:translateY(-1px);box-shadow:0 6px 14px -3px rgba(124,58,237,.25)}
-.aria-pill img{width:40px;height:40px;border-radius:11px;flex-shrink:0;box-shadow:0 2px 8px rgba(124,58,237,.35)}
-.aria-pill-txt{flex:1;min-width:0;font-size:13.5px;color:#4c1d95;line-height:1.3}
+.aria-pill{display:flex;align-items:center;gap:11px;width:100%;margin-top:12px;padding:11px 13px;border-radius:14px;border:1.5px solid #c4b5fd;background:linear-gradient(135deg,#f5f3ff,#efedf5);cursor:pointer;font-family:inherit;text-align:left;transition:all .15s}
+.aria-pill:hover{border-color:#8579ad;background:linear-gradient(135deg,#efedf5,#ddd7ec);transform:translateY(-1px);box-shadow:0 6px 14px -3px rgba(107,95,160,.25)}
+.aria-pill img{width:40px;height:40px;border-radius:11px;flex-shrink:0;box-shadow:0 2px 8px rgba(107,95,160,.35)}
+.aria-pill-txt{flex:1;min-width:0;font-size:13.5px;color:#423c63;line-height:1.3}
 .aria-pill-txt b{font-weight:800}
-.aria-pill-sub{display:block;font-size:11.5px;color:#7c3aed;margin-top:2px;font-weight:500}
-.aria-pill-arrow{color:#7c3aed;font-size:20px;font-weight:700;flex-shrink:0}
+.aria-pill-sub{display:block;font-size:11.5px;color:#5f5391;margin-top:2px;font-weight:500}
+.aria-pill-arrow{color:#5f5391;font-size:20px;font-weight:700;flex-shrink:0}
 
 .ai-chat-overlay{position:fixed;inset:0;background:rgba(8,28,21,.55);backdrop-filter:blur(3px);z-index:11000;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:640px){.ai-chat-overlay{align-items:center}}
 .ai-chat-overlay.hidden{display:none!important}
 .ai-chat-box{background:#fff;width:100%;max-width:560px;height:86vh;max-height:720px;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.25)}
 @media(min-width:640px){.ai-chat-box{border-radius:18px;height:80vh}}
-.ai-chat-head{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;flex-shrink:0}
+.ai-chat-head{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,#6b5fa0,#5f5391);color:#fff;flex-shrink:0}
 .ai-chat-head-ico{width:36px;height:36px;border-radius:11px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:18px}
 .ai-chat-head-title{flex:1;font-weight:800;font-size:15px;font-family:'Manrope','Inter',sans-serif;line-height:1.2}
 .ai-chat-head-sub{font-size:10.5px;font-weight:600;opacity:.85;margin-top:1px}
@@ -970,25 +986,25 @@ canvas{max-width:100%}
 .ai-msg{display:flex}
 .ai-msg-user{justify-content:flex-end}
 .ai-msg-bubble{max-width:85%;padding:10px 13px;border-radius:14px;font-size:13.5px;line-height:1.55;white-space:normal;overflow-wrap:anywhere}
-.ai-msg-user .ai-msg-bubble{background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;border-bottom-right-radius:4px}
-.ai-msg-bot .ai-msg-bubble{background:#fff;border:1.5px solid #e0e7ff;color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(79,70,229,.08)}
+.ai-msg-user .ai-msg-bubble{background:linear-gradient(135deg,#6b5fa0,#6d28d9);color:#fff;border-bottom-right-radius:4px}
+.ai-msg-bot .ai-msg-bubble{background:#fff;border:1.5px solid #ece9f4;color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(107,95,160,.08)}
 .ai-disclaimer{display:block;margin-top:8px;font-size:11px;color:#92400e;background:#fffbeb;border-radius:7px;padding:6px 8px}
 .ai-typing{display:inline-flex;gap:4px;align-items:center;padding:13px 16px}
-.ai-typing span{width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:aiBlink 1.2s infinite}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:#c5bfdc;animation:aiBlink 1.2s infinite}
 .ai-typing span:nth-child(2){animation-delay:.2s}
 .ai-typing span:nth-child(3){animation-delay:.4s}
 @keyframes aiBlink{0%,80%,100%{opacity:.3;transform:scale(.85)}40%{opacity:1;transform:scale(1)}}
-.ai-chat-inputrow{display:flex;gap:8px;padding:10px 12px;border-top:1.5px solid #e0e7ff;background:#fff;flex-shrink:0;align-items:flex-end}
-.ai-chat-input{flex:1;border:1.5px solid #c7d2fe;border-radius:12px;padding:11px 12px;font-size:14px;font-family:inherit;resize:none;max-height:110px;line-height:1.4}
-.ai-chat-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
-.ai-chat-send{width:44px;height:44px;border-radius:12px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(79,70,229,.30)}
+.ai-chat-inputrow{display:flex;gap:8px;padding:10px 12px;border-top:1.5px solid #ece9f4;background:#fff;flex-shrink:0;align-items:flex-end}
+.ai-chat-input{flex:1;border:1.5px solid #d8d3e7;border-radius:12px;padding:11px 12px;font-size:14px;font-family:inherit;resize:none;max-height:110px;line-height:1.4}
+.ai-chat-input:focus{outline:none;border-color:#7d72ab;box-shadow:0 0 0 3px rgba(125,114,171,.15)}
+.ai-chat-send{width:44px;height:44px;border-radius:12px;border:none;background:linear-gradient(135deg,#6b5fa0,#5f5391);color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(107,95,160,.30)}
 .ai-chat-send:hover{filter:brightness(1.08)}
 .ai-chat-send:active{transform:translateY(1px)}
 /* Análisis IA en visado */
-.ai-visado-loading{margin:10px 0;padding:12px;border-radius:11px;background:#eef2ff;border:1.5px dashed #a5b4fc;color:#4338ca;font-size:13px;font-weight:600;text-align:center}
-.ai-visado-card{margin:10px 0;border:1.5px solid #c7d2fe;border-radius:13px;overflow:hidden;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.10)}
+.ai-visado-loading{margin:10px 0;padding:12px;border-radius:11px;background:#f1eff7;border:1.5px dashed #c5bfdc;color:#564d83;font-size:13px;font-weight:600;text-align:center}
+.ai-visado-card{margin:10px 0;border:1.5px solid #d8d3e7;border-radius:13px;overflow:hidden;background:#fff;box-shadow:0 2px 10px rgba(107,95,160,.10)}
 .ai-visado-card.error{padding:12px;color:#b91c1c;background:#fef2f2;border-color:#fca5a5;font-size:13px}
-.ai-visado-title{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-weight:800;font-size:13px;padding:9px 13px;font-family:'Manrope','Inter',sans-serif}
+.ai-visado-title{background:linear-gradient(135deg,#6b5fa0,#5f5391);color:#fff;font-weight:800;font-size:13px;padding:9px 13px;font-family:'Manrope','Inter',sans-serif}
 .ai-visado-body{padding:12px 13px;font-size:13px;line-height:1.6;color:var(--text)}
 
 /* ============ AGENDAMIENTO DE PROCEDIMIENTOS (full-screen overlay) ============ */
@@ -1093,7 +1109,7 @@ canvas{max-width:100%}
 .agend-cal-day .agend-cal-badge{position:absolute;bottom:3px;right:3px;font-size:9px;font-weight:800;padding:1px 5px;border-radius:7px;line-height:1.3;letter-spacing:.2px}
 .agend-cal-badge.bd-pend{background:#fef3c7;color:#92400e}
 .agend-cal-badge.bd-aprob{background:#dcfce7;color:#166534}
-.agend-cal-badge.bd-mix{background:#dbeafe;color:#1e40af}
+.agend-cal-badge.bd-mix{background:#e7e4f1;color:#4b4475}
 
 /* Día — slots */
 .agend-day-head{background:#fff;border:1.5px solid var(--green-pale);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
@@ -1388,7 +1404,7 @@ canvas{max-width:100%}
             <h3 class="gp-portal-card-title">Riesgo Cardiovascular</h3>
             <p class="gp-portal-card-desc">RCRI, METs y derivación a Cardiología</p>
           </button>
-          <button type="button" class="gp-portal-card ai-entry-btn" onclick="openAiChat()" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
+          <button type="button" class="gp-portal-card ai-entry-btn" onclick="openAiChat()" style="background:linear-gradient(135deg,#f1eff7,#ece9f4);border-color:#c5bfdc">
             <div class="gp-portal-card-ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:14px;display:block"/></div>
             <h3 class="gp-portal-card-title">ARIA · Asistente IA</h3>
             <p class="gp-portal-card-desc">El asistente de IA de Appnesthesia — pregunta en lenguaje natural y responde con las tablas de la app</p>
@@ -1564,7 +1580,7 @@ canvas{max-width:100%}
       <div style="margin-top:14px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5">
         <span style="display:inline-block;width:10px;height:10px;background:#fef3c7;border-radius:3px;vertical-align:middle;margin:0 4px"></span>Pendientes
         <span style="display:inline-block;width:10px;height:10px;background:#dcfce7;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Aprobadas
-        <span style="display:inline-block;width:10px;height:10px;background:#dbeafe;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Mixto
+        <span style="display:inline-block;width:10px;height:10px;background:#e7e4f1;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Mixto
         <span style="display:inline-block;width:10px;height:10px;background:#f3f4f6;border:1.5px dashed #cbd5e1;border-radius:3px;vertical-align:middle;margin:0 4px 0 12px"></span>Sala cerrada
       </div>
     </div>
@@ -1610,7 +1626,7 @@ canvas{max-width:100%}
         <div id="afRangoHint" class="agend-form-hint"></div>
         <label>Iniciales del paciente *</label>
         <input type="text" id="afPaciente" required autocomplete="off" maxlength="8" placeholder="Ej: J. P." />
-        <div class="agend-form-hint" style="color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin:5px 0 10px;font-size:11.5px;line-height:1.45">🔒 Por privacidad de datos, ingresa <b>solo las iniciales</b> del paciente (no el nombre completo ni el RUT). Es suficiente para coordinar el agendamiento.</div>
+        <div class="agend-form-hint" style="color:#6b5fa0;background:#eff6ff;border:1px solid #d8d3e7;border-radius:8px;padding:7px 10px;margin:5px 0 10px;font-size:11.5px;line-height:1.45">🔒 Por privacidad de datos, ingresa <b>solo las iniciales</b> del paciente (no el nombre completo ni el RUT). Es suficiente para coordinar el agendamiento.</div>
         <div class="row2">
           <div>
             <label>Edad</label>
@@ -1815,7 +1831,7 @@ canvas{max-width:100%}
       <h3>Anestesia Regional</h3>
       <p>Bloqueos de trauma + videos NYSORA</p>
     </button>
-    <button class="card ai-entry-btn" onclick="openAiChat()" style="grid-column:span 2;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#a5b4fc">
+    <button class="card ai-entry-btn" onclick="openAiChat()" style="grid-column:span 2;background:linear-gradient(135deg,#f1eff7,#ece9f4);border-color:#c5bfdc">
       <div class="ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:12px;display:block"/></div>
       <h3>ARIA · Asistente IA</h3>
       <p>El asistente de inteligencia artificial de Appnesthesia — consulta fármacos, exámenes y riesgo CV con las tablas de la app</p>
@@ -2047,26 +2063,28 @@ canvas{max-width:100%}
   <div class="section">
     <h3>💉 Anestesia Regional</h3>
 
-    <!-- BUSCADOR ASRA 2025 — seguridad neuroaxial -->
-    <div class="asra-block">
-      <div class="asra-block-head">
-        <span class="asra-badge">ASRA 2025 · 5ª ed</span>
-        <span class="asra-block-title">Anticoagulación y bloqueo neuroaxial</span>
-      </div>
-      <p class="asra-block-sub">Antes de una espinal, peridural o bloqueo profundo: busca el fármaco y revisa cuándo <b>puncionar</b>, <b>retirar el catéter</b>, <b>reiniciar</b> la anticoagulación y si el catéter <b>se puede mantener</b>.</p>
-      <div class="asra-search"><input id="asra_reg_search" placeholder="🔎 enoxaparina, rivaroxabán, warfarina, clopidogrel…" oninput="renderASRANeuraxial('reg')" /></div>
-      <div id="asra_reg_list"></div>
-      <div class="asra-src-note">Fuente: ASRA Pain Medicine, 5ª edición (Reg Anesth Pain Med 2025). Asume función renal/hepática normal; ajustar individualmente. Referencia de apoyo — la decisión es del anestesiólogo a cargo.</div>
-    </div>
-
-    <h3 style="margin-top:22px">🦴 Bloqueos en traumatología</h3>
+    <!-- BLOQUEOS POR ZONA DEL CUERPO (arriba) -->
+    <h3 style="margin-top:4px">🦴 Bloqueos por zona del cuerpo</h3>
     <p style="color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 10px">
-      Bloqueos más usados en cirugía traumatológica, organizados por región. Cada uno enlaza a su técnica y video en <b>NYSORA</b> (se abre en el navegador).
+      Elige la zona del cuerpo para ver los bloqueos más usados, con su técnica y video en <b>NYSORA</b>.
     </p>
     <div class="reg-search"><input id="regSearch" placeholder="🔎 Buscar bloqueo o cirugía (ej. hombro, cadera, tobillo, PENG)…" oninput="renderRegional()" /></div>
     <div id="regList"></div>
     <div class="reg-credit">
       Todo el contenido técnico y los videos pertenecen a <a href="https://www.nysora.com" target="_blank" rel="noopener">NYSORA®</a> (New York School of Regional Anesthesia). Esta app solo enlaza a su material oficial de acceso público; no lo aloja ni lo reproduce. Las dosis y técnicas son referencia — la decisión es del anestesiólogo a cargo.
+    </div>
+
+    <!-- BUSCADOR ASRA 2025 — anticoagulación y neuroaxial (abajo) -->
+    <h3 style="margin-top:24px">🩸 Anticoagulación y bloqueo neuroaxial</h3>
+    <div class="asra-block">
+      <div class="asra-block-head">
+        <span class="asra-badge">ASRA 2025 · 5ª ed</span>
+        <span class="asra-block-title">Tiempos de seguridad neuroaxial</span>
+      </div>
+      <p class="asra-block-sub">Antes de una espinal, peridural o bloqueo profundo: busca el fármaco y revisa cuándo <b>puncionar</b>, <b>retirar el catéter</b>, <b>reiniciar</b> la anticoagulación y si el catéter <b>se puede mantener</b>.</p>
+      <div class="asra-search"><input id="asra_reg_search" placeholder="🔎 enoxaparina, rivaroxabán, warfarina, clopidogrel…" oninput="renderASRANeuraxial('reg')" /></div>
+      <div id="asra_reg_list"></div>
+      <div class="asra-src-note">Fuente: ASRA Pain Medicine, 5ª edición (Reg Anesth Pain Med 2025). Asume función renal/hepática normal; ajustar individualmente. Referencia de apoyo — la decisión es del anestesiólogo a cargo.</div>
     </div>
   </div>
 </section>
@@ -2239,6 +2257,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>
