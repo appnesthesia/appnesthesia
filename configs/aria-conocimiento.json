@@ -1,6 +1,6 @@
 {
   "_ayuda": "Base de conocimiento de ARIA. Cada entrada: id (único), titulo, fuente (guía/paper de origen que ARIA citará), keywords (palabras que la activan) y contenido. Sube este archivo a configs/ en GitHub tras editarlo.",
-  "version": 3,
+  "version": 4,
   "entradas": [
     {
       "id": "ayuno",
@@ -406,6 +406,375 @@
       ],
       "contenido": "La cirugía necesaria no debe negarse por el embarazo; el momento óptimo electivo-diferible es el 2º trimestre. Principios: desplazamiento uterino izquierdo desde ~18-20 semanas, evitar hipotensión/hipoxemia/hipocapnia marcada (perfusión placentaria), considerar vía aérea difícil (edema, desaturación rápida) y estómago lleno desde ~16 semanas (profilaxis aspiración). Anestésicos habituales no son teratogénicos a dosis clínicas. Monitorización fetal: tonos pre y post; continua intraop si feto viable y es factible intervenir. Laparoscopia segura (presión 10-15 mmHg). Coordinar con obstetricia; tocolisis no profiláctica de rutina.",
       "fuente": "ACOG/ASA — cirugía no obstétrica en el embarazo; guías SOAP"
+    },
+    {
+      "id": "preeclampsia",
+      "titulo": "Preeclampsia y eclampsia — manejo anestésico",
+      "fuente": "ACOG Practice Bulletin; SOAP; guías obstétricas",
+      "keywords": [
+        "preeclampsia",
+        "eclampsia",
+        "hipertension del embarazo",
+        "sulfato de magnesio",
+        "proteinuria",
+        "hellp",
+        "presion alta embarazo",
+        "convulsion embarazada"
+      ],
+      "contenido": "Preeclampsia: PA ≥140/90 tras las 20 sem + proteinuria o daño de órgano blanco. Severa: PA ≥160/110, síntomas neurológicos, edema pulmonar, ↑transaminasas, plaquetas <100.000, HELLP. Control de PA: labetalol IV, nifedipino VO o hidralazina; objetivo <160/110 evitando caídas bruscas. Sulfato de magnesio para profilaxis/tratamiento de convulsiones (carga 4-6 g IV en 20 min, luego 1-2 g/h); vigilar reflejos, diuresis y FR (antídoto: gluconato de calcio). Anestesia neuroaxial preferida para cesárea si plaquetas >70.000 y sin coagulopatía (reduce riesgo de vía aérea difícil). Cuidado: el magnesio potencia los bloqueantes neuromusculares. Manejo cuidadoso de fluidos (riesgo de edema pulmonar)."
+    },
+    {
+      "id": "hpp",
+      "titulo": "Hemorragia postparto (HPP)",
+      "fuente": "ACOG; RCOG; FIGO",
+      "keywords": [
+        "hemorragia postparto",
+        "hpp",
+        "sangrado obstetrico",
+        "atonia uterina",
+        "oxitocina",
+        "carbetocina",
+        "misoprostol",
+        "acido tranexamico",
+        "utero"
+      ],
+      "contenido": "Causas (4 T): Tono (atonía, la más frecuente), Trauma, Tejido (retención), Trombina (coagulopatía). Manejo: masaje uterino + uterotónicos escalonados: oxitocina, luego carbetocina/ergometrina (evitar ergometrina en HTA/preeclampsia), misoprostol, carboprost (evitar en asma). Ácido tranexámico 1 g IV precoz (<3 h, WOMAN trial) reduce mortalidad. Reanimación: 2 vías gruesas, protocolo de transfusión masiva (ratio ~1:1:1), mantener fibrinógeno >2 g/L, calcio, normotermia, evitar acidosis. Escalar a balón de Bakri, suturas de compresión, embolización o histerectomía. Anestesia: general si inestabilidad hemodinámica o coagulopatía."
+    },
+    {
+      "id": "cesarea",
+      "titulo": "Anestesia para cesárea",
+      "fuente": "ASA/SOAP Practice Guidelines for Obstetric Anesthesia",
+      "keywords": [
+        "cesarea",
+        "cesárea",
+        "espinal cesarea",
+        "raquidea obstetrica",
+        "anestesia obstetrica",
+        "bupivacaina hiperbarica",
+        "desviacion uterina"
+      ],
+      "contenido": "Técnica de elección: espinal (bupivacaína hiperbárica 0,5% ~10-12 mg + opioide intratecal: fentanilo 10-25 µg y/o morfina 100 µg para analgesia postop). Profilaxis de hipotensión: coloide/cristaloide co-load + infusión de fenilefrina (vasopresor de elección; noradrenalina alternativa). Desviación uterina izquierda hasta la extracción. Profilaxis de aspiración: antiácido no particulado ± ranitidina/metoclopramida. Antibiótico antes de la incisión. General reservada para emergencia, contraindicación de neuroaxial o coagulopatía: secuencia rápida, vía aérea difícil más frecuente, preoxigenar bien. Morfina neuroaxial → vigilar depresión respiratoria tardía."
+    },
+    {
+      "id": "transfusion_masiva",
+      "titulo": "Protocolo de transfusión masiva",
+      "fuente": "Guías de hemoterapia; protocolos de trauma/PBM",
+      "keywords": [
+        "transfusion masiva",
+        "hemorragia masiva",
+        "ratio 1:1:1",
+        "fibrinogeno",
+        "calcio",
+        "plasma",
+        "plaquetas",
+        "crioprecipitado",
+        "coagulopatia dilucional"
+      ],
+      "contenido": "Activar ante hemorragia mayor. Transfundir en ratio equilibrado GR:Plasma:Plaquetas ~1:1:1. Objetivos: fibrinógeno >1,5-2 g/L (reponer con crioprecipitado o concentrado de fibrinógeno), plaquetas >50.000 (>100.000 si SNC/oftálmico), Ca iónico >1,1 mmol/L (la transfusión quela calcio → reponer gluconato/cloruro de calcio), evitar la 'tríada letal': hipotermia, acidosis, coagulopatía. Ácido tranexámico 1 g precoz. Guiar con ROTEM/TEG si disponible. Mantener normotermia y normocalcemia."
+    },
+    {
+      "id": "bnm_reversion",
+      "titulo": "Bloqueo neuromuscular: monitoreo y reversión",
+      "fuente": "ASA 2023 Practice Guidelines for Monitoring and Antagonism of Neuromuscular Blockade",
+      "keywords": [
+        "bloqueo neuromuscular",
+        "reversion",
+        "sugammadex",
+        "neostigmina",
+        "tof",
+        "train of four",
+        "relajante",
+        "rocuronio",
+        "curarizacion residual",
+        "monitoreo neuromuscular"
+      ],
+      "contenido": "Monitorización cuantitativa (TOF) SIEMPRE que se use bloqueante; extubar solo con TOF ratio ≥0,9 (evita curarización residual). Sugammadex revierte rocuronio/vecuronio: 2 mg/kg si TOF ≥2 respuestas, 4 mg/kg si bloqueo profundo (1-2 post-tetánicas), 16 mg/kg para reversión inmediata tras dosis de intubación. Neostigmina (0,03-0,07 mg/kg, máx 5 mg) + atropina/glicopirrolato solo para bloqueo superficial (TOF ≥2-4); no revierte bloqueo profundo. Sugammadex: cuidado en mujeres con anticonceptivos hormonales (reduce su eficacia ~7 días) y en ERC severa."
+    },
+    {
+      "id": "aspiracion",
+      "titulo": "Aspiración pulmonar perioperatoria (Mendelson)",
+      "fuente": "ASA; guías de manejo de vía aérea",
+      "keywords": [
+        "aspiracion",
+        "aspiración",
+        "broncoaspiracion",
+        "neumonitis",
+        "estomago lleno",
+        "mendelson",
+        "secuencia rapida",
+        "presion cricoidea"
+      ],
+      "contenido": "Factores de riesgo: estómago lleno, urgencia, embarazo, obstrucción, RGE severo, GLP-1, gastroparesia. Prevención: ayuno adecuado, secuencia rápida de inducción (preoxigenar, ± presión cricoidea), profilaxis con antiácido no particulado. Si ocurre aspiración: posición lateral/Trendelenburg, aspirar vía aérea, intubar y aspirar antes de ventilar a presión positiva si es posible, O₂/soporte ventilatorio. NO dar corticoides ni antibióticos de rutina (solo si infección confirmada). Observación: si asintomático y SatO₂/Rx normales a las 2 h, bajo riesgo de evolución grave."
+    },
+    {
+      "id": "dolor_agudo",
+      "titulo": "Dolor agudo postoperatorio — analgesia multimodal",
+      "fuente": "ASA/ASRA Acute Pain Management; PROSPECT",
+      "keywords": [
+        "dolor postoperatorio",
+        "analgesia multimodal",
+        "opioides",
+        "paracetamol",
+        "aine",
+        "dexametasona",
+        "ketamina",
+        "bloqueo regional",
+        "dolor agudo"
+      ],
+      "contenido": "Base multimodal para reducir opioides: paracetamol + AINE/COX-2 (si no contraindicados) de forma horaria, + anestesia regional/infiltración cuando aplique. Adyuvantes: dexametasona (también antiemético), ketamina a dosis bajas (cirugía dolorosa o tolerancia a opioides), gabapentinoides selectivos (cautela en adulto mayor y con opioides por sedación). Opioides solo de rescate, titulados. Estrategias ahorradoras de opioides mejoran recuperación (ERAS). Evaluar dolor con escalas, vigilar sedación y FR. Plan de alta con analgesia escalonada y mínima cantidad de opioide."
+    },
+    {
+      "id": "tromboprofilaxis",
+      "titulo": "Tromboprofilaxis quirúrgica (ETV)",
+      "fuente": "ACCP; ASH; escala de Caprini",
+      "keywords": [
+        "tromboprofilaxis",
+        "profilaxis tvp",
+        "trombosis venosa",
+        "etv",
+        "hbpm profilactica",
+        "caprini",
+        "medias compresion",
+        "heparina profilactica",
+        "tep"
+      ],
+      "contenido": "Estratificar riesgo (Caprini) vs riesgo de sangrado. Métodos mecánicos (compresión neumática intermitente, medias) en riesgo alto de sangrado o como complemento. Farmacológica: HBPM (enoxaparina 40 mg/d), HNF dosis baja, o fondaparinux; iniciar según riesgo (habitualmente 6-12 h postop con hemostasia). Ortopedia mayor (cadera/rodilla): profilaxis extendida (HBPM, DOAC profiláctico, o AAS según protocolo) por hasta 14-35 días. Coordinar timing con anestesia neuroaxial (ver tablas ASRA de la app). Movilización precoz siempre."
+    },
+    {
+      "id": "profilaxis_atb",
+      "titulo": "Profilaxis antibiótica quirúrgica",
+      "fuente": "ASHP/IDSA/SIS Surgical Antimicrobial Prophylaxis",
+      "keywords": [
+        "profilaxis antibiotica",
+        "antibiotico quirurgico",
+        "cefazolina",
+        "timing antibiotico",
+        "redosis",
+        "infeccion sitio quirurgico"
+      ],
+      "contenido": "Administrar dentro de los 60 min antes de la incisión (120 min para vancomicina o fluoroquinolonas). Cefazolina es el agente de elección para la mayoría de cirugías (peso: 2 g, o 3 g si ≥120 kg). Re-dosificar intraoperatorio si la cirugía supera 2 vidas medias del fármaco (cefazolina ~cada 4 h) o si hay pérdida sanguínea importante (>1.500 mL). Ajustar en alergia a betalactámicos (clindamicina/vancomicina ± gentamicina según contexto). Suspender dentro de 24 h postop (no prolongar). El anestesiólogo suele ser responsable del timing correcto."
+    },
+    {
+      "id": "hipotermia_periop",
+      "titulo": "Hipotermia perioperatoria y normotermia",
+      "fuente": "NICE CG65; ASA; guías de normotermia",
+      "keywords": [
+        "hipotermia",
+        "temperatura",
+        "normotermia",
+        "calentador",
+        "manta termica",
+        "escalofrios",
+        "tiritar",
+        "temperatura corporal"
+      ],
+      "contenido": "Mantener T central ≥36 °C. La hipotermia (<36) aumenta infección de herida, sangrado/transfusión, eventos cardíacos, escalofríos y prolonga el despertar y la acción de fármacos. Medidas: precalentamiento activo antes de cirugías >30 min, manta de aire forzado intraoperatoria, fluidos y hemoderivados tibios, monitorizar T en cirugías >30 min o anestesia general. Tratar escalofríos postop: calentamiento activo, O₂, y meperidina 12,5-25 mg IV (muy eficaz) o dexmedetomidina/clonidina."
+    },
+    {
+      "id": "insuf_suprarrenal",
+      "titulo": "Corticoides de estrés / insuficiencia suprarrenal perioperatoria",
+      "fuente": "Consensos de manejo perioperatorio de corticoides (Endocrine Society; ASA)",
+      "keywords": [
+        "corticoides",
+        "cortisona",
+        "prednisona",
+        "insuficiencia suprarrenal",
+        "addison",
+        "hidrocortisona",
+        "estres quirurgico",
+        "supresion eje",
+        "esteroides cronicos"
+      ],
+      "contenido": "Riesgo de supresión del eje en uso de ≥5 mg/d de prednisona (o equivalente) por ≥3 semanas, o Cushing. Dosis de estrés según magnitud: cirugía menor → dar su dosis habitual ± hidrocortisona 25 mg; cirugía moderada → hidrocortisona 50 mg IV en inducción + 25 mg c/8 h por 24 h; cirugía mayor → 100 mg IV + 50 mg c/8 h por 24-48 h, luego reducir. Insuficiencia suprarrenal conocida (Addison): no omitir. Sospechar crisis suprarrenal ante hipotensión refractaria a vasopresores → hidrocortisona 100 mg IV inmediata + volumen."
+    },
+    {
+      "id": "tormenta_tiroidea",
+      "titulo": "Tormenta tiroidea perioperatoria",
+      "fuente": "American Thyroid Association",
+      "keywords": [
+        "tormenta tiroidea",
+        "hipertiroidismo",
+        "tiroides",
+        "crisis tiroidea",
+        "propranolol",
+        "tionamidas",
+        "graves",
+        "taquicardia fiebre"
+      ],
+      "contenido": "Emergencia: hipertiroidismo descompensado (fiebre, taquicardia/FA, agitación, ICC, GI). Idealmente diferir cirugía electiva hasta eutiroidismo. Manejo: betabloqueo (propranolol, controla síntomas y conversión T4→T3), tionamidas (propiltiouracilo o metimazol), yodo (≥1 h DESPUÉS de la tionamida — Lugol/yoduro), hidrocortisona (reduce conversión y trata posible insuficiencia suprarrenal), enfriamiento y soporte. Evitar aspirina (desplaza hormona tiroidea). Tratar el desencadenante. Evitar fármacos que aumenten tono simpático (ketamina, pancuronio, anticolinérgicos en exceso)."
+    },
+    {
+      "id": "feocromocitoma",
+      "titulo": "Feocromocitoma — manejo anestésico",
+      "fuente": "Endocrine Society Clinical Practice Guideline",
+      "keywords": [
+        "feocromocitoma",
+        "catecolaminas",
+        "fenoxibenzamina",
+        "crisis hipertensiva",
+        "bloqueo alfa",
+        "paraganglioma",
+        "hipertension paroxistica"
+      ],
+      "contenido": "Preparación preoperatoria 10-14 días: bloqueo ALFA primero (fenoxibenzamina o doxazosina/prazosina) hasta normalizar PA y permitir expansión de volumen; recién después betabloqueo si hay taquicardia (NUNCA betabloqueo antes del alfa → crisis hipertensiva por estímulo alfa sin oposición). Metas: PA controlada, hidratación, sin hipotensión ortostática severa. Intraop: evitar fármacos que liberen histamina/catecolaminas; tener listos nitroprusiato/fenoldopam/nicardipino y esmolol/magnesio para crisis; tras ligar el drenaje venoso del tumor, esperar hipotensión (manejar con volumen y noradrenalina). Vigilar hipoglucemia postop."
+    },
+    {
+      "id": "hiperkalemia",
+      "titulo": "Hiperkalemia aguda perioperatoria",
+      "fuente": "Guías de manejo de hiperkalemia; ERC/AKI",
+      "keywords": [
+        "hiperkalemia",
+        "hipercalemia",
+        "potasio alto",
+        "hiperpotasemia",
+        "gluconato de calcio",
+        "insulina glucosa",
+        "succinilcolina potasio",
+        "arritmia potasio"
+      ],
+      "contenido": "ECG: ondas T picudas → ensanchamiento QRS → onda sinusoidal → paro. Manejo escalonado: 1) Estabilizar membrana: gluconato de calcio 10% 10 mL IV (o cloruro de calcio) si cambios ECG. 2) Redistribuir: insulina rápida 10 U + glucosa, salbutamol nebulizado, bicarbonato si acidosis. 3) Eliminar: diuréticos, resinas, diálisis. Evitar succinilcolina (puede subir K, peligrosa en quemados >24-48 h, lesión medular, desuso, distrofias). Suspender aportes de potasio. Tratar la causa."
+    },
+    {
+      "id": "hta_pulmonar",
+      "titulo": "Hipertensión pulmonar — anestesia no cardíaca",
+      "fuente": "ESC/ERS Pulmonary Hypertension Guidelines",
+      "keywords": [
+        "hipertension pulmonar",
+        "hap",
+        "ventriculo derecho",
+        "oxido nitrico",
+        "milrinona",
+        "presion pulmonar",
+        "cor pulmonale"
+      ],
+      "contenido": "Alto riesgo perioperatorio (falla del VD). Metas: evitar todo lo que aumente la resistencia vascular pulmonar — hipoxemia, hipercapnia, acidosis, hipotermia, dolor, sobrecarga de volumen. Mantener precarga adecuada (ni baja ni excesiva), preservar la postcarga sistémica (la hipotensión reduce la perfusión coronaria del VD → noradrenalina/vasopresina). Continuar terapia pulmonar específica del paciente. Disponer de óxido nítrico inhalado/prostaciclina y un inótropo del VD (milrinona/dobutamina). Preferir, cuando sea posible, técnicas que eviten grandes cambios hemodinámicos; neuroaxial con cautela (caída de postcarga)."
+    },
+    {
+      "id": "fa_periop",
+      "titulo": "Fibrilación auricular perioperatoria",
+      "fuente": "AHA/ACC/HRS; ESC AF Guidelines",
+      "keywords": [
+        "fibrilacion auricular",
+        "fa",
+        "arritmia",
+        "control frecuencia",
+        "cardioversion",
+        "anticoagulacion fa",
+        "chadsvasc",
+        "fa nueva"
+      ],
+      "contenido": "FA nueva con inestabilidad (hipotensión, isquemia, edema pulmonar) → cardioversión eléctrica sincronizada. Estable: control de frecuencia (betabloqueo o calcioantagonista no dihidropiridínico; amiodarona si IC o inestabilidad relativa). Corregir desencadenantes: hipovolemia, dolor, hipoxemia, alteraciones electrolíticas (K, Mg), anemia, sepsis. Anticoagulación según CHA₂DS₂-VASc y riesgo de sangrado quirúrgico (decisión individual, a menudo diferida en el postop inmediato). FA postoperatoria es frecuente en cirugía torácica/cardíaca."
+    },
+    {
+      "id": "sepsis_periop",
+      "titulo": "Sepsis / shock séptico perioperatorio",
+      "fuente": "Surviving Sepsis Campaign",
+      "keywords": [
+        "sepsis",
+        "shock septico",
+        "septico",
+        "lactato",
+        "noradrenalina",
+        "antibiotico precoz",
+        "resucitacion",
+        "hipotension infeccion"
+      ],
+      "contenido": "Reconocer precozmente (hipotensión, lactato elevado, disfunción de órganos). Paquete inicial: cultivos, antibióticos de amplio espectro precoces (<1 h), cristaloides ~30 mL/kg guiados por respuesta, vasopresor de elección noradrenalina con meta PAM ≥65 mmHg (agregar vasopresina; hidrocortisona si shock refractario). Controlar el foco (drenaje/cirugía). Intraop: anticipar inestabilidad, ventilación protectora, evitar profundizar hipotensión, líneas invasivas según gravedad, vigilar lactato y diuresis. Coordinar con UCI."
+    },
+    {
+      "id": "ventilacion_protectora",
+      "titulo": "Ventilación protectora intraoperatoria",
+      "fuente": "Guías de ventilación intraoperatoria; PROVHILO/IMPROVE",
+      "keywords": [
+        "ventilacion protectora",
+        "volumen tidal",
+        "peep",
+        "reclutamiento",
+        "sdra",
+        "presion meseta",
+        "driving pressure",
+        "ventilacion mecanica"
+      ],
+      "contenido": "Volumen tidal bajo 6-8 mL/kg de peso PREDICHO (según talla/sexo, no peso real), PEEP individualizada (habitual 5 cmH₂O, mayor en obesidad/laparoscopía), presión meseta <16-18 sobre PEEP idealmente y driving pressure baja (<15 cmH₂O), maniobras de reclutamiento juiciosas. FiO₂ la mínima para SatO₂ adecuada (evitar hiperoxia). En SDRA: estrategia ARDSnet (6 mL/kg, plateau <30, PEEP según tablas, prono si severo). Reduce complicaciones pulmonares postoperatorias."
+    },
+    {
+      "id": "awareness",
+      "titulo": "Despertar intraoperatorio (awareness)",
+      "fuente": "NAP5; ASA Practice Advisory on Intraoperative Awareness",
+      "keywords": [
+        "awareness",
+        "despertar intraoperatorio",
+        "consciencia intraop",
+        "bis",
+        "memoria intraoperatoria",
+        "tiva riesgo",
+        "recuerdo pabellon"
+      ],
+      "contenido": "Riesgo aumentado: TIVA (especialmente con bloqueo neuromuscular), cesárea/obstetricia, trauma/inestabilidad (anestesia 'liviana'), antecedente previo, uso de relajante sin profundidad adecuada, fallas de equipo. Prevención: monitorizar concentración de halogenado (CAM-edad ≥0,7) o profundidad (BIS/entropía) sobre todo en TIVA + relajante, verificar bombas/vaporizadores, evitar bloqueo neuromuscular innecesario, premedicar con benzodiacepina en alto riesgo. Si ocurre: validar la experiencia del paciente, documentar, apoyo psicológico precoz (riesgo de TEPT) y seguimiento."
+    },
+    {
+      "id": "cppd",
+      "titulo": "Cefalea pospunción dural (CPPD)",
+      "fuente": "Consenso internacional sobre CPPD (Reg Anesth Pain Med)",
+      "keywords": [
+        "cefalea pospuncion",
+        "cppd",
+        "cefalea post puncion dural",
+        "parche hematico",
+        "puncion dural",
+        "cefalea espinal",
+        "postural"
+      ],
+      "contenido": "Cefalea postural (empeora de pie, mejora acostado), típicamente 1-3 días tras punción dural (espinal, o punción accidental con aguja epidural). Más frecuente con agujas gruesas/cortantes, jóvenes, mujeres, obstétricas. Manejo conservador inicial: analgesia (paracetamol, AINE), hidratación, cafeína; reposo según síntomas. Si es severa/persistente (>24-48 h) o incapacitante: parche hemático epidural (eficaz). Descartar causas graves (signos neurológicos focales, fiebre, cefalea no postural → imagen). Prevenir con agujas finas tipo punta de lápiz (Whitacre/Sprotte)."
+    },
+    {
+      "id": "testigo_jehova",
+      "titulo": "Paciente Testigo de Jehová y cirugía",
+      "fuente": "Patient Blood Management; guías de consentimiento",
+      "keywords": [
+        "testigo de jehova",
+        "jehova",
+        "rechazo de transfusion",
+        "sin sangre",
+        "patient blood management",
+        "autotransfusion",
+        "recuperador celular"
+      ],
+      "contenido": "Respetar la autonomía: documentar por escrito qué hemoderivados/técnicas acepta o rechaza (muchos aceptan recuperador celular, fracciones como albúmina o factores, y técnicas de circuito continuo; otros no). Conversación previa, individual y sin presión. Optimización agresiva: tratar anemia/ferropenia preop (hierro EV, eritropoyetina), minimizar extracciones, hemostasia meticulosa, ácido tranexámico, hipotensión controlada cuando proceda, recuperador celular y normotermia. En menores de edad puede requerir vía legal según jurisdicción. Planificar con el equipo y tener plan claro de límites acordados."
+    },
+    {
+      "id": "marcapasos_dai",
+      "titulo": "Marcapasos y desfibrilador (DAI) perioperatorio",
+      "fuente": "HRS/ASA Perioperative Management of CIED",
+      "keywords": [
+        "marcapasos",
+        "mcp",
+        "dai",
+        "desfibrilador",
+        "cied",
+        "iman",
+        "electrobisturi",
+        "interferencia electromagnetica",
+        "resincronizador"
+      ],
+      "contenido": "Identificar tipo, fabricante, dependencia del paciente y función. Riesgo: interferencia electromagnética del electrobisturí (sobre todo monopolar y por encima del ombligo). Plan: preferir bisturí bipolar o cortes breves; placa de retorno lejos del dispositivo. DAI: desactivar terapias antitaquicardia antes de cirugía (reprogramación o imán sobre el generador) y tener desfibrilación externa lista; reactivar al terminar. Marcapasos en paciente dependiente: programar a modo asincrónico (o imán) si hay interferencia. Coordinar con cardiología/electrofisiología. Monitorización continua y pulso/pletismografía confiable intraop."
+    },
+    {
+      "id": "asma_periop",
+      "titulo": "Asma y EPOC perioperatorio",
+      "fuente": "GINA; GOLD; guías de manejo respiratorio perioperatorio",
+      "keywords": [
+        "asma",
+        "epoc",
+        "broncoespasmo",
+        "reactividad bronquial",
+        "salbutamol",
+        "sibilancias",
+        "hiperreactividad",
+        "gold",
+        "gina"
+      ],
+      "contenido": "Optimizar antes de cirugía electiva: control de síntomas, continuar broncodilatadores/corticoides inhalados, tratar infección/exacerbación (diferir si activa). Considerar corticoides sistémicos preop en asma mal controlada. Intraop: profundizar anestesia antes de instrumentar la vía aérea, considerar lidocaína/opioide para atenuar reflejo, preferir agentes broncodilatadores (sevoflurano, ketamina, propofol), evitar desflurano (irritante) y fármacos liberadores de histamina. Broncoespasmo: profundizar, salbutamol en el circuito, adrenalina IV si severo, magnesio, hidrocortisona. Extubar idealmente con paciente despierto y broncodilatado o en plano profundo según riesgo de aspiración."
     }
   ]
 }
