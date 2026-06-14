@@ -3854,8 +3854,47 @@ async function loadAriaKB(){
 // Palabras demasiado comunes para usarse como gatillo (generan falsos positivos)
 const _AI_STOPWORDS = new Set(['para','pero','como','cuando','cuanto','donde','porque','tiene','tienen','antes','despues','sobre','este','esta','estos','estas','paciente','pacientes','cirugia','cirugias','cirugía','dosis','manejo','hacer','hace','puedo','debo','seria','seguir','mejor','riesgo','caso','tipo','poco','mucho','algun','alguna','tener','quiero','saber','favor','ayuda','tabla','tablas','guia','guias','guía','guías']);
 
+// Sinónimos / frases coloquiales → términos que usan las guías.
+// Si la pregunta contiene un disparador, se agregan los términos canónicos
+// para que el buscador encuentre la guía aunque no se use la palabra exacta.
+const _AI_SINONIMOS = [
+  { t:['marcapaso','mcp','dai','desfibrilador','resincronizador'], add:'marcapasos mcp dai dispositivo cardiaco' },
+  { t:['anticonceptiv','estrogeno','pastilla anticonceptiva','terapia hormonal','aco '], add:'estrogenos anticonceptivos tromboprofilaxis' },
+  { t:['embaraz','gestante','obstetric','cesarea','cesárea','trabajo de parto','parturienta'], add:'embarazo obstetrica cesarea parto preeclampsia' },
+  { t:['preeclampsia','eclampsia','presion alta en el embarazo'], add:'preeclampsia eclampsia sulfato magnesio' },
+  { t:['niñ','pediatric','pediátric','lactante','recien nacido','escolar'], add:'pediatrico pediatria niño' },
+  { t:['presion alta','hipertens'], add:'hipertension hta' },
+  { t:['azucar','azúcar','diabet','glicemia','glucosa','insulin'], add:'glicemia diabetes manejo glicemico' },
+  { t:['sangrado','hemorrag','transfus','sangra mucho'], add:'transfusion masiva hemorragia sangrado' },
+  { t:['alergi','reaccion alergica','shock anafilac','anafilax'], add:'anafilaxia alergia' },
+  { t:['relajante muscular','rocuronio','vecuronio','sugammadex','neostigmina','tof','bloqueo neuromuscular','curar'], add:'bloqueo neuromuscular reversion sugammadex neostigmina monitoreo' },
+  { t:['dolor postoperatorio','dolor post','analges','manejo del dolor'], add:'dolor agudo analgesia multimodal opioides' },
+  { t:['nausea','náusea','vomito','vómito','ponv'], add:'nvpo nausea vomito postoperatorio' },
+  { t:['coagulo','coágulo','trombosis','trombo','tep','tvp','embolia'], add:'tromboprofilaxis trombosis venosa' },
+  { t:['antibiotic','antibiótic','profilaxis quirurgica'], add:'profilaxis antibiotica quirurgica cefazolina' },
+  { t:['corticoid','cortisona','prednisona','suprarrenal','addison','hidrocortisona estres'], add:'corticoides suprarrenal estres perioperatorio' },
+  { t:['tiroid','hipertiroid','bocio'], add:'tiroidea tormenta tiroides' },
+  { t:['frio','frío','temperatura','hipotermia','tirita'], add:'hipotermia temperatura normotermia' },
+  { t:['testigo de jehova','jehova','rechaza transfusion','no acepta sangre'], add:'testigo jehova sangre patient blood management' },
+  { t:['cefalea','dolor de cabeza','pospuncion','pospunción','post puncion','parche hematico'], add:'cppd cefalea pospuncion dural' },
+  { t:['feocromocitoma','catecolamina'], add:'feocromocitoma fenoxibenzamina' },
+  { t:['aspiracion','aspiración','broncoaspir','estomago lleno','mendelson'], add:'aspiracion pulmonar neumonitis estomago lleno' },
+  { t:['hiperkalemia','hipercalemia','potasio alto','hiperpotasemia'], add:'hiperkalemia potasio' },
+  { t:['hipertension pulmonar','pulmonary hypertension','hap'], add:'hipertension pulmonar' },
+  { t:['fibrilacion auricular','fibrilación','arritmia','aco fa'], add:'fibrilacion auricular periop arritmia' },
+  { t:['sepsis','septico','shock septico'], add:'sepsis perioperatoria' },
+  { t:['ventilacion','ventilación protectora','volumen tidal','sdra','distrés'], add:'ventilacion protectora intraoperatoria sdra' },
+  { t:['despierto','despertar intraop','awareness','consciente en pabellon'], add:'awareness despertar intraoperatorio' },
+];
+
 function _aiBuildContext(question){
-  const q = _gpNorm(question);
+  let q = _gpNorm(question);
+  // Expandir con sinónimos: si la pregunta dispara un término, lo agregamos
+  try{
+    _AI_SINONIMOS.forEach(s=>{
+      if(s.t.some(trig => q.includes(_gpNorm(trig)))) q += ' ' + _gpNorm(s.add);
+    });
+  }catch(e){}
   const words = q.split(/\s+/).filter(w => w.length >= 4 && !_AI_STOPWORDS.has(w));
   if(words.length === 0) return '';
   const matches = [];
@@ -3904,15 +3943,26 @@ function _aiBuildContext(question){
     });
   }catch(e){}
 
-  // 4) Base de conocimiento ARIA (guías agregadas por el servicio)
+  // 4) Base de conocimiento ARIA (guías) — con puntaje de relevancia.
+  // Cuenta coincidencias por keyword (exacta o parcial) y por título; las
+  // guías más relevantes quedan primero.
   try{
+    const scored = [];
     (_ariaKB||[]).forEach(e=>{
       if(!e || !e.contenido) return;
       const kws = (e.keywords||[]).map(_gpNorm);
       const hayTitulo = _gpNorm(e.titulo||'');
-      const match = kws.some(kw => kw && q.includes(kw)) || words.some(w => hayTitulo.includes(w));
-      if(match) matches.push('[Guía: ' + (e.titulo||e.id) + (e.fuente ? ' — FUENTE: ' + e.fuente : '') + '] ' + e.contenido);
+      let score = 0;
+      kws.forEach(kw=>{
+        if(!kw) return;
+        if(q.includes(kw)) score += 2;                                  // keyword completa en la pregunta
+        else if(words.some(w => kw.includes(w) || w.includes(kw))) score += 1; // parcial
+      });
+      words.forEach(w=>{ if(hayTitulo.includes(w)) score += 1; });
+      if(score > 0) scored.push({ score, e });
     });
+    scored.sort((a,b)=> b.score - a.score);
+    scored.forEach(({e})=> matches.push('[Guía: ' + (e.titulo||e.id) + (e.fuente ? ' — FUENTE: ' + e.fuente : '') + '] ' + e.contenido));
   }catch(e){}
 
   // 5) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
