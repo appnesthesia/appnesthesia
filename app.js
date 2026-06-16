@@ -154,6 +154,7 @@ function save(){
     try{ localStorage.setItem(LS_KEY + '_localTs', new Date().toISOString()); }catch(e){}
     _pendingPush = true;
   }
+  try{ updateHomeBadges(); }catch(e){}
   scheduleSyncPush();
 }
 // Igual que save() pero NO marca "dirty" ni timestamp local. Sirve para
@@ -321,6 +322,7 @@ function _applyRemoteState(remote){
     });
     if(remote._updatedAt) _lastRemoteUpdatedAt = remote._updatedAt;
     localStorage.setItem(LS_KEY, JSON.stringify(state));
+    try{ updateHomeBadges(); }catch(e){}
     return true;
   } finally {
     _isApplyingRemote = false;
@@ -700,10 +702,8 @@ function showView(name){
     reloj:'Reloj Control'
   };
   document.getElementById('hdrTitle').textContent = titles[name] || titles.home;
-  // Actualizar badge de vacaciones pendientes en la home
-  const pendingVacs = (state.vacations||[]).filter(v=>v.status==='pending' && !v.deleted).length;
-  const hb = document.getElementById('vacBadgeHome');
-  if(hb){ hb.textContent = pendingVacs>0?pendingVacs:''; hb.style.display = pendingVacs>0?'inline-block':'none'; }
+  // Actualizar badges de notificación en la home (vacaciones / intercambios)
+  try{ updateHomeBadges(); }catch(e){}
   if(name==='calendario'){
     renderCalendar();
     renderSourceStatus();
@@ -4267,6 +4267,7 @@ function updateInstitutionUI(){
   const elEq = document.getElementById('instNameEquipo');
   if(elEq) elEq.textContent = INSTITUTION.name + (INSTITUTION.city?' · '+INSTITUTION.city:'');
   try{ updateAiButtons(); }catch(e){}
+  try{ updateHomeBadges(); }catch(e){}
 }
 
 function renderInstitutionPicker(institutions){
@@ -8436,6 +8437,26 @@ function updateEventBadge(){
   } else {
     b.style.display = 'none';
   }
+}
+
+// Badges de notificación en las tarjetas del home:
+//  - Vacaciones: solicitudes pendientes de aprobar
+//  - Intercambios: ofertas de turno disponibles (sin tomar)
+function _setNotif(id, n){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(n > 0){ el.textContent = n > 99 ? '99+' : n; el.style.display = 'flex'; }
+  else { el.style.display = 'none'; }
+}
+function updateHomeBadges(){
+  if(!state) return;
+  const pendingVacs = (state.vacations||[]).filter(v=>v.status==='pending' && !v.deleted).length;
+  const openExch    = (state.exchanges||[]).filter(e=>e.status==='open' && !e.deleted).length;
+  _setNotif('vacNotif', pendingVacs);
+  _setNotif('exchNotif', openExch);
+  // Mantener también el badge antiguo del título de Vacaciones
+  const hb = document.getElementById('vacBadgeHome');
+  if(hb){ hb.textContent = pendingVacs>0?pendingVacs:''; hb.style.display = pendingVacs>0?'inline-block':'none'; }
 }
 
 // ============================================================

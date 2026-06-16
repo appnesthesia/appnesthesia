@@ -116,6 +116,9 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
     radial-gradient(ellipse 95% 45% at 50% 100%, rgba(0,0,0,.22), transparent 70%);
 }
 .card .ico svg{position:relative;z-index:1;width:30px;height:30px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.28))}
+/* Badge de notificación (esquina del ícono) */
+.card-notif{position:absolute;top:11px;left:46px;min-width:21px;height:21px;padding:0 5px;background:#dc2626;color:#fff;border-radius:11px;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--card);box-shadow:0 2px 5px rgba(220,38,38,.4);z-index:3;animation:notifPop .25s ease}
+@keyframes notifPop{from{transform:scale(0)}to{transform:scale(1)}}
 .card.c1 .ico{background:linear-gradient(135deg,#0f4435 0%,#1e6b54 55%,#2e8b6b 100%)}
 .card.c2 .ico{background:linear-gradient(135deg,#1e6b54 0%,#3d8a76 55%,#4ca085 100%)}
 .card.c3 .ico{background:linear-gradient(135deg,#2e8b6b 0%,#4ca085 55%,#5fb49c 100%)}
@@ -1253,16 +1256,18 @@ canvas{max-width:100%}
 .evt-cal-title{font-weight:800;font-size:15px;color:var(--primary-dark);flex:1;text-align:center;letter-spacing:.3px;font-family:'Manrope','Inter',sans-serif}
 .evt-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 6px 12px;gap:2px}
 .evt-cal-dow{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);padding:4px 0 8px;letter-spacing:.5px;text-transform:uppercase}
-.evt-cal-cell{min-height:48px;display:flex;flex-direction:column;align-items:center;padding:5px 2px 4px;border-radius:10px;cursor:pointer;transition:background .12s;position:relative}
+.evt-cal-cell{min-height:54px;display:flex;flex-direction:column;align-items:center;padding:5px 2px 5px;border-radius:10px;cursor:pointer;transition:background .12s;position:relative}
 .evt-cal-cell.empty{cursor:default;background:none!important}
 .evt-cal-cell:not(.empty):hover{background:#e8f5f0}
 .evt-cal-cell.today .evt-cal-num{background:var(--primary);color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
 .evt-cal-cell.selected{background:#d4ede5!important}
 .evt-cal-cell.selected .evt-cal-num{color:var(--primary-dark);font-weight:800}
 .evt-cal-num{font-size:13px;color:var(--text);font-weight:500;line-height:1;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
-.evt-cal-cell.has-events .evt-cal-num{font-weight:700;color:var(--primary-dark)}
-.evt-cal-dots{display:flex;gap:3px;margin-top:2px;justify-content:center;flex-wrap:wrap}
-.evt-cal-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0}
+.evt-cal-cell.has-events{background:#eef9f3}
+.evt-cal-cell.has-events:not(.empty):hover{background:#e2f3ea}
+.evt-cal-cell.has-events .evt-cal-num{font-weight:800;color:var(--primary-dark)}
+.evt-cal-dots{display:flex;gap:4px;margin-top:3px;justify-content:center;flex-wrap:wrap}
+.evt-cal-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;border:1.5px solid #fff;box-shadow:0 1px 2.5px rgba(0,0,0,.22)}
 .evt-cal-legend{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 12px;border-top:1px solid var(--border)}
 .evt-cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:500}
 .evt-cal-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -1784,6 +1789,7 @@ canvas{max-width:100%}
       <p>Listado y puntaje para cobertura de emergencias</p>
     </button>
     <button class="card c3" onclick="showView('intercambios')">
+      <span class="card-notif" id="exchNotif" style="display:none">0</span>
       <div class="ico"><svg viewBox="0 0 24 24"><polyline class="arrow-blue" points="17 1 21 5 17 9"/><path class="arrow-blue" d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline class="arrow-orange" points="7 23 3 19 7 15"/><path class="arrow-orange" d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
       <h3>Intercambio de Turnos</h3>
       <p>Ofrecer o Tomar cambios de horarios, turnos y llamadas</p>
@@ -1794,6 +1800,7 @@ canvas{max-width:100%}
       <p>Indicadores de actividad y producción</p>
     </button>
     <button class="card c4" onclick="showView('vacaciones')">
+      <span class="card-notif" id="vacNotif" style="display:none">0</span>
       <div class="ico"><svg viewBox="0 0 24 24"><circle class="vac-sun" cx="12" cy="5.5" r="2.8"/><path class="vac-frond" d="M12 8.5c-3 0-6 3-8 5 2-1 4-1 6 0"/><path class="vac-frond" d="M12 8.5c3 0 6 3 8 5-2-1-4-1-6 0"/><path class="vac-trunk" d="M12 8.5v13"/><path class="vac-ground" d="M9 21.5h6"/></svg></div>
       <h3>Vacaciones <span id="vacBadgeHome" style="display:none;font-size:10px;background:var(--warn);color:#fff;padding:2px 7px;border-radius:9px;margin-left:4px"></span></h3>
       <p>Solicitar vacaciones, coberturas y aprobaciones</p>
@@ -2257,6 +2264,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=58"></script>
+<script src="app.js?v=59"></script>
 </body>
 </html>

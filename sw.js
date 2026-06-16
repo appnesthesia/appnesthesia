@@ -7,7 +7,7 @@
 //   - skipWaiting + clients.claim → reemplaza al SW anterior sin esperar
 //     a que el usuario cierre todas las pestañas.
 
-const CACHE = 'anestesia-v58';
+const CACHE = 'anestesia-v59';
 const ASSETS = [
   './',
   './index.html',
