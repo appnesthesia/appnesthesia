@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cómo solicitar un agendamiento · Appnesthesia</title>
+<style>
+  :root{
+    --green-deep:#0f4435; --green-forest:#1e6b54; --green-sage:#2e8b6b;
+    --green-pale:#cfe7dd; --primary-dark:#0f4435; --text:#1f2937; --muted:#6b7280;
+    --border:#e3ece8; --card:#ffffff; --warn:#d97706; --accent:#0d9488;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;background:radial-gradient(circle at 50% 0%,#0f4435,#082a22 80%);color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px 14px 30px}
+  .wrap{width:100%;max-width:430px;display:flex;flex-direction:column;align-items:center}
+  .topbar{text-align:center;margin-bottom:12px}
+  .topbar h1{font-size:18px;font-weight:800;letter-spacing:.3px}
+  .topbar p{font-size:12.5px;opacity:.8;margin-top:3px}
+  .scene-count{font-size:11px;opacity:.7;margin-top:6px;letter-spacing:.4px}
+
+  /* Marco teléfono */
+  .phone{width:300px;height:600px;background:#0a3b2c;border-radius:34px;padding:11px;box-shadow:0 16px 50px rgba(0,0,0,.5),0 0 0 2px rgba(255,255,255,.06) inset;position:relative}
+  .phone:before{content:'';position:absolute;top:18px;left:50%;transform:translateX(-50%);width:90px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);z-index:5}
+  .screen{width:100%;height:100%;background:linear-gradient(180deg,#f0faf5,#e9f4ef);border-radius:25px;overflow:hidden;position:relative;color:var(--text)}
+  .scr-scroll{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column}
+
+  /* Header app */
+  .ah{display:flex;align-items:center;gap:9px;background:linear-gradient(135deg,var(--green-deep),var(--green-sage));color:#fff;padding:14px 13px 12px}
+  .ah .logo{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px}
+  .ah h2{font-size:15px;font-weight:800}
+  .ah .sub{font-size:10.5px;opacity:.85}
+
+  .body{padding:14px 13px;flex:1;overflow:hidden}
+  .h-tit{font-size:15px;font-weight:800;color:var(--primary-dark);margin-bottom:3px}
+  .h-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;line-height:1.4}
+
+  /* Cards de módulo / cta */
+  .mcard{display:flex;align-items:center;gap:11px;padding:13px;border-radius:13px;border:1.5px solid var(--green-pale);background:linear-gradient(180deg,#fafffd,#f2faf6);margin-bottom:10px}
+  .mcard .ic{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#0f4435,#2e8b6b);display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff;flex-shrink:0}
+  .mcard .tx{flex:1}
+  .mcard .tx b{font-size:13.5px;color:var(--primary-dark);display:block}
+  .mcard .tx span{font-size:11px;color:var(--muted)}
+  .mcard .arw{color:var(--green-forest);font-size:18px;font-weight:700}
+
+  /* Formularios */
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:11px;font-weight:700;color:var(--primary-dark);margin-bottom:4px}
+  .inp{width:100%;border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;font-size:12.5px;background:#fff;color:var(--text);display:flex;align-items:center;min-height:34px}
+  .inp.ph{color:#aab3b0}
+  .row2{display:flex;gap:9px}
+  .row2 .field{flex:1}
+  .btn-main{width:100%;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;border:none;border-radius:11px;padding:12px;font-size:13.5px;font-weight:800;text-align:center;margin-top:4px}
+  .chip-unit{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--green-pale);background:#fff;font-size:12px;font-weight:700;color:var(--primary-dark);margin:0 6px 8px 0}
+  .chip-unit.sel{background:#e7f5ef;border-color:var(--green-forest)}
+
+  /* Salas */
+  .sala{display:flex;align-items:center;gap:10px;padding:11px;border-radius:12px;border:1.5px solid var(--border);background:#fff;margin-bottom:9px}
+  .sala .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;flex-shrink:0}
+  .sala b{font-size:12.5px;color:var(--primary-dark);display:block}
+  .sala span{font-size:10.5px;color:var(--muted)}
+
+  /* Calendario mini */
+  .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:800;color:var(--primary-dark);font-size:13px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal-dow{font-size:9px;text-align:center;color:var(--muted);font-weight:700}
+  .cal-d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:7px;background:#fff;border:1px solid #eef3f1;color:var(--text)}
+  .cal-d.off{color:#c4ccc9;background:#f6f8f7}
+  .cal-d.pick{background:var(--green-forest);color:#fff;font-weight:800;border-color:var(--green-forest)}
+
+  /* Time selects */
+  .time-row{display:flex;gap:9px;align-items:flex-end}
+  .selbox{flex:1;border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;font-size:13px;background:#fff;display:flex;justify-content:space-between;align-items:center;color:var(--primary-dark);font-weight:700}
+  .privacy{font-size:10.5px;color:#1d6fae;background:#eaf4fc;border:1px solid #bfdcf0;border-radius:8px;padding:7px 9px;margin:3px 0 10px;line-height:1.4}
+  .ok-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;padding:24px}
+  .ok-screen .big{width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#15803d);display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;margin-bottom:16px}
+  .ok-screen h3{font-size:17px;color:var(--primary-dark);margin-bottom:6px}
+  .ok-screen p{font-size:12px;color:var(--muted);line-height:1.5}
+
+  /* Resaltado de "toca aquí" */
+  .tap{position:relative;outline:3px solid #f59e0b;outline-offset:2px;border-radius:13px;animation:tapPulse 1.4s ease-in-out infinite}
+  @keyframes tapPulse{0%,100%{outline-color:rgba(245,158,11,.55)}50%{outline-color:rgba(245,158,11,1)}}
+  .tap-lbl{position:absolute;right:-6px;top:-14px;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;box-shadow:0 3px 8px rgba(245,158,11,.4);white-space:nowrap;z-index:9}
+
+  /* Portada / cierre */
+  .cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;padding:30px 22px;background:linear-gradient(180deg,#0f4435,#13503f);color:#fff}
+  .cover .clogo{width:74px;height:74px;border-radius:20px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:38px;margin-bottom:16px}
+  .cover h3{font-size:19px;font-weight:800;margin-bottom:8px;line-height:1.25}
+  .cover p{font-size:12.5px;opacity:.85;line-height:1.55}
+
+  /* Subtítulos */
+  .caption{width:300px;min-height:74px;margin-top:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.5;text-align:center;display:flex;align-items:center;justify-content:center}
+  .step-tag{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:2px 9px;border-radius:20px;margin-bottom:6px;letter-spacing:.4px}
+
+  /* Controles */
+  .controls{display:flex;align-items:center;gap:10px;margin-top:16px}
+  .controls button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:12px;width:48px;height:48px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+  .controls button:hover{background:rgba(255,255,255,.22)}
+  .controls .play{width:62px;height:62px;font-size:24px;background:linear-gradient(135deg,#2e8b6b,#1e6b54);border:none;box-shadow:0 6px 18px rgba(46,139,107,.4)}
+  .progress{width:300px;height:6px;background:rgba(255,255,255,.14);border-radius:4px;margin-top:14px;overflow:hidden}
+  .progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5fb49c,#2e8b6b);transition:width .4s}
+  .hint{font-size:10.5px;opacity:.6;margin-top:12px;text-align:center;max-width:320px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>Cómo solicitar un agendamiento</h1>
+    <p>Guía para unidades · Servicio de Anestesiología</p>
+    <div class="scene-count" id="sceneCount">Paso 1 de 10</div>
+  </div>
+
+  <div class="phone"><div class="screen"><div class="scr-scroll" id="appScreen"></div></div></div>
+
+  <div class="progress"><i id="progBar"></i></div>
+
+  <div class="caption" id="caption"></div>
+
+  <div class="controls">
+    <button id="btnPrev" title="Anterior">⏮</button>
+    <button class="play" id="btnPlay" title="Reproducir / Pausar">▶</button>
+    <button id="btnNext" title="Siguiente">⏭</button>
+    <button id="btnMute" title="Voz on/off">🔊</button>
+    <button id="btnReplay" title="Reiniciar">↺</button>
+  </div>
+
+  <div class="hint" id="voiceHint">La voz se reproduce con el sintetizador del dispositivo. Si no suena, los subtítulos te guían igual. Para mejor voz, usa Chrome en computador.</div>
+</div>
+
+<script>
+// ====== Pantallas (mockups con el diseño real de la app) ======
+function scrModulos(hl){
+  return `
+   <div class="ah"><div class="logo">A</div><div><h2>¿A dónde quieres entrar?</h2><div class="sub">Elige el módulo</div></div></div>
+   <div class="body">
+     <div class="mcard"><div class="ic">👥</div><div class="tx"><b>Staff</b><span>Acceso para anestesiólogos</span></div><div class="arw">›</div></div>
+     <div class="mcard ${hl?'tap':''}"><div class="ic">📅</div><div class="tx"><b>Agendamiento de procedimientos</b><span>Solicitar horas con sedación</span></div><div class="arw">›</div>${hl?'<span class="tap-lbl">👆 Toca aquí</span>':''}</div>
+     <div class="mcard"><div class="ic">🩺</div><div class="tx"><b>Portal Preanestésico</b><span>Preparación del paciente</span></div><div class="arw">›</div></div>
+   </div>`;
+}
+function scrLanding(hl){
+  return `
+   <div class="ah"><div class="logo">📅</div><div><h2>Agendamiento</h2><div class="sub">de procedimientos</div></div></div>
+   <div class="body">
+     <div class="h-tit">¿Qué quieres hacer?</div>
+     <div class="h-sub">Las unidades clínicas pueden solicitar horas para procedimientos con sedación.</div>
+     <div class="mcard ${hl?'tap':''}"><div class="ic">📤</div><div class="tx"><b>Solicitar agendamiento</b><span>Endoscopía, Imagenología, y otras</span></div><div class="arw">›</div>${hl?'<span class="tap-lbl">👆 Toca aquí</span>':''}</div>
+     <div class="mcard"><div class="ic">✅</div><div class="tx"><b>Visar solicitudes (Anestesia)</b><span>Solo el Servicio de Anestesia</span></div><div class="arw">›</div></div>
+   </div>`;
+}
+function scrUnidad(hl){
+  return `
+   <div class="ah"><div class="logo">📅</div><div><h2>Identifica tu unidad</h2><div class="sub">Datos del responsable</div></div></div>
+   <div class="body">
+     <div style="margin-bottom:10px">
+       <span class="chip-unit sel">🔬 Endoscopía</span><span class="chip-unit">🩻 Imagenología</span><span class="chip-unit">🦷 Odontología</span>
+     </div>
+     <div class="field"><label>PIN de acceso</label><div class="inp">• • • •  <span style="margin-left:auto;color:#aab3b0;font-size:10px">(1234)</span></div></div>
+     <div class="field"><label>Nombre del responsable</label><div class="inp">Dra. Pérez</div></div>
+     <div class="field"><label>Correo (opcional, para confirmación)</label><div class="inp ph">correo@clinica.cl</div></div>
+     <div class="btn-main ${hl?'tap':''}" style="position:relative">Continuar ${hl?'<span class="tap-lbl">👆</span>':''}</div>
+   </div>`;
+}
+function scrSalas(hl){
+  return `
+   <div class="ah"><div class="logo">🏥</div><div><h2>Salas disponibles</h2><div class="sub">Endoscopía</div></div></div>
+   <div class="body">
+     <div class="sala ${hl?'tap':''}"><div class="ic" style="background:#0EA5E9">🔬</div><div><b>Endoscopía</b><span>Endoscopías, colonoscopías, CPRE</span></div>${hl?'<span class="tap-lbl">👆 Toca tu sala</span>':''}</div>
+     <div class="sala"><div class="ic" style="background:#A855F7">🩻</div><div><b>Imagenología</b><span>TAC, RM con sedación</span></div></div>
+     <div class="sala"><div class="ic" style="background:#0D9488">💉</div><div><b>Accesos Vasculares</b><span>PICC, MidLine, CVC</span></div></div>
+   </div>`;
+}
+function scrCalendario(hl){
+  const dows=['L','M','M','J','V','S','D'];
+  let cells='';
+  const off=[0,0,0,0,0,0,1]; // sábados/domingos sólo de ejemplo
+  for(let d=1; d<=30; d++){
+    const isPick = d===17;
+    const cl = isPick ? 'pick' : (d%7===6||d%7===0 ? 'off':'');
+    cells += `<div class="cal-d ${cl}">${d}</div>`;
+  }
+  return `
+   <div class="ah"><div class="logo">🔬</div><div><h2>Endoscopía</h2><div class="sub">Elige el día</div></div></div>
+   <div class="body">
+     <div class="cal-head"><span>‹</span><span>Junio 2026</span><span>›</span></div>
+     <div class="cal-grid">${dows.map(x=>`<div class="cal-dow">${x}</div>`).join('')}${cells}</div>
+     ${hl?'<div style="text-align:center;margin-top:12px"><span class="tap-lbl" style="position:static;display:inline-block">👆 Toca el día (ej. 17)</span></div>':''}
+   </div>`;
+}
+function scrHorario(hl){
+  return `
+   <div class="ah"><div class="logo">🔬</div><div><h2>Miércoles 17</h2><div class="sub">Indica el horario</div></div></div>
+   <div class="body">
+     <div class="h-sub">Selecciona la hora de inicio y de término del procedimiento.</div>
+     <div class="time-row" style="margin-bottom:14px">
+       <div class="field" style="flex:1;margin:0"><label>Inicio</label><div class="selbox">08:00 <span>▾</span></div></div>
+       <div class="field" style="flex:1;margin:0"><label>Término</label><div class="selbox">10:00 <span>▾</span></div></div>
+     </div>
+     <div class="btn-main ${hl?'tap':''}" style="position:relative">Solicitar hora ${hl?'<span class="tap-lbl">👆</span>':''}</div>
+   </div>`;
+}
+function scrFormulario(hl){
+  return `
+   <div class="ah"><div class="logo">📝</div><div><h2>Datos del paciente</h2><div class="sub">Miércoles 17 · 08:00–10:00</div></div></div>
+   <div class="body" style="overflow:hidden">
+     <div class="field"><label>Iniciales del paciente *</label><div class="inp">J. P.</div></div>
+     <div class="privacy">🔒 Por privacidad, ingresa <b>solo las iniciales</b> (no el nombre completo ni el RUT).</div>
+     <div class="row2"><div class="field"><label>Edad</label><div class="inp">54</div></div><div class="field"><label>Prioridad</label><div class="inp">Electiva</div></div></div>
+     <div class="field"><label>Procedimiento</label><div class="inp">Colonoscopía</div></div>
+     <div class="field" style="margin-bottom:6px"><label>Antecedentes (opcional)</label><div class="inp ph" style="min-height:30px">Alergias, comorbilidades…</div></div>
+     ${hl?'<div style="text-align:center"><span class="tap-lbl" style="position:static;display:inline-block">👇 Luego, enviar</span></div>':''}
+   </div>`;
+}
+function scrEnviar(hl){
+  return `
+   <div class="ah"><div class="logo">📝</div><div><h2>Datos del paciente</h2><div class="sub">Revisa y envía</div></div></div>
+   <div class="body" style="display:flex;flex-direction:column">
+     <div class="field"><label>Paciente</label><div class="inp">J. P. · 54 años</div></div>
+     <div class="field"><label>Procedimiento</label><div class="inp">Colonoscopía · Electiva</div></div>
+     <div style="flex:1"></div>
+     <div class="btn-main ${hl?'tap':''}" style="position:relative">Enviar solicitud ${hl?'<span class="tap-lbl">👆 Toca para enviar</span>':''}</div>
+   </div>`;
+}
+function scrOk(){
+  return `<div class="ok-screen"><div class="big">✓</div><h3>¡Solicitud enviada!</h3><p>Tu solicitud quedó registrada.<br>El Servicio de Anestesia la revisará y aprobará.</p></div>`;
+}
+function scrCover(){
+  return `<div class="cover"><div class="clogo">📅</div><h3>Cómo solicitar una hora de procedimiento</h3><p>Aprende, paso a paso, a pedir una hora con sedación o anestesia desde la aplicación. Es muy sencillo.</p></div>`;
+}
+function scrCierre(){
+  return `<div class="cover"><div class="clogo">✅</div><h3>¡Listo!</h3><p>El anestesiólogo revisará y aprobará tu solicitud. Si dejaste un correo, recibirás la confirmación.<br><br>Ante dudas, contacta a la coordinación de Anestesia.<br><br>¡Gracias!</p></div>`;
+}
+
+// ====== Guion: pantalla + narración + subtítulo ======
+const SCENES = [
+  { tag:'Inicio',  screen:scrCover,  cap:'Bienvenido. Aprende a solicitar una hora para un procedimiento con sedación o anestesia.',
+    say:'Bienvenido. En este tutorial aprenderás, paso a paso, cómo solicitar una hora para un procedimiento con sedación o anestesia, usando la aplicación del Servicio de Anestesiología. Es muy sencillo. Comencemos.' },
+  { tag:'Paso 1',  screen:()=>scrModulos(true), cap:'Abre la aplicación y toca «Agendamiento de procedimientos».',
+    say:'Al abrir la aplicación, verás esta pantalla. Toca el botón Agendamiento de procedimientos.' },
+  { tag:'Paso 2',  screen:()=>scrLanding(true), cap:'Toca «Solicitar agendamiento».',
+    say:'A continuación, toca Solicitar agendamiento.' },
+  { tag:'Paso 3',  screen:()=>scrUnidad(true), cap:'Elige tu unidad, ingresa el PIN 1234, escribe tu nombre y, si quieres, un correo. Luego, continúa.',
+    say:'Selecciona tu unidad; por ejemplo, Endoscopía. Luego ingresa el PIN de acceso, que es uno, dos, tres, cuatro. Escribe el nombre de la persona responsable y, si quieres recibir la confirmación por correo, agrégalo. Después, continúa.' },
+  { tag:'Paso 4',  screen:()=>scrSalas(true), cap:'Elige la sala del procedimiento. Si tu unidad ya tiene sala, irás directo a ella.',
+    say:'Elige la sala donde se realizará el procedimiento. Si tu unidad ya tiene una sala asignada, la aplicación te llevará directo a ella.' },
+  { tag:'Paso 5',  screen:()=>scrCalendario(true), cap:'Toca el día que necesitas. Cada sala atiende solo en sus días habituales.',
+    say:'Verás el calendario del mes. Toca el día en que necesitas la hora. Recuerda que cada sala atiende solo en sus días y horarios habituales.' },
+  { tag:'Paso 6',  screen:()=>scrHorario(true), cap:'Indica la hora de inicio y de término, y toca «Solicitar hora».',
+    say:'Indica el horario: la hora de inicio y la hora de término del procedimiento. Luego toca Solicitar hora.' },
+  { tag:'Paso 7',  screen:()=>scrFormulario(true), cap:'Completa los datos. Por privacidad, ingresa SOLO las iniciales del paciente.',
+    say:'Completa los datos. Por privacidad, ingresa solo las iniciales del paciente; no el nombre completo ni el RUT. Agrega la edad, el procedimiento, la prioridad y, si corresponde, los antecedentes relevantes.' },
+  { tag:'Paso 8',  screen:()=>scrEnviar(true), cap:'Toca «Enviar solicitud». ¡Listo!',
+    say:'Por último, toca Enviar solicitud. ¡Listo! Tu solicitud quedó registrada.' },
+  { tag:'Final',   screen:scrCierre, cap:'El Servicio de Anestesia revisará y aprobará tu solicitud. ¡Gracias!',
+    say:'El Servicio de Anestesia revisará tu solicitud y la aprobará. Si dejaste un correo, recibirás la confirmación. Ante dudas, comunícate con la coordinación de Anestesia. ¡Gracias!' },
+];
+
+// ====== Motor de reproducción ======
+let idx = 0, playing = false, muted = false, voice = null, timer = null;
+const $ = id => document.getElementById(id);
+
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  const es = vs.filter(v => /^es/i.test(v.lang));
+  const male = es.find(v => /(jorge|diego|carlos|pablo|raul|raúl|miguel|enrique|álvaro|alvaro|male|hombre)/i.test(v.name));
+  voice = male || es.find(v=>/google/i.test(v.name)) || es[0] || vs[0] || null;
+}
+if('speechSynthesis' in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function render(){
+  const sc = SCENES[idx];
+  $('appScreen').innerHTML = sc.screen();
+  $('caption').innerHTML = `<div><span class="step-tag">${sc.tag}</span><br>${sc.cap}</div>`;
+  $('sceneCount').textContent = `Paso ${idx+1} de ${SCENES.length}`;
+  $('progBar').style.width = ((idx)/(SCENES.length-1)*100)+'%';
+}
+
+function speakAndAdvance(){
+  clearTimeout(timer);
+  const sc = SCENES[idx];
+  const wordSecs = Math.max(3.2, sc.say.split(/\s+/).length / 2.6); // fallback por longitud
+  if(!muted && 'speechSynthesis' in window){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(sc.say);
+    u.lang = 'es-ES'; u.rate = 0.96; u.pitch = 0.92;
+    if(voice) u.voice = voice;
+    u.onend = ()=>{ if(playing) nextAuto(); };
+    speechSynthesis.speak(u);
+    // salvaguarda por si 'onend' no dispara
+    timer = setTimeout(()=>{ if(playing && !speechSynthesis.speaking) nextAuto(); }, (wordSecs+4)*1000);
+  } else {
+    timer = setTimeout(()=>{ if(playing) nextAuto(); }, wordSecs*1000);
+  }
+}
+function nextAuto(){
+  if(idx < SCENES.length-1){ idx++; render(); speakAndAdvance(); }
+  else { stop(); $('progBar').style.width='100%'; }
+}
+function play(){ playing = true; $('btnPlay').textContent='⏸'; speakAndAdvance(); }
+function stop(){ playing = false; $('btnPlay').textContent='▶'; clearTimeout(timer); if('speechSynthesis' in window) speechSynthesis.cancel(); }
+function goto(i){ stop(); idx = Math.max(0, Math.min(SCENES.length-1, i)); render(); }
+
+$('btnPlay').onclick = ()=>{ playing ? stop() : play(); };
+$('btnNext').onclick = ()=>{ goto(idx+1); };
+$('btnPrev').onclick = ()=>{ goto(idx-1); };
+$('btnReplay').onclick = ()=>{ goto(0); play(); };
+$('btnMute').onclick = ()=>{ muted = !muted; $('btnMute').textContent = muted ? '🔇' : '🔊'; if(muted && 'speechSynthesis' in window) speechSynthesis.cancel(); };
+
+render();
+</script>
+</body>
+</html>
