@@ -6007,7 +6007,7 @@ function renderGuiasRiesgoCv(){
 // salaId: sala a la que entra DIRECTO la unidad tras identificarse.
 // Si es null (Pediatría / Otra unidad), se muestra el listado completo de salas.
 const AGEND_UNIDADES = [
-  { code:'endo_dig',  name:'Endoscopía Digestiva', ico:'🔬', salaId:'endoscopia' },
+  { code:'endo_dig',  name:'Endoscopía Paralela', ico:'🔬', salaId:'endoscopia' },
   { code:'radio',     name:'Imagenología',         ico:'🩻', salaId:'imagenologia' },
   { code:'accesos',   name:'Accesos Vasculares',   ico:'💉', salaId:'accesos_vasculares' },
   { code:'odonto',    name:'Odontología',          ico:'🦷', salaId:'dental' },
@@ -6042,14 +6042,14 @@ const AGEND_DEFAULT_PIN = '1234';
 //   unidad solicitante al pedir hora (reemplaza el campo libre).
 const AGEND_SALAS = [
   {
-    id:'endoscopia', name:'Endoscopía', ico:'🔬', color:'#0EA5E9',
-    desc:'Endoscopías digestivas altas y bajas, colonoscopías, CPRE',
+    id:'endoscopia', name:'Endoscopía Paralela', ico:'🔬', color:'#0EA5E9',
+    desc:'Procedimientos endoscópicos en paralelo (la endoscopía regular tiene su propia vía de solicitud)',
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: [],
+    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','oncohemato','dental','fuera_sala'],
     allowsExtra: true,
     allowsParallelExtra: true
   },
@@ -6060,7 +6060,7 @@ const AGEND_SALAS = [
       3:{start:'08:00', end:'14:00'}, 6:{start:'08:00', end:'14:00'}
     },
     // Comparten un solo anestesiólogo → se bloquean entre sí (cola)
-    blockedByOtherSalas: ['accesos_vasculares','neurologia','oncohemato','dental','fuera_sala'],
+    blockedByOtherSalas: ['endoscopia','accesos_vasculares','neurologia','oncohemato','dental','fuera_sala'],
     allowsExtra: true,
     allowsParallelExtra: false
   },
@@ -6072,7 +6072,7 @@ const AGEND_SALAS = [
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['imagenologia','neurologia','oncohemato','dental','fuera_sala'],
+    blockedByOtherSalas: ['endoscopia','imagenologia','neurologia','oncohemato','dental','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false,
     procedimientosCatalogo: [
@@ -6091,7 +6091,7 @@ const AGEND_SALAS = [
     id:'dental', name:'Dental', ico:'🦷', color:'#F59E0B',
     desc:'Sedación dental',
     schedule: { 6:{start:'08:00', end:'14:00'} },
-    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','oncohemato','fuera_sala'],
+    blockedByOtherSalas: ['endoscopia','accesos_vasculares','imagenologia','neurologia','oncohemato','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false
   },
@@ -6103,7 +6103,7 @@ const AGEND_SALAS = [
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['accesos_vasculares','imagenologia','oncohemato','dental','fuera_sala'],
+    blockedByOtherSalas: ['endoscopia','accesos_vasculares','imagenologia','oncohemato','dental','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false
   },
@@ -6115,7 +6115,7 @@ const AGEND_SALAS = [
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','dental','fuera_sala'],
+    blockedByOtherSalas: ['endoscopia','accesos_vasculares','imagenologia','neurologia','dental','fuera_sala'],
     allowsExtra: false,
     allowsParallelExtra: false
   },
@@ -6127,7 +6127,7 @@ const AGEND_SALAS = [
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
       5:{start:'08:00', end:'20:00'}, 6:{start:'08:00', end:'14:00'}
     },
-    blockedByOtherSalas: ['accesos_vasculares','imagenologia','neurologia','oncohemato','dental'],
+    blockedByOtherSalas: ['endoscopia','accesos_vasculares','imagenologia','neurologia','oncohemato','dental'],
     allowsExtra: true,
     allowsParallelExtra: false
   },
@@ -6841,8 +6841,9 @@ function agendUnidadDoLogin(){
   const email = emailEl ? emailEl.value.trim() : '';
   if(pin !== AGEND_DEFAULT_PIN){ alert('PIN incorrecto. (PIN inicial: 1234)'); return; }
   if(!nom){ alert('Ingresa el nombre del solicitante.'); return; }
-  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-    alert('El email no tiene un formato válido.'); return;
+  if(!email){ alert('Ingresa un correo de contacto. Es necesario para recibir la confirmación del agendamiento.'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    alert('El correo de contacto no tiene un formato válido.'); return;
   }
   AGEND_STATE.mode = 'unidad';
   AGEND_STATE.unidadCode = code;
@@ -7892,8 +7893,9 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   slot.comentarioVisado = comentario;
   agendSaveData(data);
   agendScheduleSync(); // propagar el visado a la nube
-  // Notificación por email al solicitante (todas las salas EXCEPTO Endoscopía)
-  if(nuevoEstado === 'aprobada' && found.salaId !== 'endoscopia'){
+  // Al aprobar: abrir correo de confirmación al solicitante con copia a las
+  // secretarías de pabellón (todas las salas, incluida Endoscopía Paralela).
+  if(nuevoEstado === 'aprobada'){
     _agendOfrecerMailtoConfirmacion(slot, found.salaId, found.dateStr);
   }
   agendOpenDetalle(reqId);
@@ -7984,9 +7986,15 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   lineas.push('');
   lineas.push('— Servicio de Anestesia');
   const body = lineas.join('\n');
-  const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Secretarías de pabellón en copia (CC). Configurable en andes.json
+  // ("agendCcEmails": ["...","..."]). Si no está, usa estos dos por defecto.
+  const ccList = (INSTITUTION && Array.isArray(INSTITUTION.agendCcEmails) && INSTITUTION.agendCcEmails.length)
+    ? INSTITUTION.agendCcEmails
+    : ['ahernandez@clinicauandes.cl','oacosta@clinicauandes.cl'];
+  const cc = ccList.join(',');
+  const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   // Confirmación rápida y luego abrir el cliente de correo
-  const ok = confirm(`Solicitud APROBADA. ¿Abrir tu cliente de correo para notificar a ${req.solicitanteEmail}?\n\nSi cancelas, la aprobación queda registrada igualmente.`);
+  const ok = confirm(`Solicitud APROBADA. ¿Abrir tu cliente de correo para notificar a ${req.solicitanteEmail}?\n\nSe enviará con copia a las secretarías de pabellón (${cc}).\n\nSi cancelas, la aprobación queda registrada igualmente.`);
   if(!ok) return;
   try{
     window.location.href = url;

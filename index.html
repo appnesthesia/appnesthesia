@@ -1559,8 +1559,8 @@ canvas{max-width:100%}
         <input type="text" id="agendUnidadNombre" placeholder="Dr/a. apellido, nombre" autocomplete="name" />
         <label>Teléfono / anexo de contacto</label>
         <input type="text" id="agendUnidadTel" placeholder="Ej: anexo 4321 o +56 9 ..." />
-        <label>Email de contacto <span style="color:var(--muted);font-weight:400">(para recibir confirmaciones)</span></label>
-        <input type="email" id="agendUnidadEmail" placeholder="tu.correo@hospital.cl" autocomplete="email" />
+        <label>Correo de contacto * <span style="color:var(--muted);font-weight:400">(obligatorio — recibirás la confirmación)</span></label>
+        <input type="email" id="agendUnidadEmail" placeholder="tu.correo@clinica.cl" autocomplete="email" required />
         <button type="button" class="agend-btn-primary" onclick="agendUnidadDoLogin()">Entrar</button>
       </div>
     </div>
@@ -2264,6 +2264,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=59"></script>
+<script src="app.js?v=62"></script>
 </body>
 </html>
