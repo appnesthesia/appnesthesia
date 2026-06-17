@@ -4197,9 +4197,43 @@ async function aiAnalizarSolicitud(reqId){
 // ============================================================
 // SERVICE WORKER (PWA)
 // ============================================================
+// Muestra un aviso flotante cuando hay una versión nueva publicada, para que
+// quien tenga la app abierta pueda actualizar con un toque (recarga).
+let _swWaiting = null;
+function showUpdateBanner(){
+  if(document.getElementById('updateBanner')) return;
+  const b = document.createElement('div');
+  b.id = 'updateBanner';
+  b.innerHTML = '🔄 Nueva versión disponible — toca para actualizar';
+  b.onclick = function(){
+    b.textContent = 'Actualizando…';
+    try{ if(_swWaiting) _swWaiting.postMessage('SKIP_WAITING'); }catch(e){}
+    setTimeout(()=>{ location.reload(); }, 250);
+  };
+  document.body.appendChild(b);
+}
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      if(!reg) return;
+      // Detectar una actualización del service worker (= versión nueva)
+      reg.addEventListener('updatefound', ()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange', ()=>{
+          // Solo si YA había una versión controlando (no en la primera carga)
+          if((nw.state === 'installed' || nw.state === 'activated') && navigator.serviceWorker.controller){
+            _swWaiting = reg.waiting || nw;
+            showUpdateBanner();
+          }
+        });
+      });
+      // Revisar si hay versión nueva: al volver a la pestaña y cada 30 min
+      const checkUpdate = ()=>{ try{ reg.update(); }catch(e){} };
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') checkUpdate(); });
+      setInterval(checkUpdate, 30*60*1000);
+    }).catch(()=>{});
   });
 }
 
