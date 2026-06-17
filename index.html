@@ -871,6 +871,36 @@ canvas{max-width:100%}
   .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
+/* Iconos del header (buscar / ayuda) */
+.hdr-icon{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);color:#fff;width:34px;height:34px;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+.hdr-icon:hover{background:rgba(255,255,255,.3)}
+
+/* Buscador global */
+.search-overlay{position:fixed;inset:0;z-index:11000;background:rgba(8,28,21,.5);backdrop-filter:blur(3px);display:flex;justify-content:center;align-items:flex-start;padding:64px 14px 14px}
+.search-overlay.hidden{display:none!important}
+.search-box{width:100%;max-width:520px;background:var(--card);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:80vh}
+.search-inputrow{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1.5px solid var(--border)}
+.search-ico{font-size:16px;opacity:.7}
+.search-inputrow input{flex:1;border:none;outline:none;font-size:16px;font-family:inherit;background:transparent;color:var(--text)}
+.search-x{background:#eef3f1;border:none;color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:19px;cursor:pointer;line-height:1}
+.search-results{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px}
+.search-item{display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border:none;background:transparent;border-radius:11px;cursor:pointer;font-family:inherit;text-align:left;color:inherit}
+.search-item:hover{background:#eef6f2}
+.search-item .si{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#0f4435,#2e8b6b);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.search-item b{font-size:13.5px;color:var(--primary-dark);display:block;font-family:'Manrope','Inter',sans-serif}
+.search-item span{font-size:11.5px;color:var(--muted)}
+.search-empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:13px}
+.search-hint{padding:10px 14px;color:var(--muted);font-size:11.5px}
+
+/* Ayuda y ajustes (tamaño de letra) */
+.help-fs-row{display:flex;align-items:center;gap:10px;margin:10px 0 4px}
+.help-fs-btn{flex:1;border:1.5px solid var(--border);background:#fff;border-radius:10px;padding:10px;font-family:inherit;font-weight:700;cursor:pointer;color:var(--primary-dark)}
+.help-fs-btn.on{background:#e7f5ef;border-color:var(--green-forest)}
+.help-card-btn{display:flex;align-items:center;gap:11px;width:100%;padding:12px;border:1.5px solid var(--green-pale);background:linear-gradient(180deg,#fafffd,#f2faf6);border-radius:13px;cursor:pointer;font-family:inherit;text-align:left;color:inherit;margin-bottom:9px}
+.help-card-btn .hi{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0f4435,#2e8b6b);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.help-card-btn b{font-size:13.5px;color:var(--primary-dark);display:block}
+.help-card-btn span{font-size:11.5px;color:var(--muted)}
+
 /* ============ CALCULADORAS PERIOPERATORIAS ============ */
 .calc-overlay{position:fixed;inset:0;z-index:10800;background:linear-gradient(180deg,#f0faf5,#e9f4ef);display:flex;flex-direction:column}
 .calc-overlay.hidden{display:none!important}
@@ -1774,6 +1804,8 @@ canvas{max-width:100%}
   <h1 id="hdrTitle">Appnesthesia</h1>
   <div id="syncStatus" class="sync-status" style="display:none" onclick="promptBackendToken()" title="Estado de sincronización con backend"></div>
   <button id="backendCfgBtn" class="admin-only sync-cfg-btn" style="display:none" onclick="promptBackendToken()" title="Configurar backend">⚙</button>
+  <button type="button" class="hdr-icon" onclick="openGlobalSearch()" title="Buscar en la app" aria-label="Buscar">🔎</button>
+  <button type="button" class="hdr-icon" onclick="openHelp()" title="Ayuda y ajustes" aria-label="Ayuda">?</button>
   <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>
   <button class="admin-toggle" id="adminBtn" onclick="toggleAdmin()">Modo usuario</button>
 </header>
@@ -2277,6 +2309,18 @@ canvas{max-width:100%}
 </footer>
 </main>
 
+<!-- BUSCADOR GLOBAL (overlay) -->
+<div id="searchOverlay" class="search-overlay hidden" onclick="if(event.target===this)closeGlobalSearch()">
+  <div class="search-box">
+    <div class="search-inputrow">
+      <span class="search-ico">🔎</span>
+      <input type="text" id="globalSearchInput" placeholder="Buscar sección o herramienta…" autocomplete="off" oninput="renderGlobalSearch()" onkeydown="if(event.key==='Escape')closeGlobalSearch()">
+      <button type="button" class="search-x" onclick="closeGlobalSearch()">×</button>
+    </div>
+    <div id="globalSearchResults" class="search-results"></div>
+  </div>
+</div>
+
 <!-- CALCULADORAS PERIOPERATORIAS (overlay) -->
 <div id="calcOverlay" class="calc-overlay hidden">
   <div class="calc-head">
@@ -2312,6 +2356,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=65"></script>
+<script src="app.js?v=66"></script>
 </body>
 </html>

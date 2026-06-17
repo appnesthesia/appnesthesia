@@ -4202,6 +4202,117 @@ async function aiAnalizarSolicitud(reqId){
 }
 
 // ============================================================
+// BUSCADOR GLOBAL · AYUDA · TAMAÑO DE LETRA
+// ============================================================
+// Cierra cualquier pantalla/overlay para luego navegar limpio.
+function _searchCloseAll(){
+  ['guiasScreen','agendScreen','calcOverlay','aiChatOverlay','modulesScreen','searchOverlay','helpOverlay'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.classList.add('hidden');
+  });
+  try{ closeModal(); }catch(e){}
+}
+function _goView(v){ _searchCloseAll(); try{ showView(v); }catch(e){} }
+function _goPortal(sec){ _searchCloseAll(); try{ openGuiasModule(); if(sec) setTimeout(()=>{ try{ openGuiasSection(sec); }catch(e){} }, 60); }catch(e){} }
+
+// Índice de destinos buscables (secciones y herramientas)
+const SEARCH_INDEX = [
+  { ico:'🏠', label:'Inicio', hint:'Pantalla principal', kw:'inicio home principal', go:()=>_goView('home') },
+  { ico:'📅', label:'Calendario de turnos', hint:'Turnos del servicio', kw:'calendario turnos rol', go:()=>_goView('calendario') },
+  { ico:'📊', label:'Horario en línea', hint:'Excel del rol', kw:'horario excel onedrive rol', go:()=>_goView('horario') },
+  { ico:'🏆', label:'Índice de permanencia', hint:'Ranking y puntaje', kw:'indice permanencia ranking puntaje', go:()=>_goView('indice') },
+  { ico:'🛡️', label:'Cobertura de emergencia', hint:'Listado de cobertura', kw:'cobertura emergencia urgencia', go:()=>_goView('cobertura') },
+  { ico:'🔄', label:'Intercambio de turnos', hint:'Ofrecer o tomar turnos', kw:'intercambio turnos cambio permuta llamada', go:()=>_goView('intercambios') },
+  { ico:'🌴', label:'Vacaciones', hint:'Solicitudes y aprobaciones', kw:'vacaciones permiso solicitud feriado', go:()=>_goView('vacaciones') },
+  { ico:'📈', label:'Estadísticas del servicio', hint:'Indicadores', kw:'estadisticas indicadores produccion', go:()=>_goView('estadisticas') },
+  { ico:'👤', label:'Mi Panel', hint:'Perfil y preferencias', kw:'mi panel perfil preferencias cuenta', go:()=>_goView('mipanel') },
+  { ico:'🎉', label:'Calendario de Eventos', hint:'Reuniones y cumpleaños', kw:'eventos reuniones cumpleaños conmemorativo', go:()=>_goView('eventos') },
+  { ico:'📄', label:'Protocolos', hint:'Guías del servicio', kw:'protocolos guias eras', go:()=>_goView('protocolos') },
+  { ico:'🧒', label:'Pediatría', hint:'Dosis por kg', kw:'pediatria pediatrico dosis niño kg', go:()=>_goView('pediatria') },
+  { ico:'🩸', label:'Coagulación · ASRA neuroaxial', hint:'Suspensión de anticoagulantes', kw:'coagulacion asra anticoagulantes neuroaxial heparina enoxaparina espinal', go:()=>_goView('coagulacion') },
+  { ico:'💉', label:'Anestesia Regional', hint:'Bloqueos por zona', kw:'regional bloqueo nervio nysora hombro cadera rodilla peng', go:()=>_goView('regional') },
+  { ico:'🧮', label:'Calculadoras Perioperatorias', hint:'AL, pesos, vasoactivos, VFG, MABL', kw:'calculadora calculo anestesico local peso ideal vasoactivo infusion renal vfg perdida sanguinea mabl', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); }catch(e){} } },
+  { ico:'🤖', label:'ARIA · Asistente IA', hint:'Pregunta en lenguaje natural', kw:'aria ia asistente inteligencia pregunta', go:()=>{ _searchCloseAll(); try{ openAiChat(); }catch(e){} } },
+  { ico:'🗓️', label:'Agendamiento de procedimientos', hint:'Solicitar / visar', kw:'agendamiento agenda procedimiento solicitud sala resonancia picc', go:()=>{ _searchCloseAll(); try{ showModulesScreen(); setTimeout(()=>{ try{ openAgendamientoModule(); }catch(e){} },60); }catch(e){} } },
+  { ico:'🩺', label:'Portal Preanestésico', hint:'Preparación del paciente', kw:'portal preanestesico preanestesia preparacion', go:()=>_goPortal(null) },
+  { ico:'🍽️', label:'Ayuno Preoperatorio', hint:'Portal Preanestésico', kw:'ayuno preoperatorio glp ozempic', go:()=>_goPortal('gpAyuno') },
+  { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
+  { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
+  { ico:'❤️', label:'Riesgo Cardiovascular (RCRI/METs)', hint:'Portal Preanestésico', kw:'riesgo cardiovascular rcri mets cardiologia', go:()=>_goPortal('gpRiesgoCv') },
+];
+
+function openGlobalSearch(){
+  document.getElementById('searchOverlay').classList.remove('hidden');
+  const inp = document.getElementById('globalSearchInput');
+  if(inp){ inp.value=''; setTimeout(()=>inp.focus(), 60); }
+  renderGlobalSearch();
+}
+function closeGlobalSearch(){ document.getElementById('searchOverlay').classList.add('hidden'); }
+function renderGlobalSearch(){
+  const q = _gpNorm(document.getElementById('globalSearchInput')?.value || '');
+  const cont = document.getElementById('globalSearchResults');
+  if(!cont) return;
+  let items = SEARCH_INDEX;
+  if(q){
+    const words = q.split(/\s+/).filter(Boolean);
+    items = SEARCH_INDEX.filter(it=>{
+      const hay = _gpNorm(it.label + ' ' + it.hint + ' ' + it.kw);
+      return words.every(w => hay.includes(w));
+    });
+  }
+  if(items.length === 0){
+    cont.innerHTML = `<div class="search-empty">Sin resultados para "${(document.getElementById('globalSearchInput').value||'').replace(/</g,'&lt;')}"</div>`;
+    return;
+  }
+  const head = q ? '' : '<div class="search-hint">Todas las secciones y herramientas:</div>';
+  cont.innerHTML = head + items.map((it,i)=>
+    `<button type="button" class="search-item" data-i="${SEARCH_INDEX.indexOf(it)}" onclick="_searchPick(${SEARCH_INDEX.indexOf(it)})"><span class="si">${it.ico}</span><span style="flex:1;min-width:0"><b>${it.label}</b><span>${it.hint}</span></span></button>`
+  ).join('');
+}
+function _searchPick(i){
+  const it = SEARCH_INDEX[i];
+  closeGlobalSearch();
+  if(it && typeof it.go === 'function') it.go();
+}
+
+// --- Ayuda y ajustes (incluye tamaño de letra) ---
+const _FS_LEVELS = [1, 1.15, 1.30];
+function applyFontScale(){
+  let lvl = 0;
+  try{ lvl = parseInt(localStorage.getItem('appnesthesia_fontscale')||'0',10) || 0; }catch(e){}
+  if(lvl<0||lvl>2) lvl=0;
+  try{ document.documentElement.style.zoom = _FS_LEVELS[lvl]; }catch(e){}
+  return lvl;
+}
+function setFontScale(lvl){
+  try{ localStorage.setItem('appnesthesia_fontscale', String(lvl)); }catch(e){}
+  applyFontScale();
+  try{ openHelp(); }catch(e){} // re-render para marcar el botón activo
+}
+function openHelp(){
+  let lvl = 0;
+  try{ lvl = parseInt(localStorage.getItem('appnesthesia_fontscale')||'0',10) || 0; }catch(e){}
+  modal(`
+    <h3 style="margin:0 0 4px">Ayuda y ajustes</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px">Encuentra ayuda y personaliza la app.</p>
+
+    <div style="font-size:12px;font-weight:800;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tamaño de letra</div>
+    <div class="help-fs-row">
+      <button type="button" class="help-fs-btn ${lvl===0?'on':''}" style="font-size:13px" onclick="setFontScale(0)">A</button>
+      <button type="button" class="help-fs-btn ${lvl===1?'on':''}" style="font-size:16px" onclick="setFontScale(1)">A+</button>
+      <button type="button" class="help-fs-btn ${lvl===2?'on':''}" style="font-size:19px" onclick="setFontScale(2)">A++</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin:2px 0 16px">Agranda todo el contenido de la app. Se recuerda en este dispositivo.</p>
+
+    <div style="font-size:12px;font-weight:800;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Ayuda</div>
+    <a class="help-card-btn" href="tutorial.html" target="_blank" rel="noopener"><span class="hi">🎬</span><span style="flex:1"><b>Ver tutorial de agendamiento</b><span>Cómo solicitar una hora, paso a paso</span></span></a>
+    <button type="button" class="help-card-btn" onclick="closeModal();openAiChat();"><span class="hi">🤖</span><span style="flex:1"><b>Preguntar a ARIA</b><span>Asistente clínico en lenguaje natural</span></span></button>
+    <button type="button" class="help-card-btn" onclick="closeModal();openGlobalSearch();"><span class="hi">🔎</span><span style="flex:1"><b>Buscar en la app</b><span>Salta a cualquier sección o herramienta</span></span></button>
+
+    <div style="text-align:right;margin-top:8px"><button class="btn" onclick="closeModal()">Cerrar</button></div>
+  `);
+}
+
+// ============================================================
 // CALCULADORAS CLÍNICAS PERIOPERATORIAS
 // Panel reutilizable abierto desde Portal Preanestésico y Staff.
 // Todas son REFERENCIA — la decisión es del anestesiólogo a cargo.
@@ -4447,6 +4558,10 @@ function showUpdateBanner(){
   };
   document.body.appendChild(b);
 }
+
+// Aplicar el tamaño de letra guardado lo antes posible
+try{ applyFontScale(); }catch(e){}
+window.addEventListener('load', ()=>{ try{ applyFontScale(); }catch(e){} });
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
