@@ -4480,33 +4480,99 @@ window._doPeso = function(){
 };
 
 // 3) Drogas vasoactivas ------------------------------------------------------
+// Nómina de drogas vasoactivas e infusiones.
+// unidad: 'ugkgmin' (µg/kg/min) · 'ugkgh' (µg/kg/h) · 'umin' (U/min, fija, no por peso)
+// dil: {mg, ml}  →  concentración µg/mL = mg*1000/ml.  Para 'umin' dil:{u, ml} (U/mL).
+const VASO_DRUGS = [
+  { name:'Noradrenalina', clase:'Vasopresor', unidad:'ugkgmin', inicio:0.05, rango:'0,01–0,5', dil:{mg:4, ml:100}, nota:'Vía central. Vasopresor de 1ª línea en shock distributivo.' },
+  { name:'Adrenalina', clase:'Vasopresor / inótropo', unidad:'ugkgmin', inicio:0.03, rango:'0,01–0,5', dil:{mg:4, ml:100}, nota:'Inótropo y vasopresor. Vigilar taquicardia, lactato, hiperglicemia.' },
+  { name:'Dobutamina', clase:'Inótropo', unidad:'ugkgmin', inicio:5, rango:'2–20', dil:{mg:250, ml:250}, nota:'Inótropo β1. Puede bajar la PA (vasodilatación) y dar taquicardia.' },
+  { name:'Dopamina', clase:'Inótropo / vasopresor', unidad:'ugkgmin', inicio:5, rango:'2–20', dil:{mg:400, ml:250}, nota:'Efecto dosis-dependiente. Más arritmias que noradrenalina.' },
+  { name:'Milrinona', clase:'Inodilatador', unidad:'ugkgmin', inicio:0.375, rango:'0,25–0,75', dil:{mg:20, ml:100}, nota:'Carga opcional 50 µg/kg en 10 min. Ajustar en falla renal. Vigilar hipotensión.' },
+  { name:'Fenilefrina', clase:'Vasopresor (α puro)', unidad:'ugkgmin', inicio:0.3, rango:'0,1–1,5', dil:{mg:10, ml:100}, nota:'α1 puro. Útil con taquicardia; puede dar bradicardia refleja.' },
+  { name:'Nitroglicerina', clase:'Vasodilatador', unidad:'ugkgmin', inicio:0.5, rango:'0,25–5', dil:{mg:50, ml:250}, nota:'Venodilatador. Tolerancia con uso prolongado. Cuidado con hipovolemia.' },
+  { name:'Nitroprusiato de sodio', clase:'Vasodilatador', unidad:'ugkgmin', inicio:0.3, rango:'0,3–8 (máx 10)', dil:{mg:50, ml:250}, nota:'Proteger de la luz. Riesgo de toxicidad por cianuro a dosis altas/prolongadas.' },
+  { name:'Esmolol', clase:'Betabloqueo', unidad:'ugkgmin', inicio:50, rango:'50–300', dil:{mg:2500, ml:250}, nota:'Carga opcional 500 µg/kg en 1 min. Vida media muy corta.' },
+  { name:'Levosimendán', clase:'Inodilatador', unidad:'ugkgmin', inicio:0.1, rango:'0,05–0,2', dil:{mg:12.5, ml:250}, nota:'Sensibilizador del calcio. Carga opcional; vigilar hipotensión.' },
+  { name:'Isoproterenol', clase:'Cronótropo (β)', unidad:'ugkgmin', inicio:0.02, rango:'0,01–0,1', dil:{mg:1, ml:250}, nota:'Para bradicardia/BAV. Aumenta consumo de O₂ miocárdico.' },
+  { name:'Dexmedetomidina', clase:'Sedante simpaticolítico', unidad:'ugkgh', inicio:0.4, rango:'0,2–0,7', dil:{mg:0.2, ml:50}, nota:'Carga opcional 1 µg/kg en 10 min (puede dar hipo/hipertensión y bradicardia).' },
+  { name:'Vasopresina', clase:'Vasopresor (no por peso)', unidad:'umin', inicio:0.03, rango:'0,01–0,04', dil:{u:20, ml:100}, nota:'Dosis FIJA en U/min (no se ajusta por peso). Coadyuvante en shock vasodilatado.' },
+];
+
+function _vasoConcUgMl(d){ return (d.dil.mg*1000)/d.dil.ml; }
+function _vasoMlh(d, peso){
+  if(d.unidad==='umin'){ const concU=d.dil.u/d.dil.ml; return d.inicio*60/concU; }
+  const conc=_vasoConcUgMl(d);
+  if(d.unidad==='ugkgh'){ return (d.inicio*peso)/conc; }
+  return (d.inicio*peso*60)/conc; // ugkgmin
+}
+function _vasoDilTxt(d){
+  if(d.unidad==='umin') return `${d.dil.u} U / ${d.dil.ml} mL (${_cFmt(d.dil.u/d.dil.ml,2)} U/mL)`;
+  return `${_cFmt(d.dil.mg,0)} mg / ${d.dil.ml} mL (${_cFmt(_vasoConcUgMl(d),0)} µg/mL)`;
+}
+function _vasoUnidadTxt(u){ return u==='ugkgh'?'µg/kg/h' : u==='umin'?'U/min' : 'µg/kg/min'; }
+
 function _calcVaso(){
   return `
-   <p class="calc-detail-sub">Convierte la dosis a velocidad de infusión (mL/h) según tu dilución.</p>
-   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doVaso();return false;">
+   <p class="calc-detail-sub">Ingresa el peso y obtén la <b>dosis inicial</b> y la <b>velocidad de infusión (mL/h)</b> de cada droga, con su dilución estándar.</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doVasoNomina();return false;">
      <div class="gp-calc-grid">
-       <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="vPeso" inputmode="decimal" placeholder="70"></label>
-       <label class="gp-calc-field"><span>Dosis objetivo</span><input type="number" id="vDosis" inputmode="decimal" placeholder="0.1"></label>
-       <label class="gp-calc-field"><span>Unidad de dosis</span><select id="vUnidad"><option value="kgmin">µg/kg/min</option><option value="min">µg/min</option></select></label>
-       <label class="gp-calc-field"><span>Droga (mg)</span><input type="number" id="vMg" inputmode="decimal" placeholder="4"></label>
-       <label class="gp-calc-field"><span>Diluida en (mL)</span><input type="number" id="vMl" inputmode="decimal" placeholder="100"></label>
+       <label class="gp-calc-field"><span>Peso del paciente (kg)</span><input type="number" id="vNomPeso" inputmode="decimal" placeholder="70" oninput="window._doVasoNomina()"></label>
      </div>
-     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular mL/h</button></div>
    </form>
-   <div id="calcOut"></div>`;
+   <div id="vasoNomina"></div>
+   <details class="asra-legacy" style="margin-top:14px">
+     <summary>🧮 Cálculo manual (otra dilución / otra dosis)</summary>
+     <form class="gp-calc-form" style="margin-top:10px" onsubmit="event.preventDefault();window._doVaso();return false;">
+       <div class="gp-calc-grid">
+         <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="vPeso" inputmode="decimal" placeholder="70"></label>
+         <label class="gp-calc-field"><span>Dosis objetivo</span><input type="number" id="vDosis" inputmode="decimal" placeholder="0.1"></label>
+         <label class="gp-calc-field"><span>Unidad de dosis</span><select id="vUnidad"><option value="kgmin">µg/kg/min</option><option value="kgh">µg/kg/h</option><option value="min">µg/min</option></select></label>
+         <label class="gp-calc-field"><span>Droga (mg)</span><input type="number" id="vMg" inputmode="decimal" placeholder="4"></label>
+         <label class="gp-calc-field"><span>Diluida en (mL)</span><input type="number" id="vMl" inputmode="decimal" placeholder="100"></label>
+       </div>
+       <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">Calcular mL/h</button></div>
+     </form>
+     <div id="calcOut"></div>
+   </details>`;
 }
+window._doVasoNomina = function(){
+  const peso = _cNum('vNomPeso');
+  const cont = document.getElementById('vasoNomina');
+  if(!cont) return;
+  if(!peso){ cont.innerHTML = '<div class="gp-calc-block nota">Ingresa el peso para ver la nómina con las velocidades de infusión.</div>'; return; }
+  const rows = VASO_DRUGS.map(d=>{
+    const mlh = _vasoMlh(d, peso);
+    const dosisTxt = d.unidad==='umin'
+      ? `${_cFmt(d.inicio,2)} U/min`
+      : `${_cFmt(d.inicio,3)} ${_vasoUnidadTxt(d.unidad)}`;
+    return `<tr>
+      <td><b>${d.name}</b><div class="vaso-sub">${d.clase}</div></td>
+      <td class="vaso-dose">${dosisTxt}<div class="vaso-sub">rango ${d.rango}</div></td>
+      <td class="vaso-mlh">${_cFmt(mlh,1)}<span> mL/h</span></td>
+    </tr>
+    <tr class="vaso-detail"><td colspan="3"><span class="vaso-dil">Dilución: ${_vasoDilTxt(d)}</span> · ${d.nota}</td></tr>`;
+  }).join('');
+  cont.innerHTML = `
+    <div class="vaso-head">Velocidad de infusión <b>inicial</b> para <b>${_cFmt(peso,0)} kg</b></div>
+    <div class="vaso-table-wrap"><table class="vaso-table">
+      <thead><tr><th>Droga</th><th>Dosis inicial</th><th>Inicio</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="gp-calc-block nota">Las diluciones mostradas son <b>estándar de referencia</b>; verifica la concentración real de tu preparación/bomba. Dosis iniciales orientativas — titular según respuesta clínica. Vasopresina es dosis fija (no por peso).</div>`;
+};
 window._doVaso = function(){
   const peso=_cNum('vPeso'), dosis=_cNum('vDosis'), mg=_cNum('vMg'), ml=_cNum('vMl'), unidad=_cVal('vUnidad');
-  if(!dosis||!mg||!ml||(unidad==='kgmin'&&!peso)){ _cResult('Completa los campos.'); return; }
+  if(!dosis||!mg||!ml||((unidad==='kgmin'||unidad==='kgh')&&!peso)){ _cResult('Completa los campos.'); return; }
   const concUgMl=(mg*1000)/ml;
-  const ugMin = unidad==='kgmin' ? dosis*peso : dosis;
-  const mlh = ugMin*60/concUgMl;
+  let mlh, ugMinTxt;
+  if(unidad==='kgh'){ const ugH=dosis*peso; mlh=ugH/concUgMl; ugMinTxt=`${_cFmt(ugH,1)} µg/h (${_cFmt(dosis,3)} µg/kg/h)`; }
+  else { const ugMin = unidad==='kgmin' ? dosis*peso : dosis; mlh=ugMin*60/concUgMl; ugMinTxt=`${_cFmt(ugMin,2)} µg/min${unidad==='kgmin'?` (${_cFmt(dosis,3)} µg/kg/min)`:''}`; }
   _cResult(`
     <div class="gp-calc-block pedir"><strong>Velocidad de infusión</strong>
       <div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin:4px 0">${_cFmt(mlh,1)} mL/h</div>
-      <div style="font-size:12px">Concentración: <b>${_cFmt(concUgMl,0)} µg/mL</b> · Dosis: ${_cFmt(ugMin,2)} µg/min${unidad==='kgmin'?` (${_cFmt(dosis,3)} µg/kg/min)`:''}</div>
-    </div>
-    <div class="gp-calc-block nota">Diluciones frecuentes: Noradrenalina 4 mg/100 mL = 40 µg/mL · 8 mg/250 mL = 32 µg/mL. Confirma siempre la concentración real de tu bomba.</div>`);
+      <div style="font-size:12px">Concentración: <b>${_cFmt(concUgMl,0)} µg/mL</b> · Dosis: ${ugMinTxt}</div>
+    </div>`);
 };
 
 // 4) Función renal -----------------------------------------------------------
