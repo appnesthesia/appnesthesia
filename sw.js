@@ -7,7 +7,7 @@
 //   - skipWaiting + clients.claim → reemplaza al SW anterior sin esperar
 //     a que el usuario cierre todas las pestañas.
 
-const CACHE = 'anestesia-v63';
+const CACHE = 'anestesia-v65';
 const ASSETS = [
   './',
   './index.html',
@@ -95,7 +95,7 @@ self.addEventListener('message', e => {
 // ============================================================
 self.addEventListener('push', e => {
   let titulo = '📋 Appnesthesia';
-  let cuerpo = 'Nueva solicitud de agendamiento. Toca para revisar.';
+  let cuerpo = 'Tienes una nueva solicitud por revisar. Toca para abrir.';
   // Si en el futuro se envía payload, se usa; si no, queda el genérico.
   try {
     if (e.data) {

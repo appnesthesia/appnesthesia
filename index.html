@@ -871,6 +871,27 @@ canvas{max-width:100%}
   .gp-calc-btn{min-width:auto;flex:1 1 100%}
 }
 
+/* ============ CALCULADORAS PERIOPERATORIAS ============ */
+.calc-overlay{position:fixed;inset:0;z-index:10800;background:linear-gradient(180deg,#f0faf5,#e9f4ef);display:flex;flex-direction:column}
+.calc-overlay.hidden{display:none!important}
+.calc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;flex-shrink:0}
+.calc-head-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:18px}
+.calc-head-title{flex:1;font-weight:800;font-size:15.5px;font-family:'Manrope','Inter',sans-serif}
+.calc-back,.calc-close{background:rgba(255,255,255,.14);border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1;font-family:inherit}
+.calc-back:hover,.calc-close:hover{background:rgba(255,255,255,.26)}
+.calc-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.calc-card{display:flex;flex-direction:column;gap:7px;padding:14px 12px;background:#fff;border:1.5px solid var(--green-pale);border-radius:15px;cursor:pointer;font-family:inherit;text-align:center;align-items:center;transition:all .15s}
+.calc-card:hover{border-color:var(--green-forest);transform:translateY(-2px);box-shadow:0 8px 18px -6px rgba(15,68,53,.2)}
+.calc-card .ci{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#0f4435,#2e8b6b);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff}
+.calc-card b{font-size:13px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.25}
+.calc-card span{font-size:11px;color:var(--muted);line-height:1.35}
+.calc-xref{margin-top:14px;background:#fff;border:1px solid var(--green-pale);border-radius:13px;padding:12px 13px;font-size:12px;line-height:1.6;color:var(--text)}
+.calc-xref b{color:var(--primary-dark)}
+.calc-xref a{color:var(--green-forest);font-weight:700;text-decoration:none;cursor:pointer}
+.calc-disc{margin-top:12px;font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 11px;line-height:1.5}
+.calc-detail-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+
 /* Aviso de nueva versión disponible */
 #updateBanner{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;font-weight:700;font-size:13.5px;padding:12px 20px;border-radius:30px;box-shadow:0 8px 26px rgba(15,68,53,.45);cursor:pointer;max-width:92%;text-align:center;letter-spacing:.2px;animation:upBannerIn .35s cubic-bezier(.2,.9,.3,1.3)}
 #updateBanner:hover{filter:brightness(1.06)}
@@ -1415,6 +1436,11 @@ canvas{max-width:100%}
             <h3 class="gp-portal-card-title">Riesgo Cardiovascular</h3>
             <p class="gp-portal-card-desc">RCRI, METs y derivación a Cardiología</p>
           </button>
+          <button type="button" class="gp-portal-card" onclick="openCalculadoras()" style="background:linear-gradient(135deg,#eef6f2,#e3f1ea);border-color:#bbd9cc">
+            <div class="gp-portal-card-ico" style="background:linear-gradient(135deg,#0f4435,#2e8b6b)"><span>🧮</span></div>
+            <h3 class="gp-portal-card-title">Calculadoras Perioperatorias</h3>
+            <p class="gp-portal-card-desc">Anestésico local, pesos, vasoactivos, función renal y pérdida sanguínea</p>
+          </button>
           <button type="button" class="gp-portal-card ai-entry-btn" onclick="openAiChat()" style="background:linear-gradient(135deg,#f1eff7,#ece9f4);border-color:#c5bfdc">
             <div class="gp-portal-card-ico" style="background:transparent;padding:0"><img src="logo-aria.png?v=49" alt="ARIA" style="width:100%;height:100%;border-radius:14px;display:block"/></div>
             <h3 class="gp-portal-card-title">ARIA · Asistente IA</h3>
@@ -1828,6 +1854,11 @@ canvas{max-width:100%}
       <div class="ico"><svg viewBox="0 0 24 24"><path class="doc-body" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path class="doc-fold" d="M14 2v6h6z"/><line class="doc-line" x1="8" y1="13" x2="16" y2="13"/><line class="doc-line" x1="8" y1="17" x2="13" y2="17"/></svg></div>
       <h3>Protocolos</h3>
       <p>Guías y procedimientos del servicio</p>
+    </button>
+    <button class="card c5" onclick="openCalculadoras()">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2.4"/><line x1="7.5" y1="7" x2="16.5" y2="7"/><line x1="8" y1="11.5" x2="8" y2="11.5"/><line x1="12" y1="11.5" x2="12" y2="11.5"/><line x1="16" y1="11.5" x2="16" y2="11.5"/><line x1="8" y1="15.5" x2="8" y2="15.5"/><line x1="12" y1="15.5" x2="12" y2="15.5"/><line x1="16" y1="15.5" x2="16" y2="18.5"/></svg></div>
+      <h3>Calculadoras Perioperatorias</h3>
+      <p>Anestésico local, pesos, vasoactivos, VFG, pérdida sanguínea</p>
     </button>
     <button class="card c8" onclick="showView('pediatria')">
       <div class="ico"><svg viewBox="0 0 24 24"><ellipse class="pac-teat" cx="12" cy="6" rx="2.6" ry="3"/><ellipse class="pac-shield" cx="12" cy="12.5" rx="6.5" ry="3.8"/><circle class="pac-ring" cx="12" cy="19" r="2.8"/></svg></div>
@@ -2246,6 +2277,17 @@ canvas{max-width:100%}
 </footer>
 </main>
 
+<!-- CALCULADORAS PERIOPERATORIAS (overlay) -->
+<div id="calcOverlay" class="calc-overlay hidden">
+  <div class="calc-head">
+    <button type="button" class="calc-back" id="calcBackBtn" onclick="calcBack()" style="display:none">‹</button>
+    <div class="calc-head-ico">🧮</div>
+    <div class="calc-head-title" id="calcTitle">Calculadoras Perioperatorias</div>
+    <button type="button" class="calc-close" onclick="closeCalculadoras()" title="Cerrar">×</button>
+  </div>
+  <div class="calc-body" id="calcBody"></div>
+</div>
+
 <!-- CHAT ASISTENTE IA -->
 <div id="aiChatOverlay" class="ai-chat-overlay hidden">
   <div class="ai-chat-box">
@@ -2270,6 +2312,6 @@ canvas{max-width:100%}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=63"></script>
+<script src="app.js?v=65"></script>
 </body>
 </html>

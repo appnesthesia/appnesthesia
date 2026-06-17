@@ -1736,6 +1736,8 @@ function saveVacation(id, isNew){
     state.vacations = state.vacations.map(x=>x.id===id?v:x);
   }
   save(); closeModal(); renderVacations(); toast(isNew?'Solicitud enviada':'Solicitud actualizada');
+  // Aviso push al admin cuando llega una NUEVA solicitud de vacaciones/permiso
+  if(isNew && v.status === 'pending'){ try{ notifyAdminsPush('vacaciones'); }catch(e){} }
   window._vacEditing = null;
 }
 function viewVacation(id){
@@ -3847,15 +3849,20 @@ async function disablePushNotifications(){
   updatePushBtn();
 }
 // Dispara el envío de la push a los admin suscritos (al crear una solicitud).
-function notifyAdminsOfNewRequest(){
+// Envía una notificación push a los dispositivos suscritos (admin).
+// El mensaje es genérico (no viaja info sensible); sirve para agendamiento,
+// vacaciones y permisos por igual. El admin abre la app y ve qué hay pendiente.
+function notifyAdminsPush(tipo){
   const base = getPushURL();
   if(!base) return;
   const headers = {'Content-Type':'application/json'};
   try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
   try{
-    fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo:'agend-nueva' }) }).catch(()=>{});
+    fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo: tipo || 'solicitud' }) }).catch(()=>{});
   }catch(e){}
 }
+// Alias para el agendamiento (mantiene compatibilidad).
+function notifyAdminsOfNewRequest(){ notifyAdminsPush('agendamiento'); }
 // Muestra/actualiza el botón de activar avisos (solo admin)
 function updatePushBtn(){
   const btn = document.getElementById('pushToggleBtn');
@@ -4193,6 +4200,234 @@ async function aiAnalizarSolicitud(reqId){
     if(cont) cont.innerHTML = '<div class="ai-visado-card error">❌ No se pudo analizar: ' + _aiEsc(e.message||String(e)) + '</div>';
   }
 }
+
+// ============================================================
+// CALCULADORAS CLÍNICAS PERIOPERATORIAS
+// Panel reutilizable abierto desde Portal Preanestésico y Staff.
+// Todas son REFERENCIA — la decisión es del anestesiólogo a cargo.
+// ============================================================
+const CALC_LIST = [
+  { key:'al',   ico:'💉', name:'Anestésico local', desc:'Dosis máxima (mg y mL)' },
+  { key:'peso', ico:'⚖️', name:'Pesos para dosificar', desc:'Ideal · ajustado · magro' },
+  { key:'vaso', ico:'💧', name:'Drogas vasoactivas', desc:'µg/kg/min ↔ mL/h' },
+  { key:'vfg',  ico:'🫘', name:'Función renal (VFG)', desc:'Cockcroft-Gault · CKD-EPI' },
+  { key:'mabl', ico:'🩸', name:'Pérdida sanguínea', desc:'Volemia y MABL permitida' },
+];
+let _calcSel = null;
+
+function openCalculadoras(){
+  _calcSel = null;
+  document.getElementById('calcOverlay').classList.remove('hidden');
+  calcRenderHome();
+}
+function closeCalculadoras(){ document.getElementById('calcOverlay').classList.add('hidden'); }
+function calcBack(){ _calcSel = null; calcRenderHome(); }
+
+function calcRenderHome(){
+  document.getElementById('calcTitle').textContent = 'Calculadoras Perioperatorias';
+  document.getElementById('calcBackBtn').style.display = 'none';
+  const cards = CALC_LIST.map(c =>
+    `<button type="button" class="calc-card" onclick="calcSelect('${c.key}')"><div class="ci">${c.ico}</div><b>${c.name}</b><span>${c.desc}</span></button>`
+  ).join('');
+  document.getElementById('calcBody').innerHTML = `
+    <div class="calc-grid">${cards}</div>
+    <div class="calc-xref">
+      <b>¿Buscas otra cosa?</b><br>
+      • <b>Riesgo cardiovascular</b> (RCRI, METs): ve al botón <a onclick="closeCalculadoras();openGuiasModule&&openGuiasModule();">Portal Preanestésico → Riesgo Cardiovascular</a>.<br>
+      • <b>Exámenes preoperatorios</b>: Portal Preanestésico → Exámenes.<br>
+      • <b>Dosis de fármacos pediátricos por kg</b>: Staff → <a onclick="closeCalculadoras();showView('pediatria');">Pediatría</a>.<br>
+      • <b>Coagulación / ASRA neuroaxial</b>: Staff → <a onclick="closeCalculadoras();showView('coagulacion');">Coagulación</a>.
+    </div>
+    <div class="calc-disc">⚠️ Todas las calculadoras son una referencia de apoyo. Verifica el resultado y la decisión final es del anestesiólogo a cargo del paciente.</div>`;
+}
+function calcSelect(key){
+  _calcSel = key;
+  const c = CALC_LIST.find(x=>x.key===key);
+  document.getElementById('calcTitle').textContent = c ? c.name : 'Calculadora';
+  document.getElementById('calcBackBtn').style.display = '';
+  const r = { al:_calcAL, peso:_calcPeso, vaso:_calcVaso, vfg:_calcVFG, mabl:_calcMABL }[key];
+  document.getElementById('calcBody').innerHTML = r ? r() : '';
+}
+function _cNum(id){ const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(',','.')); return isNaN(v)?null:v; }
+function _cVal(id){ const el=document.getElementById(id); return el?el.value:''; }
+function _cFmt(n,d){ if(n===null||n===undefined||isNaN(n)) return '—'; return Number(n).toLocaleString('es-CL',{maximumFractionDigits:d===undefined?1:d}); }
+function _cResult(html){ const o=document.getElementById('calcOut'); if(o) o.innerHTML='<div class="gp-calc-result">'+html+'</div>'; }
+
+// 1) Anestésico local --------------------------------------------------------
+const _AL_MAX = {
+  lidocaina:{sin:4.5,con:7,aSin:300,aCon:500,n:'Lidocaína'},
+  mepivacaina:{sin:4.5,con:7,aSin:400,aCon:550,n:'Mepivacaína'},
+  bupivacaina:{sin:2,con:3,aSin:175,aCon:225,n:'Bupivacaína'},
+  levobupivacaina:{sin:2,con:3,aSin:150,aCon:200,n:'Levobupivacaína'},
+  ropivacaina:{sin:3,con:3.5,aSin:225,aCon:250,n:'Ropivacaína'},
+  prilocaina:{sin:6,con:8,aSin:400,aCon:600,n:'Prilocaína'},
+};
+function _calcAL(){
+  return `
+   <p class="calc-detail-sub">Calcula la dosis máxima de anestésico local para evitar toxicidad sistémica (LAST).</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doAL();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="alPeso" inputmode="decimal" placeholder="70"></label>
+       <label class="gp-calc-field"><span>Fármaco</span><select id="alDrug">
+         <option value="lidocaina">Lidocaína</option><option value="bupivacaina">Bupivacaína</option>
+         <option value="levobupivacaina">Levobupivacaína</option><option value="ropivacaina">Ropivacaína</option>
+         <option value="mepivacaina">Mepivacaína</option><option value="prilocaina">Prilocaína</option></select></label>
+       <label class="gp-calc-field"><span>¿Con epinefrina?</span><select id="alEpi"><option value="sin">Sin epinefrina</option><option value="con">Con epinefrina</option></select></label>
+       <label class="gp-calc-field"><span>Concentración (%)</span><input type="number" id="alConc" inputmode="decimal" placeholder="0.5"></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doAL = function(){
+  const peso=_cNum('alPeso'), conc=_cNum('alConc'); const d=_AL_MAX[_cVal('alDrug')]; const epi=_cVal('alEpi');
+  if(!peso||!d){ _cResult('Ingresa el peso.'); return; }
+  const mgkg = epi==='con'?d.con:d.sin; const absMax=epi==='con'?d.aCon:d.aSin;
+  const porPeso = mgkg*peso; const maxMg=Math.min(porPeso, absMax);
+  const capInfo = porPeso>absMax ? ` <em>(limitado por la dosis máxima absoluta de ${absMax} mg)</em>` : '';
+  const vol = conc ? maxMg/(conc*10) : null;
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Dosis máxima de ${d.n} (${epi==='con'?'con':'sin'} epinefrina)</strong>
+      <div style="font-size:20px;font-weight:800;color:var(--primary-dark);margin:4px 0">${_cFmt(maxMg,0)} mg${capInfo}</div>
+      <div style="font-size:12.5px">Límite: ${mgkg} mg/kg × ${_cFmt(peso,0)} kg</div>
+    </div>
+    ${conc?`<div class="gp-calc-block"><strong>Volumen máximo a esa concentración (${_cFmt(conc,2)} %)</strong>
+      <div style="font-size:18px;font-weight:800;color:var(--primary-dark);margin:3px 0">${_cFmt(vol,1)} mL</div>
+      <div style="font-size:11.5px;color:var(--muted)">1 % = 10 mg/mL → ${_cFmt(conc*10,0)} mg/mL</div></div>`:''}
+    <div class="gp-calc-block nota">Valores de referencia para infiltración/bloqueo en adulto sano. Reducir en ancianos, hepatopatía, embarazo o bajo peso. Ante toxicidad: emulsión lipídica (ASRA).</div>`);
+};
+
+// 2) Pesos para dosificar ----------------------------------------------------
+function _calcPeso(){
+  return `
+   <p class="calc-detail-sub">Peso ideal, ajustado y magro — para dosificar correctamente, sobre todo en obesidad.</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doPeso();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Sexo</span><select id="pSexo"><option value="m">Hombre</option><option value="f">Mujer</option></select></label>
+       <label class="gp-calc-field"><span>Talla (cm)</span><input type="number" id="pTalla" inputmode="decimal" placeholder="170"></label>
+       <label class="gp-calc-field"><span>Peso real (kg)</span><input type="number" id="pPeso" inputmode="decimal" placeholder="95"></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doPeso = function(){
+  const sexo=_cVal('pSexo'), cm=_cNum('pTalla'), real=_cNum('pPeso');
+  if(!cm||!real){ _cResult('Ingresa talla y peso.'); return; }
+  const inch=cm/2.54; const m=cm/100; const bmi=real/(m*m);
+  let ibw=(sexo==='f'?45.5:50)+2.3*(inch-60); if(ibw<35) ibw=35;
+  const adj=ibw+0.4*(real-ibw);
+  const lbw = sexo==='f' ? (9270*real)/(8780+244*bmi) : (9270*real)/(6680+216*bmi);
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Resultados</strong>
+      <div style="font-size:12.5px;line-height:2">
+        IMC: <b>${_cFmt(bmi,1)} kg/m²</b><br>
+        Peso ideal (IBW): <b>${_cFmt(ibw,1)} kg</b><br>
+        Peso ajustado (AdjBW): <b>${_cFmt(adj,1)} kg</b><br>
+        Peso magro (LBW): <b>${_cFmt(lbw,1)} kg</b>
+      </div>
+    </div>
+    <div class="gp-calc-block nota"><strong>Qué peso usar (referencia):</strong> propofol inducción y remifentanilo → magro (LBW); succinilcolina → peso real; rocuronio/vecuronio → ideal (IBW); mantención propofol → ajustado. Verifica según ficha del fármaco.</div>`);
+};
+
+// 3) Drogas vasoactivas ------------------------------------------------------
+function _calcVaso(){
+  return `
+   <p class="calc-detail-sub">Convierte la dosis a velocidad de infusión (mL/h) según tu dilución.</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doVaso();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="vPeso" inputmode="decimal" placeholder="70"></label>
+       <label class="gp-calc-field"><span>Dosis objetivo</span><input type="number" id="vDosis" inputmode="decimal" placeholder="0.1"></label>
+       <label class="gp-calc-field"><span>Unidad de dosis</span><select id="vUnidad"><option value="kgmin">µg/kg/min</option><option value="min">µg/min</option></select></label>
+       <label class="gp-calc-field"><span>Droga (mg)</span><input type="number" id="vMg" inputmode="decimal" placeholder="4"></label>
+       <label class="gp-calc-field"><span>Diluida en (mL)</span><input type="number" id="vMl" inputmode="decimal" placeholder="100"></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular mL/h</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doVaso = function(){
+  const peso=_cNum('vPeso'), dosis=_cNum('vDosis'), mg=_cNum('vMg'), ml=_cNum('vMl'), unidad=_cVal('vUnidad');
+  if(!dosis||!mg||!ml||(unidad==='kgmin'&&!peso)){ _cResult('Completa los campos.'); return; }
+  const concUgMl=(mg*1000)/ml;
+  const ugMin = unidad==='kgmin' ? dosis*peso : dosis;
+  const mlh = ugMin*60/concUgMl;
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Velocidad de infusión</strong>
+      <div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin:4px 0">${_cFmt(mlh,1)} mL/h</div>
+      <div style="font-size:12px">Concentración: <b>${_cFmt(concUgMl,0)} µg/mL</b> · Dosis: ${_cFmt(ugMin,2)} µg/min${unidad==='kgmin'?` (${_cFmt(dosis,3)} µg/kg/min)`:''}</div>
+    </div>
+    <div class="gp-calc-block nota">Diluciones frecuentes: Noradrenalina 4 mg/100 mL = 40 µg/mL · 8 mg/250 mL = 32 µg/mL. Confirma siempre la concentración real de tu bomba.</div>`);
+};
+
+// 4) Función renal -----------------------------------------------------------
+function _calcVFG(){
+  return `
+   <p class="calc-detail-sub">Estima la función renal para ajustar fármacos (Cockcroft-Gault y CKD-EPI 2021).</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doVFG();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Edad (años)</span><input type="number" id="rEdad" inputmode="decimal" placeholder="68"></label>
+       <label class="gp-calc-field"><span>Sexo</span><select id="rSexo"><option value="m">Hombre</option><option value="f">Mujer</option></select></label>
+       <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="rPeso" inputmode="decimal" placeholder="75"></label>
+       <label class="gp-calc-field"><span>Creatinina (mg/dL)</span><input type="number" id="rCrea" inputmode="decimal" placeholder="1.1"></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doVFG = function(){
+  const edad=_cNum('rEdad'), sexo=_cVal('rSexo'), peso=_cNum('rPeso'), crea=_cNum('rCrea');
+  if(!edad||!crea){ _cResult('Ingresa edad y creatinina.'); return; }
+  const f = sexo==='f';
+  const cg = peso ? ((140-edad)*peso*(f?0.85:1))/(72*crea) : null;
+  const k=f?0.7:0.9, a=f?-0.241:-0.302;
+  const egfr=142*Math.pow(Math.min(crea/k,1),a)*Math.pow(Math.max(crea/k,1),-1.200)*Math.pow(0.9938,edad)*(f?1.012:1);
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Clearance de creatinina (Cockcroft-Gault)</strong>
+      <div style="font-size:20px;font-weight:800;color:var(--primary-dark);margin:3px 0">${cg!==null?_cFmt(cg,0)+' mL/min':'— (falta peso)'}</div>
+      <div style="font-size:11.5px;color:var(--muted)">Es el método preferido para ajuste de dosis de fármacos.</div>
+    </div>
+    <div class="gp-calc-block"><strong>VFG estimada (CKD-EPI 2021)</strong>
+      <div style="font-size:18px;font-weight:800;color:var(--primary-dark);margin:3px 0">${_cFmt(egfr,0)} mL/min/1.73m²</div>
+    </div>
+    <div class="gp-calc-block nota">Valores en falla renal aguda pueden estar sobreestimados. Ajustar anticoagulantes, antibióticos y relajantes según función renal.</div>`);
+};
+
+// 5) Pérdida sanguínea permitida (MABL) --------------------------------------
+function _calcMABL(){
+  return `
+   <p class="calc-detail-sub">Volumen sanguíneo estimado y pérdida sanguínea máxima permitida antes de transfundir.</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doMABL();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Peso (kg)</span><input type="number" id="mPeso" inputmode="decimal" placeholder="70"></label>
+       <label class="gp-calc-field"><span>Categoría (volemia)</span><select id="mCat">
+         <option value="75">Adulto hombre (75 mL/kg)</option><option value="65">Adulto mujer (65 mL/kg)</option>
+         <option value="70">Niño (70 mL/kg)</option><option value="80">Lactante (80 mL/kg)</option>
+         <option value="85">Neonato (85 mL/kg)</option><option value="95">Prematuro (95 mL/kg)</option></select></label>
+       <label class="gp-calc-field"><span>Hematocrito inicial (%)</span><input type="number" id="mHi" inputmode="decimal" placeholder="40"></label>
+       <label class="gp-calc-field"><span>Hematocrito mínimo aceptable (%)</span><input type="number" id="mHf" inputmode="decimal" placeholder="25"></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doMABL = function(){
+  const peso=_cNum('mPeso'), factor=parseFloat(_cVal('mCat')), hi=_cNum('mHi'), hf=_cNum('mHf');
+  if(!peso||!hi||!hf){ _cResult('Completa los campos.'); return; }
+  if(hf>=hi){ _cResult('El hematocrito mínimo debe ser menor al inicial.'); return; }
+  const ebv=peso*factor;
+  const mabl=ebv*(hi-hf)/hi;
+  _cResult(`
+    <div class="gp-calc-block"><strong>Volumen sanguíneo estimado</strong>
+      <div style="font-size:18px;font-weight:800;color:var(--primary-dark);margin:3px 0">${_cFmt(ebv,0)} mL</div>
+      <div style="font-size:11.5px;color:var(--muted)">${_cFmt(peso,0)} kg × ${factor} mL/kg</div>
+    </div>
+    <div class="gp-calc-block pedir"><strong>Pérdida sanguínea permitida (MABL)</strong>
+      <div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin:4px 0">≈ ${_cFmt(mabl,0)} mL</div>
+      <div style="font-size:12px">Hasta caer de Hto ${_cFmt(hi,0)} % a ${_cFmt(hf,0)} %</div>
+    </div>
+    <div class="gp-calc-block nota">Estimación; el umbral transfusional se individualiza (comorbilidad, sangrado activo, signos de hipoperfusión). Considerar ácido tranexámico y recuperador celular.</div>`);
+};
 
 // ============================================================
 // SERVICE WORKER (PWA)
