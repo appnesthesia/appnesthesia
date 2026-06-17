@@ -1598,7 +1598,7 @@ function renderVacations(){
         ${v.coberturaPedCv?`<span class="chip ${v.coberturaPedCv==='si'?'green':(v.coberturaPedCv==='no'?'red':'gray')}">Ped/CV: ${ {si:'Sí',no:'No',na:'No aplica'}[v.coberturaPedCv] }</span>`:''}
       </div>
       ${v.notes?`<div class="what" style="font-style:italic;color:var(--muted)">"${v.notes}"</div>`:''}
-      ${v.adminNote?`<div class="what" style="font-size:12px;background:#f0f4f5;padding:6px 8px;border-radius:6px;margin-top:4px"><b>Nota del admin:</b> ${v.adminNote}</div>`:''}
+      ${v.adminNote?`<div class="what" style="font-size:12px;background:var(--tint1);padding:6px 8px;border-radius:6px;margin-top:4px"><b>Nota del admin:</b> ${v.adminNote}</div>`:''}
       <div class="actions">
         <button class="btn sm secondary" onclick="viewVacation('${v.id}')">Ver detalle</button>
         ${state.isAdmin && v.status==='pending'?`
@@ -1663,7 +1663,7 @@ function openVacationModal(v){
       <div id="v_pending">${renderCovRows(v.pending,'pending')||'<div class="help">Ninguna pendiente todavía.</div>'}</div>
       <button class="btn sm secondary" style="margin-top:6px" onclick="addCov('pending')">+ Agregar pendiente</button>
     </div>
-    <div class="field" style="background:#f7fcf9;border:1px solid var(--green-pale);border-radius:10px;padding:10px 12px">
+    <div class="field" style="background:var(--tint1);border:1px solid var(--green-pale);border-radius:10px;padding:10px 12px">
       <label style="margin-bottom:6px">🏥 ¿Cobertura Pediatría/Cardiovascular resuelta?</label>
       <select id="v_cobpedcv">
         <option value="" ${!v.coberturaPedCv?'selected':''}>— Seleccionar —</option>
@@ -4240,6 +4240,19 @@ const SEARCH_INDEX = [
   { ico:'❤️', label:'Riesgo Cardiovascular (RCRI/METs)', hint:'Portal Preanestésico', kw:'riesgo cardiovascular rcri mets cardiologia', go:()=>_goPortal('gpRiesgoCv') },
 ];
 
+// Menú compacto del encabezado (agrupa buscar, ayuda/ajustes y config admin)
+function openAppMenu(){
+  const isAdmin = state && state.isAdmin;
+  modal(`
+    <h3 style="margin:0 0 12px">Menú</h3>
+    <button type="button" class="help-card-btn" onclick="closeModal();openGlobalSearch();"><span class="hi">🔎</span><span style="flex:1"><b>Buscar en la app</b><span>Salta a cualquier sección o herramienta</span></span></button>
+    <button type="button" class="help-card-btn" onclick="closeModal();openHelp();"><span class="hi">⚙️</span><span style="flex:1"><b>Ayuda y ajustes</b><span>Tema, tamaño de letra, tutorial</span></span></button>
+    <button type="button" class="help-card-btn" onclick="closeModal();openAiChat();"><span class="hi">🤖</span><span style="flex:1"><b>Preguntar a ARIA</b><span>Asistente clínico</span></span></button>
+    ${isAdmin?`<button type="button" class="help-card-btn" onclick="closeModal();promptBackendToken();"><span class="hi">🔧</span><span style="flex:1"><b>Configuración de conexión</b><span>Backend / token (administrador)</span></span></button>`:''}
+    <div style="text-align:right;margin-top:6px"><button class="btn" onclick="closeModal()">Cerrar</button></div>
+  `);
+}
+
 function openGlobalSearch(){
   document.getElementById('searchOverlay').classList.remove('hidden');
   const inp = document.getElementById('globalSearchInput');
@@ -4274,6 +4287,22 @@ function _searchPick(i){
   if(it && typeof it.go === 'function') it.go();
 }
 
+// --- Tema claro / oscuro ---
+function applyTheme(){
+  let t = 'light';
+  try{ t = localStorage.getItem('appnesthesia_theme') || 'light'; }catch(e){}
+  if(t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.removeAttribute('data-theme');
+  // Color de la barra del navegador acorde al tema
+  try{ const m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', t==='dark'?'#0e1714':'#0f4435'); }catch(e){}
+  return t;
+}
+function setTheme(mode){
+  try{ localStorage.setItem('appnesthesia_theme', mode); }catch(e){}
+  applyTheme();
+  try{ openHelp(); }catch(e){}
+}
+
 // --- Ayuda y ajustes (incluye tamaño de letra) ---
 const _FS_LEVELS = [1, 1.15, 1.30];
 function applyFontScale(){
@@ -4291,9 +4320,18 @@ function setFontScale(lvl){
 function openHelp(){
   let lvl = 0;
   try{ lvl = parseInt(localStorage.getItem('appnesthesia_fontscale')||'0',10) || 0; }catch(e){}
+  let tema = 'light';
+  try{ tema = localStorage.getItem('appnesthesia_theme') || 'light'; }catch(e){}
   modal(`
     <h3 style="margin:0 0 4px">Ayuda y ajustes</h3>
     <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px">Encuentra ayuda y personaliza la app.</p>
+
+    <div style="font-size:12px;font-weight:800;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tema</div>
+    <div class="help-fs-row">
+      <button type="button" class="help-fs-btn ${tema!=='dark'?'on':''}" onclick="setTheme('light')">☀️ Claro</button>
+      <button type="button" class="help-fs-btn ${tema==='dark'?'on':''}" onclick="setTheme('dark')">🌙 Oscuro</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin:2px 0 16px">Cambia entre tema claro y oscuro. Se recuerda en este dispositivo.</p>
 
     <div style="font-size:12px;font-weight:800;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tamaño de letra</div>
     <div class="help-fs-row">
@@ -4559,9 +4597,10 @@ function showUpdateBanner(){
   document.body.appendChild(b);
 }
 
-// Aplicar el tamaño de letra guardado lo antes posible
+// Aplicar tema y tamaño de letra guardados lo antes posible
+try{ applyTheme(); }catch(e){}
 try{ applyFontScale(); }catch(e){}
-window.addEventListener('load', ()=>{ try{ applyFontScale(); }catch(e){} });
+window.addEventListener('load', ()=>{ try{ applyTheme(); }catch(e){} try{ applyFontScale(); }catch(e){} });
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
@@ -8189,7 +8228,7 @@ function agendOpenDetalle(reqId){
     ? `${req.visadoBy} · ${new Date(req.visadoAt).toLocaleString('es-CL')}${req.comentarioVisado?`<br><em>"${_gpEsc(req.comentarioVisado)}"</em>`:''}`
     : '—';
   let actionsHtml = '';
-  const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:#fff;color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
+  const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:var(--card);color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
   const btnIA = (typeof aiAvailable === 'function' && aiAvailable())
     ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #a5b4fc;color:#4338ca;font-weight:700">🤖 Analizar con ARIA</button></div><div id="aiVisadoResult" style="display:none"></div>`
     : '';
@@ -8204,7 +8243,7 @@ function agendOpenDetalle(reqId){
   } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
-        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:#fff;color:var(--muted)">Revertir a pendiente</button>
+        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:var(--card);color:var(--muted)">Revertir a pendiente</button>
         ${btnEliminar}
       </div>
       ${btnIA}`;
