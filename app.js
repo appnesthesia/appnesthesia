@@ -8993,13 +8993,72 @@ function checkReminders(){
 // ============================================================
 // PERFILES DE USUARIO — PIN, login, panel personal
 // ============================================================
-const PIN_SALT = 'appnesthesia_v1_salt';
+const PIN_SALT = 'appnesthesia_v1_salt'; // LEGADO: solo para verificar PINs creados antes del endurecimiento
 const ADMIN_USER_ID = '__admin__';
+const PIN_ITERATIONS = 200000; // PBKDF2: encarece cada intento de adivinanza
 
-async function hashPIN(pin, scope){
+// --- Hash legado (v1): SHA-256 de salt:scope:pin (un solo paso, rápido de romper).
+//     Se conserva SOLO para validar PINs antiguos y migrarlos de forma transparente.
+async function hashPINLegacy(pin, scope){
   const data = new TextEncoder().encode(PIN_SALT + ':' + scope + ':' + pin);
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function _bytesToHex(bytes){
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function _hexToBytes(hex){
+  const out = new Uint8Array(hex.length/2);
+  for(let i=0;i<out.length;i++) out[i] = parseInt(hex.substr(i*2,2),16);
+  return out;
+}
+// Comparación en tiempo constante (no filtra info por el tiempo que tarda).
+function _pinEqual(a, b){
+  if(typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for(let i=0;i<a.length;i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// --- Hash fuerte (v2): PBKDF2-SHA256 con sal aleatoria por usuario.
+async function _derivePIN(pin, scope, saltBytes, iterations){
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(scope + ':' + pin), 'PBKDF2', false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name:'PBKDF2', salt:saltBytes, iterations:iterations, hash:'SHA-256' },
+    keyMaterial, 256
+  );
+  return _bytesToHex(new Uint8Array(bits));
+}
+
+// Crea un hash NUEVO (v2) con sal aleatoria. Formato: "pbkdf2$<iter>$<saltHex>$<hashHex>".
+async function makePINHash(pin, scope){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await _derivePIN(pin, scope, salt, PIN_ITERATIONS);
+  return 'pbkdf2$' + PIN_ITERATIONS + '$' + _bytesToHex(salt) + '$' + hash;
+}
+
+// Verifica un PIN contra un hash almacenado (v2 PBKDF2 o v1 legado).
+// Devuelve { ok, upgrade }. Si era v1 y coincide, "upgrade" trae el hash v2
+// para re-guardarlo (migración transparente: el usuario no nota nada).
+async function verifyPINHash(pin, scope, stored){
+  if(!stored) return { ok:false, upgrade:null };
+  if(typeof stored === 'string' && stored.indexOf('pbkdf2$') === 0){
+    const parts = stored.split('$'); // ['pbkdf2', iter, saltHex, hashHex]
+    const iter = parseInt(parts[1], 10) || PIN_ITERATIONS;
+    const salt = _hexToBytes(parts[2]);
+    const h = await _derivePIN(pin, scope, salt, iter);
+    return { ok: _pinEqual(h, parts[3]), upgrade:null };
+  }
+  // Legado v1: validar con el método viejo y, si coincide, devolver el hash fuerte.
+  const h = await hashPINLegacy(pin, scope);
+  if(_pinEqual(h, stored)){
+    const upgrade = await makePINHash(pin, scope);
+    return { ok:true, upgrade };
+  }
+  return { ok:false, upgrade:null };
 }
 
 function ensureUserDefaults(s){
@@ -9157,7 +9216,7 @@ async function promptSetAdminPin(){
                 setTimeout(()=>res(promptSetAdminPin()), 500);
                 return;
               }
-              state.adminPinHash = await hashPIN(pin, '__admin__');
+              state.adminPinHash = await makePINHash(pin, '__admin__');
               save();
               closePinPad();
               toast && toast('PIN de administrador configurado');
@@ -9178,9 +9237,11 @@ async function promptVerifyAdminPin(){
       sub:'Ingresa el PIN para activar modo admin.',
       maxLen:4,
       onComplete: async(pin)=>{
-        const h = await hashPIN(pin, '__admin__');
-        if(h === state.adminPinHash){ closePinPad(); res(true); }
-        else { pinError('PIN incorrecto'); }
+        const r = await verifyPINHash(pin, '__admin__', state.adminPinHash);
+        if(r.ok){
+          if(r.upgrade){ state.adminPinHash = r.upgrade; save(); } // migración transparente a PBKDF2
+          closePinPad(); res(true);
+        } else { pinError('PIN incorrecto'); }
       },
       onCancel: ()=>res(false)
     });
@@ -9375,7 +9436,7 @@ async function promptSetupUserPin(user){
                 setTimeout(()=>res(promptSetupUserPin(user)), 500);
                 return;
               }
-              user.pinHash = await hashPIN(pin, user.id);
+              user.pinHash = await makePINHash(pin, user.id);
               save();
               // Sube el PIN a la nube de inmediato (los no-admin no hacen push del staff array)
               _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
@@ -9399,9 +9460,14 @@ async function promptVerifyUserPin(user){
       sub:'Ingresa tu PIN de 4 dígitos',
       maxLen:4,
       onComplete: async(pin)=>{
-        const h = await hashPIN(pin, user.id);
-        if(h === user.pinHash){ closePinPad(); res(true); }
-        else {
+        const r = await verifyPINHash(pin, user.id, user.pinHash);
+        if(r.ok){
+          if(r.upgrade){ // migración transparente a PBKDF2: re-guardar y subir a la nube
+            user.pinHash = r.upgrade; save();
+            _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
+          }
+          closePinPad(); res(true);
+        } else {
           attempts++;
           pinError(attempts>=3 ? 'Pídele al admin que te resetee el PIN' : 'PIN incorrecto');
         }
@@ -9450,9 +9516,9 @@ async function changeUserPIN(){
             onComplete: async(pin2)=>{
               if(pin2 !== firstPin){ pinError('No coinciden'); firstPin = null; return; }
               if(isAdmin){
-                state.adminPinHash = await hashPIN(pin, '__admin__');
+                state.adminPinHash = await makePINHash(pin, '__admin__');
               } else {
-                u.pinHash = await hashPIN(pin, u.id);
+                u.pinHash = await makePINHash(pin, u.id);
                 // Sube el PIN a la nube de inmediato
                 _pushMyPinHash(u.id, u.pinHash).catch(()=>{});
               }
