@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0a5f59" />
+<meta name="theme-color" content="#0e1714" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Appnesthesia" />
@@ -17,6 +17,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+/* Aplica el tema ANTES de pintar para evitar el parpadeo blanco.
+   Por defecto: oscuro. El usuario puede cambiar a claro y se recuerda. */
+try{
+  var _t = localStorage.getItem('appnesthesia_theme') || 'dark';
+  if(_t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+}catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+</script>
 <style>
 :root{
   --primary:#1e6b54;
@@ -202,7 +210,7 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .card.c9 .ico svg .drop-shine{fill:none;stroke:#fecaca;stroke-width:1.8;stroke-linecap:round}
 /* Vista médica (Pediatría / Coagulación) — tema verde claro con tablas verde oscuro */
 #view-pediatria > .section, #view-coagulacion > .section{
-  background:linear-gradient(180deg,var(--tint1) 0%,#ffffff 60%,var(--tint1) 100%);
+  background:linear-gradient(180deg,var(--tint1) 0%,var(--card) 60%,var(--tint1) 100%);
   border:1px solid var(--green-pale);
   box-shadow:0 4px 18px rgba(30,107,84,.10),0 1px 3px rgba(30,107,84,.06);
 }
@@ -386,7 +394,7 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .sync-cfg-btn:hover{background:rgba(255,255,255,.28)}
 /* Reloj Control */
 .reloj-wrap{display:flex;flex-direction:column;align-items:center;gap:18px;padding:14px 0}
-.reloj-display{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:54px;font-weight:700;color:var(--primary-dark);background:linear-gradient(180deg,var(--tint1) 0%,#ffffff 60%,var(--tint1) 100%);border:2px solid var(--green-pale);border-radius:18px;padding:22px 30px;box-shadow:0 6px 20px rgba(30,107,84,.14),inset 0 1px 0 rgba(255,255,255,.6);letter-spacing:2px;text-align:center;min-width:280px;line-height:1}
+.reloj-display{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:54px;font-weight:700;color:var(--primary-dark);background:linear-gradient(180deg,var(--tint1) 0%,var(--card) 60%,var(--tint1) 100%);border:2px solid var(--green-pale);border-radius:18px;padding:22px 30px;box-shadow:0 6px 20px rgba(30,107,84,.14),inset 0 1px 0 rgba(255,255,255,.6);letter-spacing:2px;text-align:center;min-width:280px;line-height:1}
 .reloj-display .reloj-ms{font-size:22px;color:var(--muted);font-weight:500;letter-spacing:1px}
 .reloj-buttons{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .reloj-btn-main{min-width:110px;font-size:14px;padding:11px 16px}
@@ -1202,8 +1210,8 @@ canvas{max-width:100%}
 .agend-slot:hover{border-color:var(--green-forest);background:var(--tint1)}
 .agend-slot.libre{background:var(--tint1);border-style:dashed}
 .agend-slot.libre:hover{background:var(--tint1);border-style:solid}
-.agend-slot.pendiente{background:linear-gradient(90deg,#fef3c7 0%,#fff 60%);border-color:#fde68a;border-left:4px solid #f59e0b}
-.agend-slot.aprobada{background:linear-gradient(90deg,#dcfce7 0%,#fff 60%);border-color:#bbf7d0;border-left:4px solid #16a34a}
+.agend-slot.pendiente{background:linear-gradient(90deg,#fef3c7 0%,var(--card) 60%);border-color:#fde68a;border-left:4px solid #f59e0b}
+.agend-slot.aprobada{background:linear-gradient(90deg,#dcfce7 0%,var(--card) 60%);border-color:#bbf7d0;border-left:4px solid #16a34a}
 .agend-slot.rechazada{background:#fef2f2;border-color:#fecaca;border-left:4px solid var(--danger);opacity:.7}
 .agend-slot-hour{font-family:'Manrope','Inter',sans-serif;font-size:15px;font-weight:800;color:var(--primary-dark);min-width:62px;letter-spacing:.4px}
 .agend-slot-body{flex:1;font-size:13px;line-height:1.4}
@@ -1423,6 +1431,16 @@ html[data-theme="dark"] .gp-calc-rec-cf strong{color:#bcd0f5}
 html[data-theme="dark"] .gp-calc-block.evitar{color:#cbd5e1}
 html[data-theme="dark"] .gp-calc-rec{background:var(--tint1)}
 html[data-theme="dark"] .reg-block-perlas{background:var(--tint1)}
+/* Chips, encabezados de tabla y hovers claros → superficies oscuras */
+html[data-theme="dark"] th{background:var(--tint1);color:var(--muted)}
+html[data-theme="dark"] .cal-day:hover{background:var(--tint1)}
+html[data-theme="dark"] .agend-cal-nav button:hover{background:var(--tint1)}
+html[data-theme="dark"] .user-picker-inst{background:#1f2a25;color:var(--primary)}
+html[data-theme="dark"] .chip.green{background:#1c3a30;color:#86e3c0}
+html[data-theme="dark"] .chip.yellow{background:#3a2f17;color:#fcd9a0}
+html[data-theme="dark"] .chip.red{background:#3a1f22;color:#f3b0b6}
+html[data-theme="dark"] .chip.blue{background:#1f2740;color:#bcd0f5}
+html[data-theme="dark"] .chip.gray{background:var(--tint1);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -2439,6 +2457,6 @@ html[data-theme="dark"] .reg-block-perlas{background:var(--tint1)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=70"></script>
+<script src="app.js?v=71"></script>
 </body>
 </html>

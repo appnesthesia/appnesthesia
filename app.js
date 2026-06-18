@@ -220,6 +220,14 @@ function setBackendToken(t){
   if(t) localStorage.setItem(BACKEND_TOKEN_LS_KEY, t);
   else localStorage.removeItem(BACKEND_TOKEN_LS_KEY);
 }
+// Opciones para los GET de estado: mandan el token (admin o usuario) para que
+// el backend pueda exigir autenticación de lectura (flag REQUIRE_READ_AUTH).
+// Inofensivo si el backend aún tiene el GET abierto.
+function _stateGetOpts(){
+  const opts = { cache:'no-store' };
+  try{ const t = getBackendToken(); if(t) opts.headers = { 'Authorization':'Bearer '+t }; }catch(e){}
+  return opts;
+}
 
 function _renderSyncIndicator(){
   const el = document.getElementById('syncStatus');
@@ -334,7 +342,7 @@ async function fetchRemoteState(){
   if(!base || !INSTITUTION){ _setSyncStatus('disabled'); return null; }
   try{
     _setSyncStatus('syncing');
-    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
     if(!r.ok){ _setSyncStatus('error'); return null; }
     const data = await r.json();
     _updateRemotePinCache(data);
@@ -380,7 +388,7 @@ async function pushRemoteState(){
     // 1) Traer el estado remoto más reciente para no pisar cambios de otros.
     let remote = null;
     try{
-      const rr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+      const rr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
       if(rr.ok) remote = await rr.json();
     }catch(e){ /* sin conexión: se maneja abajo */ }
 
@@ -654,7 +662,7 @@ async function testBackendConn(){
     const rh = await fetch(url + '/api/health', {cache:'no-store'});
     let msg = '<div>Health → <b>HTTP ' + rh.status + '</b></div>';
     // 2) GET estado actual (NO escribe, no muta nada)
-    const r = await fetch(url + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+    const r = await fetch(url + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
     let bodyInfo = '';
     if(r.ok){
       const d = await r.json().catch(()=>({}));
@@ -4290,7 +4298,7 @@ function _searchPick(i){
 // --- Tema claro / oscuro ---
 function applyTheme(){
   let t = 'light';
-  try{ t = localStorage.getItem('appnesthesia_theme') || 'light'; }catch(e){}
+  try{ t = localStorage.getItem('appnesthesia_theme') || 'dark'; }catch(e){}
   if(t === 'dark') document.documentElement.setAttribute('data-theme','dark');
   else document.documentElement.removeAttribute('data-theme');
   // Color de la barra del navegador acorde al tema
@@ -4321,7 +4329,7 @@ function openHelp(){
   let lvl = 0;
   try{ lvl = parseInt(localStorage.getItem('appnesthesia_fontscale')||'0',10) || 0; }catch(e){}
   let tema = 'light';
-  try{ tema = localStorage.getItem('appnesthesia_theme') || 'light'; }catch(e){}
+  try{ tema = localStorage.getItem('appnesthesia_theme') || 'dark'; }catch(e){}
   modal(`
     <h3 style="margin:0 0 4px">Ayuda y ajustes</h3>
     <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px">Encuentra ayuda y personaliza la app.</p>
@@ -6797,7 +6805,7 @@ async function agendSyncNow(){
   try{
     let remoteData = {};
     try{
-      const r = await fetch(base + '/api/state/' + encodeURIComponent(id), {cache:'no-store'});
+      const r = await fetch(base + '/api/state/' + encodeURIComponent(id), _stateGetOpts());
       if(r.ok){
         const remote = await r.json();
         if(remote && !remote._empty && remote.data) remoteData = remote.data;
@@ -9173,7 +9181,7 @@ async function _fetchRemotePins(){
   const base = getBackendURL();
   if(!base || !INSTITUTION) return null;
   try{
-    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store'});
+    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
     if(!r.ok) return null;
     const remote = await r.json();
     if(!remote || remote._empty) return null;
