@@ -1183,6 +1183,8 @@ canvas{max-width:100%}
 .agend-cal-day.closed.extra-allowed{cursor:pointer}
 .agend-cal-day.closed.extra-allowed:hover{background:#fff7ed;border-color:#fb923c;color:#b45309}
 .agend-cal-day.closed.extra-allowed:hover .agend-cal-d{color:#b45309}
+.agend-cal-day.toosoon{opacity:.55}
+.agend-cal-day.toosoon.extra-allowed{opacity:.8}
 .agend-cal-sched{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px;background:var(--tint1);border:1px solid #bbf7d0;border-radius:10px;font-size:12.5px;color:#166534;line-height:1.4}
 .agend-cal-sched-label{font-weight:700;text-transform:uppercase;letter-spacing:.3px;font-size:10.5px;color:#15803d}
 .agend-cal-sched-value{color:#166534}
@@ -1213,6 +1215,7 @@ canvas{max-width:100%}
 .agend-slot.pendiente{background:linear-gradient(90deg,#fef3c7 0%,var(--card) 60%);border-color:#fde68a;border-left:4px solid #f59e0b}
 .agend-slot.aprobada{background:linear-gradient(90deg,#dcfce7 0%,var(--card) 60%);border-color:#bbf7d0;border-left:4px solid #16a34a}
 .agend-slot.rechazada{background:#fef2f2;border-color:#fecaca;border-left:4px solid var(--danger);opacity:.7}
+.agend-slot.propuesta{background:linear-gradient(90deg,#eef2ff 0%,var(--card) 60%);border-color:#c7d2fe;border-left:4px solid #6366f1}
 .agend-slot-hour{font-family:'Manrope','Inter',sans-serif;font-size:15px;font-weight:800;color:var(--primary-dark);min-width:62px;letter-spacing:.4px}
 .agend-slot-body{flex:1;font-size:13px;line-height:1.4}
 .agend-slot-name{font-weight:700;color:var(--primary-dark);font-size:13.5px}
@@ -1222,6 +1225,12 @@ canvas{max-width:100%}
 .agend-slot-status.pendiente{background:#fef3c7;color:#92400e}
 .agend-slot-status.aprobada{background:#dcfce7;color:#166534}
 .agend-slot-status.rechazada{background:#fee2e2;color:#991b1b}
+.agend-slot-status.propuesta{background:#e0e7ff;color:#3730a3}
+.agend-propuesta-box{background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:12px 14px;margin:10px 0}
+.agend-propuesta-title{font-weight:800;color:#3730a3;font-size:13px;margin-bottom:6px}
+.agend-propuesta-line{color:var(--primary-dark);font-size:14px;font-weight:600}
+.agend-propuesta-note{color:var(--text);font-size:13px;margin-top:6px;font-style:italic}
+.agend-propuesta-hint{color:var(--muted);font-size:11.5px;margin-top:8px;line-height:1.4}
 .agend-slot-libre-text{color:var(--muted);font-size:13px;font-style:italic}
 .agend-slot-libre-cta{color:var(--green-forest);font-weight:700;font-size:12.5px;white-space:nowrap}
 
@@ -1829,7 +1838,10 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
             <label>Edad</label>
             <input type="number" id="afEdad" min="0" max="120" />
           </div>
-          <div></div>
+          <div>
+            <label>Peso (kg)</label>
+            <input type="number" id="afPeso" min="0" max="350" step="0.1" placeholder="Ej: 18,5" />
+          </div>
         </div>
         <input type="hidden" id="afRut" value="" />
         <!-- Procedimiento: input libre (default) -->
@@ -1869,8 +1881,46 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
           <label>Plaquetas / Coagulación</label>
           <input type="text" id="afAccesosCoag" placeholder="Ej: plaquetas 120k, INR 1.1, TACO suspendido hace 48h" autocomplete="off" />
         </div>
+        <!-- Triage clínico (todos opcionales, ayudan a preparar la anestesia) -->
+        <div id="afTriageBlock">
+          <label style="margin-top:2px">Datos clínicos para la anestesia <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted)">(opcionales pero recomendados)</span></label>
+          <div class="row2">
+            <div>
+              <label>ASA</label>
+              <select id="afAsa">
+                <option value="">— No indicado —</option>
+                <option value="I">ASA I</option>
+                <option value="II">ASA II</option>
+                <option value="III">ASA III</option>
+                <option value="IV">ASA IV</option>
+                <option value="V">ASA V</option>
+              </select>
+            </div>
+            <div>
+              <label>Ayuno</label>
+              <select id="afAyuno">
+                <option value="">— No indicado —</option>
+                <option value="si6">Sí, ≥ 6 h</option>
+                <option value="si_menos">Sí, &lt; 6 h</option>
+                <option value="no">No / por confirmar</option>
+              </select>
+            </div>
+          </div>
+          <label>Tipo de anestesia solicitada</label>
+          <select id="afTipoAnestesia">
+            <option value="">— A definir por Anestesia —</option>
+            <option value="sedacion">Sedación</option>
+            <option value="general">Anestesia general</option>
+            <option value="regional">Anestesia regional</option>
+            <option value="local_mac">Local / MAC</option>
+          </select>
+          <label>Alergias</label>
+          <input type="text" id="afAlergias" autocomplete="off" placeholder="Ej: ninguna conocida, penicilina, látex, AINEs..." />
+          <label>Anticoagulantes / antiagregantes</label>
+          <input type="text" id="afAnticoag" autocomplete="off" placeholder="Ej: ninguno; TACO, aspirina, clopidogrel — última dosis..." />
+        </div>
         <label>Indicación clínica / antecedentes relevantes</label>
-        <textarea id="afNotas" placeholder="Comorbilidades, alergias, medicamentos, ASA, ayuno, motivo del procedimiento..."></textarea>
+        <textarea id="afNotas" placeholder="Motivo del procedimiento, comorbilidades, otros antecedentes relevantes..."></textarea>
         <label>Prioridad</label>
         <select id="afPrioridad">
           <option value="electiva">Electiva</option>
@@ -1892,6 +1942,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
     <div class="agend-view" data-view="overview">
       <div class="agend-overview-tabs">
         <button type="button" class="agend-overview-tab active" data-tab="pendiente" onclick="agendOverviewTab('pendiente')">Pendientes <span class="agend-overview-count" id="ovCountPend">0</span></button>
+        <button type="button" class="agend-overview-tab" data-tab="propuesta" onclick="agendOverviewTab('propuesta')">Propuestas <span class="agend-overview-count" id="ovCountProp">0</span></button>
         <button type="button" class="agend-overview-tab" data-tab="aprobada" onclick="agendOverviewTab('aprobada')">Aprobadas <span class="agend-overview-count" id="ovCountAprob">0</span></button>
         <button type="button" class="agend-overview-tab" data-tab="rechazada" onclick="agendOverviewTab('rechazada')">Rechazadas <span class="agend-overview-count" id="ovCountRech">0</span></button>
       </div>

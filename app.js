@@ -4231,6 +4231,12 @@ async function aiAnalizarSolicitud(reqId){
     estado: r.estado,
     es_extra: !!r.isExtra,
     edad_paciente: r.edad || null,
+    peso_kg: r.peso || undefined,
+    asa: r.asa || undefined,
+    ayuno: r.ayuno ? _agendAyunoLabel(r.ayuno) : undefined,
+    tipo_anestesia_solicitada: r.tipoAnestesia ? _agendTipoAnestLabel(r.tipoAnestesia) : undefined,
+    alergias: r.alergias || undefined,
+    anticoagulantes: r.anticoag || undefined,
     procedimiento: r.procedimiento || '',
     prioridad: r.prioridad || 'electiva',
     antecedentes: r.notas || '',
@@ -6715,6 +6721,17 @@ const AGEND_DAY_START_MIN = 8 * 60;      // 08:00 — límite global mínimo abs
 const AGEND_DAY_END_MIN   = 20 * 60;     // 20:00 — límite global máximo absoluto
 const AGEND_DATA_LS_KEY    = 'appx_agend_data_v1';
 const AGEND_SESSION_LS_KEY = 'appx_agend_sess_v1';
+const AGEND_CFG_LS_KEY     = 'appx_agend_cfg_v1';   // config sincronizada (días cerrados manuales)
+
+// Anticipación mínima para agendamiento REGULAR (horas hábiles: no cuentan
+// domingos ni feriados/cierres). Bajo este umbral solo queda la vía de
+// Agendamiento Extra (que requiere visado del administrador).
+const AGEND_LEAD_TIME_HABILES_H = 24;
+
+// Feriados irrenunciables de Chile (mes-día). Se repiten todos los años, por
+// lo que no requieren mantención anual. Las elecciones u otros feriados se
+// agregan como "día cerrado manual" desde el panel admin.
+const AGEND_FERIADOS_IRRENUNCIABLES = ['01-01','05-01','09-18','09-19','12-25'];
 
 // --- Estado en memoria ---
 const AGEND_STATE = {
@@ -6795,6 +6812,149 @@ function agendLoadSession(){
 function agendSaveSession(sess){
   if(sess) localStorage.setItem(AGEND_SESSION_LS_KEY, JSON.stringify(sess));
   else localStorage.removeItem(AGEND_SESSION_LS_KEY);
+}
+
+// ============================================================
+// DÍAS CERRADOS: feriados irrenunciables (automáticos) + cierres manuales
+// (sincronizados a todos los dispositivos por un canal de config aparte).
+// ============================================================
+function _agendIsFeriadoIrrenunciable(dateStr){
+  return AGEND_FERIADOS_IRRENUNCIABLES.includes(String(dateStr||'').slice(5)); // 'MM-DD'
+}
+function agendLoadCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem(AGEND_CFG_LS_KEY) || '{}');
+    if(!c.closures || typeof c.closures !== 'object') c.closures = {};
+    return c;
+  }catch(e){ return { closures: {} }; }
+}
+function agendSaveCfg(cfg){
+  try{ localStorage.setItem(AGEND_CFG_LS_KEY, JSON.stringify(cfg)); }
+  catch(e){ console.error('No se pudo guardar config de agendamiento', e); }
+}
+// Cierre manual vigente (ignora tombstones de cierres eliminados).
+function _agendManualClosure(dateStr){
+  const c = agendLoadCfg();
+  const x = c.closures && c.closures[dateStr];
+  return (x && !x.deleted) ? x : null;
+}
+function _agendIsClosedDate(dateStr){
+  return _agendIsFeriadoIrrenunciable(dateStr) || !!_agendManualClosure(dateStr);
+}
+function _agendClosureLabel(dateStr){
+  if(_agendIsFeriadoIrrenunciable(dateStr)) return 'Feriado irrenunciable';
+  const m = _agendManualClosure(dateStr);
+  return m ? (m.reason || 'Día cerrado') : '';
+}
+
+// --- Lead-time (anticipación mínima en horas hábiles) ---
+function _agendSlotDatetime(dateStr, startMin){
+  const dt = _agendParseDateStr(dateStr);
+  dt.setHours(Math.floor((startMin||0)/60), (startMin||0)%60, 0, 0);
+  return dt;
+}
+// Primer instante permitido para agenda regular: ahora + N horas, descontando
+// domingos y feriados/cierres (no cuentan como horas hábiles).
+function _agendLeadTimeDeadline(){
+  let remaining = AGEND_LEAD_TIME_HABILES_H;
+  let cursor = new Date();
+  let guard = 0;
+  while(remaining > 0 && guard < 24*90){
+    cursor = new Date(cursor.getTime() + 3600*1000); // +1 hora
+    const ds = _agendDateStr(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+    const habil = (cursor.getDay() !== 0) && !_agendIsClosedDate(ds); // domingo / feriado no cuentan
+    if(habil) remaining--;
+    guard++;
+  }
+  return cursor;
+}
+function _agendMeetsLeadTime(dateStr, startMin){
+  return _agendSlotDatetime(dateStr, startMin).getTime() >= _agendLeadTimeDeadline().getTime();
+}
+
+// --- Sync del canal de config (cierres manuales) ---
+let _agendCfgSyncing = false;
+let _agendCfgTimer = null;
+function _agendCfgRemoteId(){ return INSTITUTION ? (INSTITUTION.id + '-agendcfg') : null; }
+function _agendMergeCfg(remote, local){
+  const out = { closures: {} };
+  const r = (remote && remote.closures) || {};
+  const l = (local && local.closures) || {};
+  const keys = new Set([...Object.keys(r), ...Object.keys(l)]);
+  keys.forEach(d => {
+    const a = r[d], b = l[d];
+    const pick = !a ? b : (!b ? a : (((a.at||0) >= (b.at||0)) ? a : b)); // gana el más reciente
+    if(pick) out.closures[d] = pick;
+  });
+  // Purgar tombstones de cierres eliminados hace más de 90 días
+  const cutoff = Date.now() - 90*24*3600*1000;
+  Object.keys(out.closures).forEach(d => {
+    const x = out.closures[d];
+    if(x && x.deleted && (x.at||0) < cutoff) delete out.closures[d];
+  });
+  return out;
+}
+async function agendCfgSyncNow(){
+  const base = getBackendURL();
+  const id = _agendCfgRemoteId();
+  if(!base || !id || _agendCfgSyncing) return false;
+  _agendCfgSyncing = true;
+  try{
+    let remote = { closures: {} };
+    try{
+      const r = await fetch(base + '/api/state/' + encodeURIComponent(id), _stateGetOpts());
+      if(r.ok){
+        const j = await r.json();
+        if(j && !j._empty && j.data) remote = j.data;
+      }
+    }catch(e){ return false; }
+    const merged = _agendMergeCfg(remote, agendLoadCfg());
+    agendSaveCfg(merged);
+    const token = getBackendToken();
+    if(token){
+      await fetch(base + '/api/state/' + encodeURIComponent(id), {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ data: merged })
+      }).catch(()=>{});
+    }
+    return true;
+  }catch(e){ console.warn('agendCfgSyncNow', e); return false; }
+  finally{ _agendCfgSyncing = false; }
+}
+function agendScheduleCfgSync(){
+  if(_agendCfgTimer) clearTimeout(_agendCfgTimer);
+  _agendCfgTimer = setTimeout(()=>{ _agendCfgTimer = null; agendCfgSyncNow(); }, 800);
+}
+
+// Admin: agregar o quitar un día cerrado manual.
+function agendGestionarCierre(){
+  if(AGEND_STATE.mode !== 'admin'){ alert('Solo el administrador puede gestionar días cerrados.'); return; }
+  const fechaIn = prompt('Día a cerrar/reabrir (AAAA-MM-DD):', AGEND_STATE.selectedDate || _agendTodayStr());
+  if(fechaIn === null) return;
+  const ds = String(fechaIn).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(ds) || isNaN(_agendParseDateStr(ds).getTime())){
+    alert('Fecha inválida. Usa el formato AAAA-MM-DD.'); return;
+  }
+  if(_agendIsFeriadoIrrenunciable(ds)){
+    alert('Ese día ya es feriado irrenunciable (cerrado automáticamente). No es necesario agregarlo.'); return;
+  }
+  const cfg = agendLoadCfg();
+  const ya = _agendManualClosure(ds);
+  if(ya){
+    if(confirm(`El ${ds} está cerrado ("${ya.reason||'Día cerrado'}").\n\n¿Reabrirlo?`)){
+      cfg.closures[ds] = { deleted: true, at: Date.now() }; // tombstone para propagar la reapertura
+      agendSaveCfg(cfg); agendScheduleCfgSync();
+      toast && toast('Día reabierto');
+      try{ agendRenderCalendario(); }catch(e){}
+    }
+    return;
+  }
+  const reason = (prompt('Motivo del cierre (ej: Capacitación del servicio):') || 'Día cerrado').trim();
+  cfg.closures[ds] = { reason, by: (AGEND_STATE.staffNombre || 'Admin'), at: Date.now() };
+  agendSaveCfg(cfg); agendScheduleCfgSync();
+  toast && toast('Día marcado como cerrado');
+  try{ agendRenderCalendario(); }catch(e){}
 }
 
 // ============================================================
@@ -7050,7 +7210,7 @@ function _agendCountDay(salaId, dateStr){
   const slots = _agendGetDaySlots(salaId, dateStr);
   let pend=0, aprob=0, rech=0;
   slots.forEach(r => {
-    if(r.estado === 'pendiente') pend++;
+    if(r.estado === 'pendiente' || r.estado === 'propuesta') pend++;
     else if(r.estado === 'aprobada') aprob++;
     else if(r.estado === 'rechazada') rech++;
   });
@@ -7498,7 +7658,13 @@ function agendOpenSala(salaId){
   _agendShowView('calendario', true);
   const s = _agendGetSala(salaId);
   _agendSetTitle(s ? s.name : 'Calendario', AGEND_STATE.mode === 'admin' ? 'Modo Admin' : (_agendGetUnidad(AGEND_STATE.unidadCode)||{}).name || '');
-  _agendSetHeadAction(null);
+  if(AGEND_STATE.mode === 'admin'){
+    _agendSetHeadAction('🚫 Cierres', () => agendGestionarCierre());
+  } else {
+    _agendSetHeadAction(null);
+  }
+  // Traer cierres manuales desde la nube y repintar cuando lleguen
+  try{ agendCfgSyncNow().then(ok => { if(ok && AGEND_STATE.view === 'calendario') agendRenderCalendario(); }); }catch(e){}
   // Pintar resumen de horario de la sala arriba del grid (si existe el contenedor)
   const sumEl = document.getElementById('agendCalScheduleSummary');
   if(sumEl){
@@ -7531,6 +7697,10 @@ function agendRenderCalendario(){
   const todayStr = _agendTodayStr();
   const sala = _agendGetSala(AGEND_STATE.salaId);
   const allowsExtra = !!(sala && sala.allowsExtra);
+  // Primer día agendable por agenda regular (lead-time): los días anteriores
+  // quedan "muy pronto" para la unidad (solo Extra).
+  const _dl = _agendLeadTimeDeadline();
+  const deadlineDs = _agendDateStr(_dl.getFullYear(), _dl.getMonth(), _dl.getDate());
   let html = '';
   for(let i=0; i<offset; i++) html += `<div class="agend-cal-day empty"></div>`;
   for(let d=1; d<=daysInMonth; d++){
@@ -7539,6 +7709,8 @@ function agendRenderCalendario(){
     const isPast = (ds < todayStr);
     const isToday = (ds === todayStr);
     const isOpen = _agendIsDayOpenForSala(AGEND_STATE.salaId, ds);
+    const isClosed = _agendIsClosedDate(ds);
+    const isTooSoon = (ds < deadlineDs); // todo el día cae dentro del lead-time
     let badge = '';
     if(counts.total > 0){
       let cls = 'bd-pend', txt = `${counts.total}`;
@@ -7549,25 +7721,36 @@ function agendRenderCalendario(){
     const cls = ['agend-cal-day'];
     if(isToday) cls.push('today');
     if(isPast) cls.push('past');
-    if(!isOpen) cls.push('closed');
+    if(!isOpen || isClosed) cls.push('closed');
+    if(isTooSoon && !isPast && !isClosed && isOpen) cls.push('toosoon');
     // Lógica de click:
     //   pasado → sin handler
+    //   unidad + día cerrado → solo Extra (si la sala lo permite)
+    //   "muy pronto" queda clicable: el envío bloquea solo las electivas
+    //     (las urgentes <24h pueden agendarse igual)
     //   abierto → agendOpenDia normal
-    //   cerrado y la sala permite Extra → ofrecer Agendamiento Extra
-    //   cerrado y la sala NO permite Extra → sin handler
+    //   admin → puede entrar a revisar/visar (incl. feriados en día hábil)
+    const blockRegularUnit = (AGEND_STATE.mode === 'unidad') && isClosed;
     let handler = '';
     if(!isPast){
-      if(isOpen){
+      if(blockRegularUnit){
+        if(allowsExtra){
+          handler = `onclick="agendOfrecerExtraDesdeCal('${ds}')"`;
+          cls.push('extra-allowed');
+        }
+        // sin Extra → día no agendable para la unidad (sin handler)
+      } else if(isOpen){
         handler = `onclick="agendOpenDia('${ds}')"`;
       } else if(allowsExtra && AGEND_STATE.mode === 'unidad'){
         handler = `onclick="agendOfrecerExtraDesdeCal('${ds}')"`;
         cls.push('extra-allowed');
-      } else if(allowsExtra && AGEND_STATE.mode === 'admin'){
+      } else if(AGEND_STATE.mode === 'admin' && (allowsExtra || isClosed)){
         // Admin puede igual entrar al día para revisar
         handler = `onclick="agendOpenDia('${ds}')"`;
       }
     }
-    html += `<button type="button" class="${cls.join(' ')}" ${handler}><div class="agend-cal-d">${d}</div>${badge}</button>`;
+    const titleAttr = isClosed ? ` title="${_gpEsc(_agendClosureLabel(ds))}"` : '';
+    html += `<button type="button" class="${cls.join(' ')}"${titleAttr} ${handler}><div class="agend-cal-d">${d}</div>${badge}</button>`;
   }
   grid.innerHTML = html;
 }
@@ -7579,8 +7762,16 @@ function agendOfrecerExtraDesdeCal(dateStr){
   const dt = _agendParseDateStr(dateStr);
   const dayName = _agendDiasES[dt.getDay()];
   const fmt = `${dayName.charAt(0).toUpperCase()+dayName.slice(1)} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]}`;
+  let motivo;
+  if(_agendIsClosedDate(dateStr)){
+    motivo = `El ${fmt} está cerrado (${_agendClosureLabel(dateStr)}).`;
+  } else if(_agendSlotDatetime(dateStr, AGEND_DAY_END_MIN).getTime() < _agendLeadTimeDeadline().getTime()){
+    motivo = `El ${fmt} está dentro de las ${AGEND_LEAD_TIME_HABILES_H} h hábiles de anticipación mínima para agenda regular.`;
+  } else {
+    motivo = `${sala.name} no tiene agenda regular el ${fmt}.`;
+  }
   const ok = confirm(
-    `${sala.name} no tiene agenda regular el ${fmt}.\n\n`+
+    `${motivo}\n\n`+
     `Puedes solicitar un Agendamiento EXTRA para ese día. `+
     `Requerirá visado del administrador.\n\n`+
     `¿Continuar con Agendamiento Extra?`
@@ -7962,6 +8153,7 @@ function agendOpenFormForRange(startHHMM, endHHMM){
   document.getElementById('afRut').value = '';
   document.getElementById('afNotas').value = '';
   document.getElementById('afPrioridad').value = 'electiva';
+  _agendResetTriageFields();
   // Toggle modo horario y procedimiento según la sala
   _agendApplyFormModeForSala(sala);
   if(isAmPm){
@@ -8124,6 +8316,35 @@ function _agendUpdateRangoHint(){
   hint.innerHTML = `<span style="color:#16a34a">✓ Horario disponible · Duración ${durStr}</span>`;
 }
 
+// --- Triage clínico: lectura, reset y etiquetas legibles ---
+function _agendReadTriageFields(){
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value||'').trim() : ''; };
+  return {
+    peso: v('afPeso'), asa: v('afAsa'), ayuno: v('afAyuno'),
+    tipoAnestesia: v('afTipoAnestesia'), alergias: v('afAlergias'), anticoag: v('afAnticoag')
+  };
+}
+function _agendResetTriageFields(){
+  ['afPeso','afAsa','afAyuno','afTipoAnestesia','afAlergias','afAnticoag'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+}
+const _AGEND_AYUNO_LABEL    = { si6:'Sí, ≥ 6 h', si_menos:'Sí, < 6 h', no:'No / por confirmar' };
+const _AGEND_TIPOANEST_LABEL = { sedacion:'Sedación', general:'Anestesia general', regional:'Anestesia regional', local_mac:'Local / MAC' };
+function _agendAyunoLabel(v){ return _AGEND_AYUNO_LABEL[v] || v || ''; }
+function _agendTipoAnestLabel(v){ return _AGEND_TIPOANEST_LABEL[v] || v || ''; }
+// Pares [etiqueta, valor] de triage presentes en la solicitud (para detalle/mailto).
+function _agendTriagePairs(req){
+  const out = [];
+  if(req.peso)          out.push(['Peso', req.peso + ' kg']);
+  if(req.asa)           out.push(['ASA', 'ASA ' + req.asa]);
+  if(req.ayuno)         out.push(['Ayuno', _agendAyunoLabel(req.ayuno)]);
+  if(req.tipoAnestesia) out.push(['Anestesia solicitada', _agendTipoAnestLabel(req.tipoAnestesia)]);
+  if(req.alergias)      out.push(['Alergias', req.alergias]);
+  if(req.anticoag)      out.push(['Anticoagulantes', req.anticoag]);
+  return out;
+}
+
 function agendSubmitSolicitud(ev){
   if(ev) ev.preventDefault();
   const salaId = AGEND_STATE.salaId;
@@ -8140,6 +8361,8 @@ function agendSubmitSolicitud(ev){
   const rut = '';
   const notas = document.getElementById('afNotas').value.trim();
   const prio = document.getElementById('afPrioridad').value;
+  // Triage clínico (todos opcionales)
+  const triage = _agendReadTriageFields();
 
   // Procedimiento (catálogo o libre)
   let proc;
@@ -8177,6 +8400,30 @@ function agendSubmitSolicitud(ev){
     if(endMin <= startMin){ alert('El horario de término debe ser mayor que el de inicio.'); return; }
     if(startMin < AGEND_DAY_START_MIN || endMin > AGEND_DAY_END_MIN){
       alert(`Horario fuera del rango permitido (${_agendMinToHHMM(AGEND_DAY_START_MIN)}–${_agendMinToHHMM(AGEND_DAY_END_MIN)}).`); return;
+    }
+  }
+
+  // Blindaje universal: ninguna vía (regular, AM/PM ni Extra) acepta fechas pasadas.
+  if(dateStr < _agendTodayStr()){
+    alert('No se puede agendar en una fecha pasada. Elige una fecha de hoy en adelante.');
+    return;
+  }
+
+  // Validación de anticipación y días cerrados (solo agenda regular; el
+  // Agendamiento Extra es la vía de escape y omite estas reglas).
+  if(!isExtra){
+    if(_agendIsClosedDate(dateStr)){
+      alert(`Ese día está cerrado (${_agendClosureLabel(dateStr)}). No se puede agendar en agenda regular.` +
+        (sala && sala.allowsExtra ? '\n\nSi es imprescindible, usa "Agendamiento Extra" (requiere visado del administrador).' : '\n\nElige otra fecha.'));
+      return;
+    }
+    if(prio !== 'urgente' && !_agendMeetsLeadTime(dateStr, startMin)){
+      const dl = _agendLeadTimeDeadline();
+      alert(`Las solicitudes electivas requieren al menos ${AGEND_LEAD_TIME_HABILES_H} horas hábiles de anticipación ` +
+        `(sin contar domingos ni feriados).\n\nEl primer horario disponible es a partir del ${dl.toLocaleString('es-CL')}.` +
+        `\n\nSi el caso es de menos de 24 h, marca la prioridad como "Urgente"` +
+        (sala && sala.allowsExtra ? ', o solicita un "Agendamiento Extra" (requiere visado).' : '.'));
+      return;
     }
   }
 
@@ -8228,6 +8475,8 @@ function agendSubmitSolicitud(ev){
   const req = {
     id: _agendGenId(),
     paciente, edad, rut, procedimiento: proc, notas, prioridad: prio,
+    peso: triage.peso, asa: triage.asa, ayuno: triage.ayuno,
+    tipoAnestesia: triage.tipoAnestesia, alergias: triage.alergias, anticoag: triage.anticoag,
     startMin, endMin,
     isExtra: isExtra,
     unidadCode: AGEND_STATE.unidadCode,
@@ -8303,6 +8552,7 @@ function agendOpenFormExtra(dateStr){
   const procInp = document.getElementById('afProc'); if(procInp) procInp.value = '';
   document.getElementById('afNotas').value = '';
   document.getElementById('afPrioridad').value = 'electiva';
+  _agendResetTriageFields();
   // Aplica modo de form (catálogo/AM-PM si corresponde — defensivo, las salas con Extra son horario libre)
   _agendApplyFormModeForSala(sala);
   // En Extra: usar rango completo 08–20 (jornada amplia)
@@ -8356,6 +8606,17 @@ function agendOpenDetalle(reqId){
         <button type="button" class="agend-action-btn aprobar" onclick="agendVisarSolicitud('${req.id}','aprobada')">✓ Aprobar</button>
         <button type="button" class="agend-action-btn rechazar" onclick="agendVisarSolicitud('${req.id}','rechazada')">✗ Rechazar</button>
       </div>
+      <div class="agend-detalle-actions" style="margin-top:8px">
+        <button type="button" class="agend-btn-secondary" onclick="agendProponerHorario('${req.id}')" style="background:#eef2ff;border:1.5px solid #c7d2fe;color:#3730a3;font-weight:700">🔁 Proponer otro horario</button>
+        ${btnEliminar}
+      </div>
+      ${btnIA}`;
+  } else if(AGEND_STATE.mode === 'admin' && req.estado === 'propuesta'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-btn-secondary" onclick="agendProponerHorario('${req.id}')" style="background:#eef2ff;border:1.5px solid #c7d2fe;color:#3730a3;font-weight:700">🔁 Cambiar la propuesta</button>
+        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:var(--card);color:var(--muted)">Cancelar propuesta</button>
+      </div>
       <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>
       ${btnIA}`;
   } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
@@ -8365,6 +8626,29 @@ function agendOpenDetalle(reqId){
         ${btnEliminar}
       </div>
       ${btnIA}`;
+  } else if(AGEND_STATE.mode === 'unidad' && req.estado === 'propuesta'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-action-btn aprobar" onclick="agendAceptarPropuesta('${req.id}')">✓ Aceptar nuevo horario</button>
+        <button type="button" class="agend-action-btn rechazar" onclick="agendRechazarPropuesta('${req.id}')">✗ No me sirve</button>
+      </div>`;
+  }
+  // Bloque visual de la contrapropuesta (si existe)
+  let propuestaRow = '';
+  if(req.propuesta){
+    const p = req.propuesta;
+    const pdt = _agendParseDateStr(p.date || dateStr);
+    const pFecha = `${_agendDiasES[pdt.getDay()]} ${pdt.getDate()}/${_agendPad(pdt.getMonth()+1)}/${pdt.getFullYear()}`;
+    const pHora = (p.block === 'AM' || p.block === 'PM')
+      ? `${p.block} ${p.block==='PM'?'(14:00–20:00)':'(08:00–14:00)'}`
+      : ((typeof p.startMin==='number'&&typeof p.endMin==='number') ? _agendFmtRange(p.startMin,p.endMin) : '—');
+    propuestaRow = `
+      <div class="agend-propuesta-box">
+        <div class="agend-propuesta-title">🔁 Horario propuesto por Anestesia</div>
+        <div class="agend-propuesta-line"><b>${pFecha}</b> · ${pHora}</div>
+        ${p.comentario ? `<div class="agend-propuesta-note">"${_gpEsc(p.comentario)}"</div>` : ''}
+        ${AGEND_STATE.mode === 'unidad' ? `<div class="agend-propuesta-hint">Acepta para confirmar, o indica que no te sirve para que el servicio proponga otra opción.</div>` : `<div class="agend-propuesta-hint">A la espera de que la unidad acepte o rechace.</div>`}
+      </div>`;
   }
   const extraBadge = req.isExtra ? ` <span class="agend-extra-pill">EXTRA</span>` : '';
   const horarioRow = isAmPmReq
@@ -8379,13 +8663,19 @@ function agendOpenDetalle(reqId){
       ${req.accesosCoagulacion ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Coagulación</div><div class="agend-detalle-v">${_gpEsc(req.accesosCoagulacion)}</div></div>` : ''}
     `
     : '';
+  // Filas de triage clínico (solo las presentes)
+  const triageRows = _agendTriagePairs(req)
+    .map(([k,v]) => `<div class="agend-detalle-row"><div class="agend-detalle-k">${k}</div><div class="agend-detalle-v">${_gpEsc(String(v))}</div></div>`)
+    .join('');
   body.innerHTML = `
     <div class="agend-detalle-card">
       <div class="agend-detalle-row"><div class="agend-detalle-k">Estado</div><div class="agend-detalle-v"><span class="agend-slot-status ${req.estado}">${req.estado}</span>${extraBadge}</div></div>
+      ${propuestaRow}
       ${horarioRow}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Paciente</div><div class="agend-detalle-v">${_gpEsc(req.paciente)}${req.edad?` · ${_gpEsc(String(req.edad))} años`:''}${req.rut?` · ${_gpEsc(req.rut)}`:''}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Procedimiento</div><div class="agend-detalle-v">${_gpEsc(req.procedimiento)}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Prioridad</div><div class="agend-detalle-v">${_gpEsc(req.prioridad||'electiva')}</div></div>
+      ${triageRows}
       ${accesosRows}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Antecedentes</div><div class="agend-detalle-v">${req.notas?_gpEsc(req.notas):'<em style="color:#9ca3af">Sin antecedentes adicionales</em>'}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Unidad</div><div class="agend-detalle-v">${unidad?unidad.ico+' '+_gpEsc(unidad.name):'—'}</div></div>
@@ -8432,12 +8722,19 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   slot.visadoAt = Date.now();
   slot.updatedAt = Date.now();
   slot.comentarioVisado = comentario;
+  // Cualquier visado directo (aprobar/rechazar/revertir) descarta una
+  // contrapropuesta vigente para no dejar un recuadro de propuesta huérfano.
+  if(slot.propuesta) delete slot.propuesta;
   agendSaveData(data);
   agendScheduleSync(); // propagar el visado a la nube
   // Al aprobar: abrir correo de confirmación al solicitante con copia a las
   // secretarías de pabellón (todas las salas, incluida Endoscopía Paralela).
   if(nuevoEstado === 'aprobada'){
     _agendOfrecerMailtoConfirmacion(slot, found.salaId, found.dateStr);
+  }
+  // Al rechazar: cerrar el loop avisando al solicitante (motivo + cómo reagendar).
+  if(nuevoEstado === 'rechazada'){
+    _agendOfrecerMailtoRechazo(slot, found.salaId, found.dateStr);
   }
   agendOpenDetalle(reqId);
 }
@@ -8505,6 +8802,7 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   lineas.push(`• Paciente: ${req.paciente || '—'}${req.edad?` · ${req.edad} años`:''}${req.rut?` · RUT ${req.rut}`:''}`);
   lineas.push(`• Procedimiento: ${req.procedimiento || '—'}`);
   lineas.push(`• Prioridad: ${req.prioridad || 'electiva'}`);
+  _agendTriagePairs(req).forEach(([k,v]) => lineas.push(`• ${k}: ${v}`));
   if(req.notas) lineas.push(`• Antecedentes: ${req.notas}`);
   // Extras Accesos Vasculares
   if(salaId === 'accesos_vasculares'){
@@ -8544,6 +8842,308 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   }
 }
 
+// Abre el cliente de correo pre-llenado para avisar al solicitante que su
+// solicitud fue RECHAZADA, con el motivo registrado e indicación de reagendar.
+// Cierra el loop: hoy el rechazo quedaba sin notificación a la unidad.
+function _agendOfrecerMailtoRechazo(req, salaId, dateStr){
+  if(!req || !req.solicitanteEmail){
+    toast && toast('Rechazada (sin email del solicitante registrado)');
+    return;
+  }
+  const sala = _agendGetSala(salaId);
+  const unidad = _agendGetUnidad(req.unidadCode);
+  const dt = _agendParseDateStr(dateStr);
+  const fechaTxt = `${_agendDiasES[dt.getDay()]} ${dt.getDate()} de ${_agendMesesES[dt.getMonth()]} de ${dt.getFullYear()}`;
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+  const block = _agendBlockOfSlot(req);
+  const horarioTxt = isAmPm
+    ? (block === 'PM' ? 'Bloque PM (aprox. 14:00–20:00)' : 'Bloque AM (aprox. 08:00–14:00)')
+    : ((typeof req.startMin === 'number' && typeof req.endMin === 'number')
+        ? `Horario ${_agendFmtRange(req.startMin, req.endMin)}`
+        : 'Horario solicitado');
+  const visadoTxt = req.visadoBy ? `${req.visadoBy}` : 'Servicio de Anestesia';
+  const subject = `Agendamiento NO disponible · ${sala?sala.name:'Procedimiento'} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()}`;
+  const lineas = [];
+  lineas.push(`Estimado(a) ${req.solicitanteNombre || ''}:`);
+  lineas.push('');
+  lineas.push(`Lamentablemente la siguiente solicitud de agendamiento NO pudo ser confirmada por el Servicio de Anestesia para la fecha y horario pedidos.`);
+  lineas.push('');
+  lineas.push(`• Sala: ${sala ? sala.name : '—'}`);
+  lineas.push(`• Unidad solicitante: ${unidad ? unidad.name : '—'}`);
+  lineas.push(`• Fecha solicitada: ${fechaTxt}`);
+  lineas.push(`• ${horarioTxt}`);
+  lineas.push(`• Paciente: ${req.paciente || '—'}${req.edad?` · ${req.edad} años`:''}`);
+  lineas.push(`• Procedimiento: ${req.procedimiento || '—'}`);
+  _agendTriagePairs(req).forEach(([k,v]) => lineas.push(`• ${k}: ${v}`));
+  lineas.push('');
+  if(req.comentarioVisado){
+    lineas.push(`Motivo / observación del Servicio de Anestesia:`);
+    lineas.push(`"${req.comentarioVisado}"`);
+    lineas.push('');
+  }
+  lineas.push(`Te pedimos reenviar una nueva solicitud proponiendo otra fecha u horario a través de la aplicación de Agendamiento. Si necesitas coordinar directamente, responde este correo.`);
+  lineas.push('');
+  lineas.push(`Gestionado por: ${visadoTxt}`);
+  lineas.push(`Fecha: ${new Date(req.visadoAt || Date.now()).toLocaleString('es-CL')}`);
+  lineas.push('');
+  lineas.push('— Servicio de Anestesia');
+  const body = lineas.join('\n');
+  const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const ok = confirm(`Solicitud RECHAZADA. ¿Abrir tu cliente de correo para avisar a ${req.solicitanteEmail}?\n\nSi cancelas, el rechazo queda registrado igualmente.`);
+  if(!ok) return;
+  try{
+    window.location.href = url;
+  }catch(e){
+    try{ window.open(url, '_self'); }catch(e2){}
+  }
+}
+
+// ============================================================
+// CONTRAPROPUESTA — el admin ofrece un horario alternativo en vez de
+// rechazar. La solicitud pasa a estado 'propuesta' (sigue reservando su
+// horario original hasta que la unidad acepte o rechace). Al aceptar, se
+// confirma en el horario propuesto (moviéndola de día si corresponde).
+// ============================================================
+
+// Parsea "HH:MM" a minutos desde medianoche. Devuelve null si es inválido.
+function _agendParseHHMM(txt){
+  const m = String(txt||'').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  const h = parseInt(m[1],10), mi = parseInt(m[2],10);
+  if(isNaN(h) || isNaN(mi) || h<0 || h>23 || mi<0 || mi>59) return null;
+  return h*60 + mi;
+}
+
+// Admin: proponer una fecha/horario alternativo para una solicitud.
+function agendProponerHorario(reqId){
+  if(AGEND_STATE.mode !== 'admin'){ alert('Solo el modo Administrador puede proponer horarios.'); return; }
+  const found = _agendFindRequest(reqId);
+  if(!found) return;
+  const salaId = found.salaId;
+  const sala = _agendGetSala(salaId);
+  const isAmPm = !!(sala && sala.usesAmPmOnly);
+
+  // 1) Fecha propuesta
+  const fechaIn = prompt('Fecha propuesta (AAAA-MM-DD):', found.dateStr);
+  if(fechaIn === null) return;
+  const newDate = String(fechaIn).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || isNaN(_agendParseDateStr(newDate).getTime())){
+    alert('Fecha inválida. Usa el formato AAAA-MM-DD.');
+    return;
+  }
+  if(newDate < _agendTodayStr()){
+    alert('La fecha propuesta no puede ser en el pasado.');
+    return;
+  }
+
+  // 2) Horario propuesto
+  let startMin, endMin, block = null;
+  if(isAmPm){
+    const bIn = prompt('Bloque propuesto (escribe AM o PM):', _agendBlockOfSlot(found.req) || 'AM');
+    if(bIn === null) return;
+    block = String(bIn).trim().toUpperCase() === 'PM' ? 'PM' : 'AM';
+    const rng = _agendBlockRange(block);
+    startMin = rng.startMin; endMin = rng.endMin;
+  } else {
+    const iniIn = prompt('Hora de inicio propuesta (HH:MM):', (typeof found.req.startMin==='number') ? _agendMinToHHMM(found.req.startMin) : '08:00');
+    if(iniIn === null) return;
+    const finIn = prompt('Hora de término propuesta (HH:MM):', (typeof found.req.endMin==='number') ? _agendMinToHHMM(found.req.endMin) : '09:00');
+    if(finIn === null) return;
+    startMin = _agendParseHHMM(iniIn);
+    endMin   = _agendParseHHMM(finIn);
+    if(startMin === null || endMin === null){ alert('Horario inválido. Usa el formato HH:MM.'); return; }
+    if(endMin <= startMin){ alert('La hora de término debe ser posterior al inicio.'); return; }
+    if(startMin < AGEND_DAY_START_MIN || endMin > AGEND_DAY_END_MIN){
+      alert('El horario debe estar entre las 08:00 y las 20:00.'); return;
+    }
+  }
+
+  // 3) Validar que el horario propuesto no choque con otra solicitud activa
+  if(!isAmPm){
+    const overlap = _agendFindOverlap(salaId, newDate, startMin, endMin, reqId, !!found.req.isExtra);
+    if(overlap){
+      alert(`El horario propuesto choca con otra solicitud activa (${_agendFmtRange(overlap.startMin, overlap.endMin)}). Elige otro horario.`);
+      return;
+    }
+    const cross = _agendFindCrossBlock(salaId, newDate, startMin, endMin);
+    if(cross){
+      const otra = cross.sala ? cross.sala.name : 'otra sala';
+      if(!confirm(`Atención: ${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)}, lo que normalmente bloquea esta sala.\n\n¿Proponer de todas formas?`)) return;
+    }
+  }
+
+  // 4) Comentario para la unidad
+  const comentario = prompt('Comentario para la unidad (opcional):') || '';
+
+  // 5) Guardar
+  const data = agendLoadData();
+  if(!Array.isArray(data[found.salaId][found.dateStr])){
+    data[found.salaId][found.dateStr] = _agendMigrateDayEntry(data[found.salaId][found.dateStr]);
+  }
+  const arr = data[found.salaId][found.dateStr];
+  const idx = arr.findIndex(r => r && r.id === reqId);
+  if(idx < 0) return;
+  const slot = arr[idx];
+  slot.propuesta = { date: newDate, startMin, endMin, comentario, by: (AGEND_STATE.staffNombre || 'Anestesia'), at: Date.now() };
+  if(block) slot.propuesta.block = block;
+  slot.estado = 'propuesta';
+  slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
+  slot.visadoAt = Date.now();
+  slot.updatedAt = Date.now();
+  agendSaveData(data);
+  agendScheduleSync();
+  _agendOfrecerMailtoPropuesta(slot, found.salaId, found.dateStr);
+  agendOpenDetalle(reqId);
+}
+
+// Unidad: aceptar el horario propuesto → confirma la solicitud (la mueve de
+// día si la propuesta es para otra fecha).
+function agendAceptarPropuesta(reqId){
+  const found = _agendFindRequest(reqId);
+  if(!found || !found.req.propuesta){ alert('Esta solicitud ya no tiene una propuesta vigente.'); return; }
+  const salaId = found.salaId;
+  const p = found.req.propuesta;
+  const newDate = p.date || found.dateStr;
+  const isAmPm = (p.block === 'AM' || p.block === 'PM');
+
+  // Revalidar disponibilidad del horario propuesto (pudo ocuparse mientras tanto)
+  if(!isAmPm){
+    const overlap = _agendFindOverlap(salaId, newDate, p.startMin, p.endMin, reqId, !!found.req.isExtra);
+    if(overlap){
+      alert(`El horario propuesto ya no está disponible (${_agendFmtRange(overlap.startMin, overlap.endMin)} fue tomado).\n\nEl servicio te propondrá otra opción.`);
+      return;
+    }
+    const cross = _agendFindCrossBlock(salaId, newDate, p.startMin, p.endMin);
+    if(cross){
+      const otra = cross.sala ? cross.sala.name : 'otra sala';
+      if(!confirm(`Nota: ${otra} tiene reservado ${_agendFmtRange(cross.startMin, cross.endMin)} ese día.\n\n¿Confirmar de todas formas?`)) return;
+    }
+  }
+
+  const data = agendLoadData();
+  if(!Array.isArray(data[found.salaId][found.dateStr])){
+    data[found.salaId][found.dateStr] = _agendMigrateDayEntry(data[found.salaId][found.dateStr]);
+  }
+  const arr = data[found.salaId][found.dateStr];
+  const idx = arr.findIndex(r => r && r.id === reqId);
+  if(idx < 0) return;
+  const original = arr[idx];
+
+  let targetReq;
+  if(newDate === found.dateStr){
+    // Misma fecha → solo actualizar horario/estado
+    original.startMin = p.startMin;
+    original.endMin   = p.endMin;
+    if(p.block) original.block = p.block; else delete original.block;
+    original.estado = 'aprobada';
+    original.comentarioVisado = p.comentario || original.comentarioVisado || '';
+    original.visadoAt = Date.now();
+    original.updatedAt = Date.now();
+    delete original.propuesta;
+    targetReq = original;
+  } else {
+    // Otra fecha → mover: tombstone en el bucket original, nueva en el destino
+    targetReq = Object.assign({}, original, {
+      startMin: p.startMin,
+      endMin: p.endMin,
+      estado: 'aprobada',
+      comentarioVisado: p.comentario || original.comentarioVisado || '',
+      visadoAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    if(p.block) targetReq.block = p.block; else delete targetReq.block;
+    delete targetReq.propuesta;
+    arr[idx] = { id: reqId, deleted: true, deletedAt: Date.now(), updatedAt: Date.now() };
+    if(!Array.isArray(data[salaId][newDate])){
+      data[salaId][newDate] = _agendMigrateDayEntry(data[salaId][newDate]);
+    }
+    data[salaId][newDate].push(targetReq);
+    data[salaId][newDate].sort((a,b) => a.startMin - b.startMin);
+  }
+  agendSaveData(data);
+  agendScheduleSync();
+  try{ notifyAdminsOfNewRequest(); }catch(e){}
+  toast && toast('✅ Nuevo horario aceptado');
+  // Confirmación formal al solicitante + copia a secretarías de pabellón
+  _agendOfrecerMailtoConfirmacion(targetReq, salaId, newDate);
+  agendOpenDetalle(reqId);
+}
+
+// Unidad: rechazar la propuesta → la solicitud queda rechazada (libera el
+// horario original) y el servicio queda avisado.
+function agendRechazarPropuesta(reqId){
+  const found = _agendFindRequest(reqId);
+  if(!found){ return; }
+  const motivo = prompt('¿Por qué no te sirve el horario propuesto? (opcional)') || '';
+  const data = agendLoadData();
+  if(!Array.isArray(data[found.salaId][found.dateStr])){
+    data[found.salaId][found.dateStr] = _agendMigrateDayEntry(data[found.salaId][found.dateStr]);
+  }
+  const arr = data[found.salaId][found.dateStr];
+  const idx = arr.findIndex(r => r && r.id === reqId);
+  if(idx < 0) return;
+  const slot = arr[idx];
+  slot.estado = 'rechazada';
+  slot.comentarioVisado = 'La unidad no aceptó la contrapropuesta' + (motivo ? ': ' + motivo : '');
+  slot.updatedAt = Date.now();
+  agendSaveData(data);
+  agendScheduleSync();
+  try{ notifyAdminsOfNewRequest(); }catch(e){}
+  toast && toast('Propuesta rechazada. El servicio fue avisado.');
+  agendOpenDetalle(reqId);
+}
+
+// Correo al solicitante avisando de la contrapropuesta de horario.
+function _agendOfrecerMailtoPropuesta(req, salaId, dateStr){
+  if(!req || !req.solicitanteEmail){
+    toast && toast('Propuesta enviada (sin email del solicitante registrado)');
+    return;
+  }
+  const sala = _agendGetSala(salaId);
+  const unidad = _agendGetUnidad(req.unidadCode);
+  const p = req.propuesta || {};
+  const dtOrig = _agendParseDateStr(dateStr);
+  const dtProp = _agendParseDateStr(p.date || dateStr);
+  const fechaOrig = `${_agendDiasES[dtOrig.getDay()]} ${dtOrig.getDate()} de ${_agendMesesES[dtOrig.getMonth()]} de ${dtOrig.getFullYear()}`;
+  const fechaProp = `${_agendDiasES[dtProp.getDay()]} ${dtProp.getDate()} de ${_agendMesesES[dtProp.getMonth()]} de ${dtProp.getFullYear()}`;
+  const horaOrig = (typeof req.startMin==='number'&&typeof req.endMin==='number') ? _agendFmtRange(req.startMin, req.endMin) : '—';
+  const horaProp = (p.block === 'AM' || p.block === 'PM')
+    ? `Bloque ${p.block} ${p.block==='PM'?'(14:00–20:00)':'(08:00–14:00)'}`
+    : ((typeof p.startMin==='number'&&typeof p.endMin==='number') ? _agendFmtRange(p.startMin, p.endMin) : '—');
+  const subject = `Propuesta de nuevo horario · ${sala?sala.name:'Procedimiento'} · ${dtProp.getDate()}/${_agendPad(dtProp.getMonth()+1)}/${dtProp.getFullYear()}`;
+  const lineas = [];
+  lineas.push(`Estimado(a) ${req.solicitanteNombre || ''}:`);
+  lineas.push('');
+  lineas.push(`El Servicio de Anestesia no puede atender tu solicitud en el horario pedido, pero te propone una alternativa:`);
+  lineas.push('');
+  lineas.push(`• Sala: ${sala ? sala.name : '—'}`);
+  lineas.push(`• Unidad solicitante: ${unidad ? unidad.name : '—'}`);
+  lineas.push(`• Paciente: ${req.paciente || '—'}${req.edad?` · ${req.edad} años`:''}`);
+  lineas.push(`• Procedimiento: ${req.procedimiento || '—'}`);
+  _agendTriagePairs(req).forEach(([k,v]) => lineas.push(`• ${k}: ${v}`));
+  lineas.push('');
+  lineas.push(`Horario solicitado originalmente: ${fechaOrig} · ${horaOrig}`);
+  lineas.push(`HORARIO PROPUESTO: ${fechaProp} · ${horaProp}`);
+  if(p.comentario){
+    lineas.push('');
+    lineas.push(`Comentario del Servicio de Anestesia:`);
+    lineas.push(`"${p.comentario}"`);
+  }
+  lineas.push('');
+  lineas.push(`Por favor ingresa a la aplicación de Agendamiento para ACEPTAR o RECHAZAR esta propuesta, o responde este correo.`);
+  lineas.push('');
+  lineas.push('— Servicio de Anestesia');
+  const body = lineas.join('\n');
+  const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const ok = confirm(`Propuesta registrada. ¿Abrir tu cliente de correo para avisar a ${req.solicitanteEmail}?\n\nSi cancelas, la propuesta queda registrada igualmente.`);
+  if(!ok) return;
+  try{
+    window.location.href = url;
+  }catch(e){
+    try{ window.open(url, '_self'); }catch(e2){}
+  }
+}
+
 // --- Vista: Overview admin (pendientes / aprobadas / rechazadas) ---
 function agendShowOverview(tab){
   AGEND_STATE.overviewTab = tab || 'pendiente';
@@ -8561,9 +9161,10 @@ function agendOverviewTab(tab){
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
   const all = _agendAllRequests();
-  const counts = { pendiente:0, aprobada:0, rechazada:0 };
+  const counts = { pendiente:0, propuesta:0, aprobada:0, rechazada:0 };
   all.forEach(r => { if(counts[r.estado]!==undefined) counts[r.estado]++; });
   document.getElementById('ovCountPend').textContent = counts.pendiente;
+  const elProp = document.getElementById('ovCountProp'); if(elProp) elProp.textContent = counts.propuesta;
   document.getElementById('ovCountAprob').textContent = counts.aprobada;
   document.getElementById('ovCountRech').textContent = counts.rechazada;
   // Filtrar y ordenar por fecha+inicio ascendente
