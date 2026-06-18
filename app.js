@@ -373,14 +373,14 @@ function _mergeById(remoteArr, localArr){
 }
 
 async function pushRemoteState(){
-  if(_isApplyingRemote) return;
+  if(_isApplyingRemote) return false;
   const base = getBackendURL();
-  if(!base || !INSTITUTION) return;
+  if(!base || !INSTITUTION) return false;
   const token = getBackendToken();
   if(!token){
     _setSyncStatus('unauthorized');
     if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
-    return;
+    return false;
   }
   try{
     _setSyncStatus('syncing');
@@ -408,7 +408,7 @@ async function pushRemoteState(){
       if(!remote){
         // No se pudo leer el estado remoto → no arriesgamos. Reintenta luego.
         _setSyncStatus('offline');
-        return;
+        return false;
       }
       if(remote._empty){
         payload = _extractSharedState();
@@ -454,9 +454,9 @@ async function pushRemoteState(){
     if(r.status === 401){
       _setSyncStatus('unauthorized');
       if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
-      return;
+      return false;
     }
-    if(!r.ok){ _setSyncStatus('error'); return; }
+    if(!r.ok){ _setSyncStatus('error'); return false; }
     const data = await r.json().catch(()=>({}));
     if(data && data._updatedAt){
       _lastRemoteUpdatedAt = data._updatedAt;
@@ -481,9 +481,11 @@ async function pushRemoteState(){
     }catch(e){}
 
     _setSyncStatus('synced');
+    return true;
   }catch(e){
     console.warn('pushRemoteState', e);
     _setSyncStatus('offline');
+    return false;
   }
 }
 
@@ -523,7 +525,12 @@ function _flushSyncNow(){
       payload.adminUser = a;
     }
     // keepalive: permite que la request siga viva aunque la página se cierre.
-    fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {
+    // IMPORTANTE: usamos /patch (merge superficial en el backend) en lugar del
+    // replace completo. Un usuario normal solo manda {vacations, exchanges}; con
+    // un POST replace eso BORRARÍA el resto del estado en la nube (roster,
+    // protocolos, eventos, PINs). Con /patch solo se fusionan esos campos y el
+    // resto del estado guardado queda intacto.
+    fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id) + '/patch', {
       method: 'POST',
       keepalive: true,
       headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
@@ -1723,7 +1730,7 @@ function syncVacFormDraft(){
   const n = document.getElementById('v_notes'); if(n) window._vacEditing.notes = n.value;
   const cp = document.getElementById('v_cobpedcv'); if(cp) window._vacEditing.coberturaPedCv = cp.value;
 }
-function saveVacation(id, isNew){
+async function saveVacation(id, isNew){
   syncVacFormDraft();
   const v = window._vacEditing;
   if(!v.staffId){toast('Falta el anestesiólogo');return;}
@@ -1743,10 +1750,24 @@ function saveVacation(id, isNew){
   } else {
     state.vacations = state.vacations.map(x=>x.id===id?v:x);
   }
-  save(); closeModal(); renderVacations(); toast(isNew?'Solicitud enviada':'Solicitud actualizada');
-  // Aviso push al admin cuando llega una NUEVA solicitud de vacaciones/permiso
-  if(isNew && v.status === 'pending'){ try{ notifyAdminsPush('vacaciones'); }catch(e){} }
+  save(); closeModal(); renderVacations();
   window._vacEditing = null;
+  // Confirmación REAL de sincronización: guardamos local y SOLO decimos
+  // "enviada" cuando de verdad llegó al backend en la nube. Si falla, avisamos
+  // claramente para que nadie crea que subió algo que no llegó.
+  const base = getBackendURL();
+  if(!base){ toast(isNew?'Guardada en este equipo':'Actualizada (solo local)'); return; }
+  toast(isNew?'Guardada · sincronizando…':'Actualizando…');
+  if(_syncTimer){ clearTimeout(_syncTimer); _syncTimer = null; } // forzamos el push ahora
+  let ok = false;
+  try{ ok = await pushRemoteState(); }catch(e){ ok = false; }
+  if(ok){
+    toast(isNew ? '✅ Solicitud enviada' : '✅ Cambios sincronizados');
+    // Aviso push al admin solo si la solicitud realmente llegó a la nube.
+    if(isNew && v.status === 'pending'){ try{ notifyAdminsPush('vacaciones'); }catch(e){} }
+  } else {
+    toast('⚠️ Guardada en este equipo, pero NO se pudo enviar a la nube. Se reintentará al reabrir la app.');
+  }
 }
 function viewVacation(id){
   const v = state.vacations.find(x=>x.id===id); if(!v) return;
@@ -3882,6 +3903,29 @@ function updatePushBtn(){
   try{ on = localStorage.getItem('appnesthesia_push_on')==='1'; }catch(e){}
   btn.textContent = on ? '🔔 Avisos activados en este dispositivo' : '🔕 Activar avisos de agendamiento';
   btn.classList.toggle('on', on);
+  // Botón "Probar push": solo para admin con avisos activados en este dispositivo.
+  const test = document.getElementById('pushTestBtn');
+  if(test) test.style.display = (on ? '' : 'none');
+}
+// Dispara una notificación de prueba a TODOS los dispositivos suscritos.
+// Sirve para confirmar de extremo a extremo que el push funciona (token del
+// worker correcto, suscripciones vivas, VAPID OK). Muestra el resultado real.
+async function testPushFromBtn(){
+  const base = getPushURL();
+  if(!base){ alert('Push no configurado en la app.'); return; }
+  if(!confirm('Se enviará un aviso de PRUEBA a todos los dispositivos suscritos (sonará/vibrará). ¿Continuar?')) return;
+  const headers = {'Content-Type':'application/json'};
+  try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
+  try{
+    const r = await fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo:'prueba' }) });
+    const d = await r.json().catch(()=>null);
+    if(r.status === 401){ alert('❌ El worker de push rechazó el token (401).\n\nRevisa que el secret APP_TOKEN del worker de push sea igual al token de la app.'); return; }
+    if(r.ok && d && d.ok){
+      alert('✅ Resultado de la prueba:\n\n• Enviadas: '+(d.enviadas??'?')+'\n• Expiradas/eliminadas: '+(d.eliminadas??'?')+'\n• Suscritos en total: '+(d.total??'?')+'\n\nSi "Enviadas" es 0 pero hay suscritos, las llaves VAPID del worker no coinciden con las de la app.');
+      return;
+    }
+    alert('No se pudo enviar la prueba: ' + ((d&&d.error) || ('HTTP '+r.status)));
+  }catch(e){ alert('No se pudo enviar la prueba: ' + (e.message||e)); }
 }
 function togglePushFromBtn(){
   let on = false;

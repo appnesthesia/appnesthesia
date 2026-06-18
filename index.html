@@ -1452,7 +1452,13 @@ html[data-theme="dark"] .aria-pill-sub,
 html[data-theme="dark"] .aria-pill-arrow{color:#b3a7e0}
 /* Botón Administrador del selector de usuario (claro + oscuro) */
 .user-item-admin{background:linear-gradient(135deg,#fff8ec 0%,#fef3c7 100%);border-color:#f59e0b}
-html[data-theme="dark"] .user-item-admin{background:linear-gradient(135deg,#2a2412 0%,#3a2f17 100%);border-color:#a86b13}
+.user-item-admin:hover{background:linear-gradient(135deg,#fff4dd 0%,#fde9b0 100%);border-color:#d97706}
+/* Modo oscuro: fondo ámbar oscuro legible + texto ámbar claro que identifica el rol */
+html[data-theme="dark"] .user-item-admin{background:linear-gradient(135deg,#2b2410 0%,#362b13 100%);border-color:#c08a2e}
+html[data-theme="dark"] .user-item-admin:hover{background:linear-gradient(135deg,#342c15 0%,#41331a 100%);border-color:#e0a83a}
+html[data-theme="dark"] .user-item-admin .user-item-name{color:#f3c266}
+html[data-theme="dark"] .user-item-admin .user-item-role{color:#cbb488}
+html[data-theme="dark"] .user-item-admin .user-item-lock{color:#f3c266;opacity:.8}
 /* Superficies neutras claras (grises) → oscuras en modo oscuro */
 html[data-theme="dark"] .calc-fx > div{background:var(--tint1);color:var(--muted)}
 html[data-theme="dark"] .mod-item.disabled{background:var(--tint1);border-color:var(--border)}
@@ -1950,6 +1956,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
     <span style="color:#ea580c;font-size:18px;font-weight:700">›</span>
   </div>
   <button type="button" id="pushToggleBtn" class="push-toggle-btn" style="display:none" onclick="togglePushFromBtn()">🔕 Activar avisos de agendamiento</button>
+  <button type="button" id="pushTestBtn" class="push-toggle-btn" style="display:none;margin-top:6px;opacity:.9" onclick="testPushFromBtn()">🧪 Probar push (enviar aviso de prueba)</button>
   <div class="grid">
     <button class="card c2" onclick="showView('mipanel')" style="grid-column:span 2">
       <div class="ico"><svg viewBox="0 0 24 24"><circle class="shield-body" cx="12" cy="8" r="4"/><path class="shield-body" d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div>
