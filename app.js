@@ -1204,7 +1204,7 @@ function renderRanking(){
   list.innerHTML = ranked.map((s,i)=>{
     const inDanger = cut>0 && i<cut;
     const chips = [];
-    chips.push(`<span class="chip" style="background:#eef2f4">Cumpl. ${cumplimientoLabel(s.cumplimientoJornadas)}</span>`);
+    chips.push(`<span class="chip gray">Cumpl. ${cumplimientoLabel(s.cumplimientoJornadas)}</span>`);
     if((s.jornadasBorradas||0)>0) chips.push(`<span class="chip yellow">Borradas: ${s.jornadasBorradas}</span>`);
     if(s.equipoTMT) chips.push(`<span class="chip green">TMT</span>`);
     if(s.equipoCardio) chips.push(`<span class="chip green">Cardio</span>`);
@@ -1340,7 +1340,7 @@ function renderCobertura(){
   const list = document.getElementById('covList');
   list.innerHTML = ranked.map((s,i)=>{
     const chips = [];
-    chips.push(`<span class="chip" style="background:#eef2f4">Residencia: ${residenciaLabel(s.residenciaAnios)}</span>`);
+    chips.push(`<span class="chip gray">Residencia: ${residenciaLabel(s.residenciaAnios)}</span>`);
     if(s.esResidente) chips.push(`<span class="chip green">Residente</span>`);
     if(s.llamadaPediatrica) chips.push(`<span class="chip green">Ll. Pediátrica</span>`);
     if(s.llamadaCardio) chips.push(`<span class="chip green">Ll. Cardio</span>`);
@@ -4254,9 +4254,9 @@ function openAppMenu(){
   modal(`
     <h3 style="margin:0 0 12px">Menú</h3>
     <button type="button" class="help-card-btn" onclick="closeModal();openGlobalSearch();"><span class="hi">🔎</span><span style="flex:1"><b>Buscar en la app</b><span>Salta a cualquier sección o herramienta</span></span></button>
-    <button type="button" class="help-card-btn" onclick="closeModal();openHelp();"><span class="hi">⚙️</span><span style="flex:1"><b>Ayuda y ajustes</b><span>Tema, tamaño de letra, tutorial</span></span></button>
+    <button type="button" class="help-card-btn" onclick="closeModal();openHelp();"><span class="hi">🔧</span><span style="flex:1"><b>Ayuda y ajustes</b><span>Tema, tamaño de letra, tutorial</span></span></button>
     <button type="button" class="help-card-btn" onclick="closeModal();openAiChat();"><span class="hi">🤖</span><span style="flex:1"><b>Preguntar a ARIA</b><span>Asistente clínico</span></span></button>
-    ${isAdmin?`<button type="button" class="help-card-btn" onclick="closeModal();promptBackendToken();"><span class="hi">🔧</span><span style="flex:1"><b>Configuración de conexión</b><span>Backend / token (administrador)</span></span></button>`:''}
+    ${isAdmin?`<button type="button" class="help-card-btn" onclick="closeModal();promptBackendToken();"><span class="hi">🔌</span><span style="flex:1"><b>Configuración de conexión</b><span>Backend / token (administrador)</span></span></button>`:''}
     <div style="text-align:right;margin-top:6px"><button class="btn" onclick="closeModal()">Cerrar</button></div>
   `);
 }
@@ -8304,7 +8304,7 @@ function agendOpenDetalle(reqId){
   let actionsHtml = '';
   const btnEliminar = `<button type="button" class="agend-action-btn" onclick="agendEliminarSolicitud('${req.id}')" style="background:var(--card);color:#dc2626;border:1.5px solid #fca5a5">🗑 Eliminar</button>`;
   const btnIA = (typeof aiAvailable === 'function' && aiAvailable())
-    ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1.5px solid #a5b4fc;color:#4338ca;font-weight:700">🤖 Analizar con ARIA</button></div><div id="aiVisadoResult" style="display:none"></div>`
+    ? `<div class="agend-detalle-actions" style="margin-top:8px"><button type="button" class="agend-btn-secondary ai-entry-btn" onclick="aiAnalizarSolicitud('${req.id}')" style="background:var(--tintv);border:1.5px solid #8579ad;color:var(--primary-dark);font-weight:700">🤖 Analizar con ARIA</button></div><div id="aiVisadoResult" style="display:none"></div>`
     : '';
   if(AGEND_STATE.mode === 'admin' && req.estado === 'pendiente'){
     actionsHtml = `
@@ -9270,7 +9270,7 @@ function renderUserPicker(){
   var html = '';
 
   // 1) Administrador (siempre arriba)
-  html += '<button type="button" class="user-item" onclick="selectAdmin()" style="background:linear-gradient(135deg,#fff8ec 0%,#fef3c7 100%);border-color:#f59e0b">'
+  html += '<button type="button" class="user-item user-item-admin" onclick="selectAdmin()">'
     + '<div class="user-item-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">🛡️</div>'
     + '<div style="flex:1;min-width:0"><div class="user-item-name">Administrador</div><div class="user-item-role">Gestión completa del servicio</div></div>'
     + '<div class="user-item-lock">'+adminLock+'</div>'

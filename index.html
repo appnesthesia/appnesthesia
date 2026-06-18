@@ -1441,6 +1441,27 @@ html[data-theme="dark"] .chip.yellow{background:#3a2f17;color:#fcd9a0}
 html[data-theme="dark"] .chip.red{background:#3a1f22;color:#f3b0b6}
 html[data-theme="dark"] .chip.blue{background:#1f2740;color:#bcd0f5}
 html[data-theme="dark"] .chip.gray{background:var(--tint1);color:var(--muted)}
+/* Cajas de alerta / info legibles en oscuro (se usan como "detalle" en varias vistas) */
+html[data-theme="dark"] .alert{background:#352b16;border-color:#5c4a1f;color:#fcd9a0}
+html[data-theme="dark"] .alert.info{background:#1f2740;border-color:#33405e;color:#bcd0f5}
+html[data-theme="dark"] .rank-row.in-danger{background:#2e1b1d}
+/* Botón de ARIA (pill) en la pantalla de módulos */
+html[data-theme="dark"] .aria-pill{background:linear-gradient(135deg,#241f33,#211f2e);border-color:#4b3f73}
+html[data-theme="dark"] .aria-pill-txt{color:#d8d0f0}
+html[data-theme="dark"] .aria-pill-sub,
+html[data-theme="dark"] .aria-pill-arrow{color:#b3a7e0}
+/* Botón Administrador del selector de usuario (claro + oscuro) */
+.user-item-admin{background:linear-gradient(135deg,#fff8ec 0%,#fef3c7 100%);border-color:#f59e0b}
+html[data-theme="dark"] .user-item-admin{background:linear-gradient(135deg,#2a2412 0%,#3a2f17 100%);border-color:#a86b13}
+/* Superficies neutras claras (grises) → oscuras en modo oscuro */
+html[data-theme="dark"] .calc-fx > div{background:var(--tint1);color:var(--muted)}
+html[data-theme="dark"] .mod-item.disabled{background:var(--tint1);border-color:var(--border)}
+html[data-theme="dark"] .gp-search-clear:hover{background:var(--tint1)}
+html[data-theme="dark"] .ai-chat-msgs{background:var(--bg)}
+html[data-theme="dark"] .agend-slot-status.crossblock{background:#2a3550;color:#aebfd6}
+html[data-theme="dark"] .agend-overview-tab:not(.active) .agend-overview-count{background:var(--tint1)}
+html[data-theme="dark"] .pin-key.action:hover{background:var(--tint1)}
+html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 </style>
 </head>
 <body>
@@ -1569,7 +1590,7 @@ html[data-theme="dark"] .chip.gray{background:var(--tint1);color:var(--muted)}
             <h3 class="gp-portal-card-title">Riesgo Cardiovascular</h3>
             <p class="gp-portal-card-desc">RCRI, METs y derivación a Cardiología</p>
           </button>
-          <button type="button" class="gp-portal-card" onclick="openCalculadoras()" style="background:linear-gradient(135deg,var(--tint1),#e3f1ea);border-color:#bbd9cc">
+          <button type="button" class="gp-portal-card" onclick="openCalculadoras()" style="background:linear-gradient(135deg,var(--tint1),var(--card));border-color:var(--border)">
             <div class="gp-portal-card-ico" style="background:linear-gradient(135deg,#0f4435,#2e8b6b)"><span>🧮</span></div>
             <h3 class="gp-portal-card-title">Calculadoras Perioperatorias</h3>
             <p class="gp-portal-card-desc">Anestésico local, pesos, vasoactivos, función renal y pérdida sanguínea</p>
@@ -1907,7 +1928,7 @@ html[data-theme="dark"] .chip.gray{background:var(--tint1);color:var(--muted)}
   <h1 id="hdrTitle">Appnesthesia</h1>
   <div id="syncStatus" class="sync-status" style="display:none" onclick="promptBackendToken()" title="Estado de sincronización con backend"></div>
   <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>
-  <button type="button" class="hdr-icon" onclick="openAppMenu()" title="Menú" aria-label="Menú">⋯</button>
+  <button type="button" class="hdr-icon" onclick="openAppMenu()" title="Menú" aria-label="Menú">⚙️</button>
   <button class="admin-toggle" id="adminBtn" onclick="toggleAdmin()">Modo usuario</button>
 </header>
 
@@ -2058,7 +2079,7 @@ html[data-theme="dark"] .chip.gray{background:var(--tint1);color:var(--muted)}
         <a class="btn sm secondary" id="horarioOpenLink" target="_blank" rel="noopener">↗ Abrir en OneDrive</a>
         <button class="btn sm secondary admin-only" style="display:none" onclick="openHorarioModal()">⚙️ Cambiar enlace</button>
       </div>
-      <div id="horarioLoading" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--tint1) 0%,#dff0e7 100%);border:1.5px solid var(--green-sage);color:var(--primary-dark);padding:14px 16px;border-radius:12px;margin-bottom:12px;font-size:13.5px;font-weight:600;box-shadow:0 2px 8px rgba(30,107,84,.12)">
+      <div id="horarioLoading" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--tint1) 0%,var(--card) 100%);border:1.5px solid var(--green-sage);color:var(--primary-dark);padding:14px 16px;border-radius:12px;margin-bottom:12px;font-size:13.5px;font-weight:600;box-shadow:0 2px 8px rgba(30,107,84,.12)">
         <span class="horario-spinner" style="display:inline-block;width:20px;height:20px;border:3px solid var(--green-pale);border-top-color:var(--green-forest);border-radius:50%;animation:hor-spin 0.9s linear infinite;flex-shrink:0"></span>
         <span>⏳ Espera unos segundos a que se cargue el documento online… No cierres esta pantalla.</span>
       </div>
