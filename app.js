@@ -4428,11 +4428,15 @@ function openCalculadoras(){
   calcRenderHome();
 }
 function closeCalculadoras(){ document.getElementById('calcOverlay').classList.add('hidden'); }
-function calcBack(){ _calcSel = null; calcRenderHome(); }
+function calcBack(){
+  // Contextual: dentro de una calculadora vuelve al menú; en el menú cierra el módulo.
+  if(_calcSel){ _calcSel = null; calcRenderHome(); }
+  else { closeCalculadoras(); }
+}
 
 function calcRenderHome(){
   document.getElementById('calcTitle').textContent = 'Calculadoras Perioperatorias';
-  document.getElementById('calcBackBtn').style.display = 'none';
+  document.getElementById('calcBackBtn').style.display = ''; // siempre visible (en el menú = cerrar)
   const cards = CALC_LIST.map(c =>
     `<button type="button" class="calc-card" onclick="calcSelect('${c.key}')"><div class="ci">${c.ico}</div><b>${c.name}</b><span>${c.desc}</span></button>`
   ).join('');
@@ -4844,6 +4848,7 @@ async function selectInstitution(id){
     migrateLegacyStateIfNeeded(id);
     applyInstitutionConfig(cfg);
     state = load();
+    ensureAllUserDefaults();
     // Traer estado compartido del backend antes de seguir
     await bootSync();
     // saveRaw() en vez de save() para no falsear el timestamp local (ver boot())
@@ -4852,7 +4857,20 @@ async function selectInstitution(id){
     document.getElementById('institutionPicker').classList.add('hidden');
     updateInstitutionUI();
     updateAdminUI();
-    // Después de elegir institución → pantalla de los 3 módulos
+    // Si ya hay sesión activa para esta institución → restaurar su inicio;
+    // si no, mostrar el selector de los 3 módulos.
+    if(state.currentUserId){
+      const u = (state.currentUserId === ADMIN_USER_ID) ? getAdminVirtualUser() : state.staff.find(s=>s.id===state.currentUserId);
+      if(u){
+        updateWelcomeName();
+        showHome();
+        try{ updateEventBadge(); }catch(e){}
+        try{ checkReminders(); }catch(e){}
+        return;
+      } else {
+        state.currentUserId = null;
+      }
+    }
     showModulesScreen();
   }catch(e){
     console.error(e);
@@ -5280,7 +5298,7 @@ const EXAM_PREOP_ESPECIFICOS = [
   { cond:'Síntomas urinarios o cirugía que afecte vía urinaria', pedir:'Orina completa · urocultivo', nota:'No solicitar de rutina en asintomáticos.' },
   { cond:'Sospecha de IC sintomática / cardiopatía no estudiada', pedir:'Ecocardiograma + optimización por especialista (1B)', nota:'No repetir si ecocardiograma <12 meses sin cambios clínicos.' },
   { cond:'Cirugía alto riesgo (>5%) con CF <4 METs o desconocida', pedir:'Considerar Angio-TAC coronario (2B)', nota:'Sin beneficio en pacientes con buena capacidad funcional o cirugía de bajo riesgo.' },
-  { cond:'≥65 a · o ≥45 a con síntomas · o enfermedad CV conocida', pedir:'Considerar NT-proBNP (2B) · troponinas según contexto', nota:'Útil para estratificación y vigilancia de MINS.' },
+  { cond:'≥65 a · o ≥45 a con enfermedad CV — en cirugía de riesgo intermedio/alto', pedir:'NT-proBNP/BNP para estratificación (ESC 2022, IIa) · troponinas postop si está elevado', nota:'NO indicado en cirugía de bajo riesgo. Si está elevado, vigilar troponinas días 1–2 (MINS).' },
   { cond:'Marcapasos (MCP) / Desfibrilador (DAI)', pedir:'Planificación previa si habrá interferencia electromagnética (1B). Reprogramación o imán intraop. en cirugía supraumbilical (1B)', nota:'Coordinar con cardiología/electrofisiología.' },
   { cond:'TACO / NOAC',                           pedir:'INR día previo (TACO) · función renal y revisar tabla de suspensión (NOAC)', nota:'TTPa/TP/INR normales NO excluyen efecto residual de NOACs.' },
   { cond:'EPOC severo o sospecha de hipoxemia',    pedir:'GSA · espirometría reciente', nota:'PFP/GSA no de rutina, solo dirigidos.' }
@@ -6108,37 +6126,43 @@ function calcExamenesPreop(input){
     out.pedir.push('β-HCG si duda razonable (anamnesis dirigida + consentimiento; documentar)');
   }
 
-  // Pro-BNP / troponinas (2B): >=65 a, o >=45 a con enfermedad CV
-  if(edad >= 65 || (edad >= 45 && (has('CardioIsq') || has('ICC') || has('ACV_previo')))){
-    out.pedir.push('Considerar NT-proBNP (2B) · troponinas según contexto');
-  }
-
-  // === Evaluación cardiovascular por capacidad funcional ===
+  // === Evaluación cardiovascular ===
   // (AHA/ACC 2024 Perioperative Guideline · ESC 2022 Non-cardiac Surgery)
   const cfBaja = (cf === '<4METs' || cf === 'desconocida');
+  const antecedentesCV = has('CardioIsq') || has('ICC') || has('ACV_previo');
   const factoresCV = ['CardioIsq','ICC','ACV_previo','DM','IRC'].filter(has).length;
+  const riesgoQxElevado = (riesgoQx === 'intermedio' || riesgoQx === 'alto');
 
-  if(cfBaja && (riesgoQx === 'intermedio' || riesgoQx === 'alto')){
-    if(factoresCV >= 1 || asa >= 3){
-      out.interconsultas.push('Evaluación cardiológica preoperatoria (CF < 4 METs o desconocida + factores de riesgo CV en cirugía de riesgo ' + (riesgoQx==='alto'?'alto':'intermedio') + ')');
-      out.pedir.push('Considerar estudio de isquemia: test de esfuerzo · eco estrés con dobutamina · perfusión miocárdica (2B — solo si el resultado cambiará la conducta)');
-      out.pedir.push('ECG de 12 derivaciones + NT-proBNP como primera línea de estratificación (ESC 2022)');
-      out.notas.push('AHA/ACC 2024 y ESC 2022: con CF < 4 METs y riesgo elevado, el estudio de isquemia se justifica solo si modificará el manejo (revascularización, cambio de técnica anestésico-quirúrgica o suspensión).');
+  // NT-proBNP / BNP: SOLO en cirugía de riesgo intermedio/alto, en ≥65 a o
+  // ≥45 a con enfermedad CV (ESC 2022, IIa). NO en cirugía de bajo riesgo
+  // ni en sano sin factores → así se evita la sobreindicación.
+  if(riesgoQxElevado && (edad >= 65 || (edad >= 45 && antecedentesCV))){
+    out.pedir.push('NT-proBNP/BNP preoperatorio para estratificación (ESC 2022 · ≥65 a, o ≥45 a con enfermedad CV, en cirugía de riesgo ' + (riesgoQx==='alto'?'alto':'intermedio') + ')');
+    out.notas.push('Si NT-proBNP/BNP está elevado → medir troponinas en el postoperatorio (días 1–2) para detectar daño miocárdico (MINS).');
+  }
+
+  // CF dudosa/desconocida + factores de riesgo en cirugía elevada → evaluación
+  // cardiológica + test de isquemia (esfuerzo si puede ejercitarse; eco
+  // dobutamina o perfusión miocárdica si no puede), siempre que cambie conducta.
+  if(cfBaja && riesgoQxElevado){
+    if(antecedentesCV || factoresCV >= 1 || asa >= 3){
+      out.interconsultas.push('Evaluación cardiológica preoperatoria (CF < 4 METs o desconocida + factores de riesgo CV, en cirugía de riesgo ' + (riesgoQx==='alto'?'alto':'intermedio') + ')');
+      out.pedir.push('Test de isquemia inducible: test de esfuerzo si el paciente puede ejercitarse; eco estrés con dobutamina o perfusión miocárdica si no puede (solo si el resultado cambiará la conducta)');
+      out.notas.push('AHA/ACC 2024 y ESC 2022: con CF < 4 METs y riesgo elevado, el estudio de isquemia se justifica solo si modificará el manejo (revascularización, optimización médica, cambio de técnica anestésico-quirúrgica o suspensión).');
     } else {
-      out.notas.push('CF < 4 METs sin otros factores de riesgo CV: considerar ECG + NT-proBNP como primera línea antes que test de isquemia (ESC 2022).');
+      out.notas.push('CF < 4 METs/desconocida sin factores de riesgo CV: primero objetivar la CF (cuestionario DASI) y considerar ECG; el test de isquemia no está indicado de rutina (ESC 2022).');
     }
   }
   if(cf === 'desconocida'){
-    out.notas.push('Capacidad funcional desconocida: puede objetivarse con cuestionario DASI (>34 puntos ≈ CF adecuada) antes de solicitar estudios (AHA/ACC 2024).');
+    out.notas.push('Capacidad funcional desconocida: objetivar con cuestionario DASI (>34 puntos ≈ CF adecuada) antes de solicitar estudios (AHA/ACC 2024).');
   }
   if(cf === '>=4METs'){
     out.notas.push('CF ≥ 4 METs sin síntomas → no se requieren estudios de isquemia adicionales, independiente del riesgo quirúrgico (salvo condición cardíaca activa).');
   }
 
-  // Angio-TAC coronario: alto riesgo + CF baja
+  // Angio-TAC coronario: alto riesgo + CF baja (2B)
   if(riesgoQx === 'alto' && cfBaja){
     out.pedir.push('Considerar Angio-TAC coronario (2B)');
-    out.interconsultas.push('Considerar derivación a Cardiología (CF < 4 METs en cirugía de alto riesgo)');
   }
 
   // Eventos CV recientes → diferir
@@ -10294,57 +10318,13 @@ async function boot(){
   const institutions = idx.institutions||[];
   INSTITUTIONS_CACHE = institutions; // cache para showInstitutionPicker()
 
-  // 2) Ver si ya hay institución elegida
-  const saved = localStorage.getItem(INSTITUTION_LS_KEY);
-  let chosen = saved && institutions.find(i=>i.id===saved);
-
-  if(chosen){
-    try{
-      const cfg = await loadInstitutionConfig(chosen.id);
-      migrateLegacyStateIfNeeded(chosen.id);
-      applyInstitutionConfig(cfg);
-      state = load();
-      ensureAllUserDefaults();
-      // Traer estado compartido del backend (si está configurado)
-      await bootSync();
-      // OJO: usamos saveRaw() en lugar de save() para NO marcar como "dirty"
-      // ni pisar el timestamp local. De lo contrario, cada boot haría creer
-      // al próximo boot que lo local es más nuevo que lo remoto, lo cual
-      // bloquearía la sincronización entre dispositivos.
-      saveRaw();
-      _bindFlushHandlers();
-      updateInstitutionUI();
-
-      // 3) Flujo de usuario: ¿hay sesión activa?
-      if(state.currentUserId){
-        const u = (state.currentUserId === ADMIN_USER_ID) ? getAdminVirtualUser() : state.staff.find(s=>s.id===state.currentUserId);
-        if(u){
-          updateAdminUI();
-          updateWelcomeName();
-          showHome();
-          // Recordatorios del día y badge de eventos
-          try{ updateEventBadge(); }catch(e){}
-          try{ checkReminders(); }catch(e){}
-          // Pedir permiso de notificaciones la primera vez tras login
-          try{
-            if(notifSupported() && Notification.permission === 'default'){
-              setTimeout(()=>{ try{ requestNotifPermission(); }catch(e){} }, 1500);
-            }
-          }catch(e){}
-          return;
-        } else {
-          state.currentUserId = null;
-        }
-      }
-      // Sin sesión → mostrar pantalla con los 3 módulos
-      showModulesScreen();
-      return;
-    }catch(e){
-      console.error('Config inválida, mostrando selector institución',e);
-    }
-  }
-
-  // 4) Sin institución elegida → mostrar selector de institución
+  // 2) Arranque en frío: SIEMPRE mostrar el selector de institución.
+  //    Decisión de producto: con la app abierta a mucha gente, cada vez que se
+  //    abre (carga en frío) debe partir en "Selecciona tu institución".
+  //    Si el usuario mantiene la pestaña/app abierta, conserva su lugar en
+  //    memoria (no se ejecuta boot()); solo al cerrar y reabrir vuelve aquí.
+  //    La institución y los datos siguen guardados por institución, así que al
+  //    tocarla se restaura todo (ver selectInstitution()).
   renderInstitutionPicker(institutions);
   document.getElementById('institutionPicker').classList.remove('hidden');
 }

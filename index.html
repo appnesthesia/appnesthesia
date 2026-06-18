@@ -932,10 +932,11 @@ canvas{max-width:100%}
 /* ============ CALCULADORAS PERIOPERATORIAS ============ */
 .calc-overlay{position:fixed;inset:0;z-index:10800;background:linear-gradient(180deg,var(--tint1),var(--tint1));display:flex;flex-direction:column}
 .calc-overlay.hidden{display:none!important}
-.calc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;flex-shrink:0}
+.calc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;padding-top:max(13px,env(safe-area-inset-top));background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;flex-shrink:0}
 .calc-head-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:18px}
 .calc-head-title{flex:1;font-weight:800;font-size:15.5px;font-family:'Manrope','Inter',sans-serif}
-.calc-back,.calc-close{background:rgba(255,255,255,.14);border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1;font-family:inherit}
+.calc-back{background:rgba(255,255,255,.14);border:none;color:#fff;height:36px;padding:0 13px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;line-height:36px;font-family:inherit;white-space:nowrap}
+.calc-close{background:rgba(255,255,255,.14);border:none;color:#fff;width:36px;height:36px;border-radius:9px;font-size:21px;cursor:pointer;line-height:1;font-family:inherit}
 .calc-back:hover,.calc-close:hover{background:rgba(255,255,255,.26)}
 .calc-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px}
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -2504,7 +2505,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 <!-- CALCULADORAS PERIOPERATORIAS (overlay) -->
 <div id="calcOverlay" class="calc-overlay hidden">
   <div class="calc-head">
-    <button type="button" class="calc-back" id="calcBackBtn" onclick="calcBack()" style="display:none">‹</button>
+    <button type="button" class="calc-back" id="calcBackBtn" onclick="calcBack()">‹ Volver</button>
     <div class="calc-head-ico">🧮</div>
     <div class="calc-head-title" id="calcTitle">Calculadoras Perioperatorias</div>
     <button type="button" class="calc-close" onclick="closeCalculadoras()" title="Cerrar">×</button>
