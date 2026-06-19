@@ -378,8 +378,10 @@ async function pushRemoteState(){
   if(!base || !INSTITUTION) return false;
   const token = getBackendToken();
   if(!token){
+    // Sin token: marcamos el estado de sync (indicador silencioso, solo admin),
+    // pero NO abrimos el modal automáticamente. El admin puede configurarlo a
+    // mano desde el menú (Ayuda → Configuración de conexión) si hiciera falta.
     _setSyncStatus('unauthorized');
-    if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
     return false;
   }
   try{
@@ -452,8 +454,8 @@ async function pushRemoteState(){
       body: JSON.stringify(payload)
     });
     if(r.status === 401){
+      // Token rechazado por la nube: indicador silencioso, sin modal automático.
       _setSyncStatus('unauthorized');
-      if(state && state.isAdmin && !window._backendTokenPrompted){ window._backendTokenPrompted = true; promptBackendToken(); }
       return false;
     }
     if(!r.ok){ _setSyncStatus('error'); return false; }
@@ -9698,6 +9700,14 @@ function _pinEqual(a, b){
   return diff === 0;
 }
 
+// Si el navegador no expone Web Crypto (típico fuera de un contexto seguro
+// https), NO se puede verificar el PIN. Devuelve un mensaje claro o null.
+function _pinCryptoUnavailableMsg(){
+  return (typeof crypto === 'undefined' || !crypto.subtle)
+    ? 'Este navegador no puede verificar el PIN de forma segura (contexto no seguro). Abre la app desde el enlace https oficial e inténtalo de nuevo.'
+    : null;
+}
+
 // --- Hash fuerte (v2): PBKDF2-SHA256 con sal aleatoria por usuario.
 async function _derivePIN(pin, scope, saltBytes, iterations){
   const keyMaterial = await crypto.subtle.importKey(
@@ -9880,6 +9890,8 @@ async function promptSetAdminPin(){
       sub:'Este PIN da acceso a modo admin. Anótalo en lugar seguro.',
       maxLen:4,
       onComplete: async(pin)=>{
+        const ce = _pinCryptoUnavailableMsg();
+        if(ce){ pinError(ce); return; }
         if(!firstPin){
           firstPin = pin;
           openPinPad({
@@ -9893,7 +9905,9 @@ async function promptSetAdminPin(){
                 setTimeout(()=>res(promptSetAdminPin()), 500);
                 return;
               }
-              state.adminPinHash = await makePINHash(pin, '__admin__');
+              try{
+                state.adminPinHash = await makePINHash(pin, '__admin__');
+              }catch(e){ pinError('No se pudo guardar el PIN: ' + (e && e.message ? e.message : e)); return; }
               save();
               closePinPad();
               toast && toast('PIN de administrador configurado');
@@ -9914,11 +9928,17 @@ async function promptVerifyAdminPin(){
       sub:'Ingresa el PIN para activar modo admin.',
       maxLen:4,
       onComplete: async(pin)=>{
-        const r = await verifyPINHash(pin, '__admin__', state.adminPinHash);
-        if(r.ok){
-          if(r.upgrade){ state.adminPinHash = r.upgrade; save(); } // migración transparente a PBKDF2
-          closePinPad(); res(true);
-        } else { pinError('PIN incorrecto'); }
+        try{
+          const ce = _pinCryptoUnavailableMsg();
+          if(ce){ pinError(ce); return; }
+          const r = await verifyPINHash(pin, '__admin__', state.adminPinHash);
+          if(r.ok){
+            if(r.upgrade){ state.adminPinHash = r.upgrade; save(); } // migración transparente a PBKDF2
+            closePinPad(); res(true);
+          } else { pinError('PIN incorrecto'); }
+        }catch(e){
+          pinError('No se pudo verificar el PIN: ' + (e && e.message ? e.message : e));
+        }
       },
       onCancel: ()=>res(false)
     });
@@ -10100,6 +10120,8 @@ async function promptSetupUserPin(user){
       sub:'Es tu primer ingreso. Definí un PIN de 4 dígitos.',
       maxLen:4,
       onComplete: async(pin)=>{
+        const ce = _pinCryptoUnavailableMsg();
+        if(ce){ pinError(ce); return; }
         if(!firstPin){
           firstPin = pin;
           openPinPad({
@@ -10113,7 +10135,9 @@ async function promptSetupUserPin(user){
                 setTimeout(()=>res(promptSetupUserPin(user)), 500);
                 return;
               }
-              user.pinHash = await makePINHash(pin, user.id);
+              try{
+                user.pinHash = await makePINHash(pin, user.id);
+              }catch(e){ pinError('No se pudo guardar el PIN: ' + (e && e.message ? e.message : e)); return; }
               save();
               // Sube el PIN a la nube de inmediato (los no-admin no hacen push del staff array)
               _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
@@ -10137,16 +10161,22 @@ async function promptVerifyUserPin(user){
       sub:'Ingresa tu PIN de 4 dígitos',
       maxLen:4,
       onComplete: async(pin)=>{
-        const r = await verifyPINHash(pin, user.id, user.pinHash);
-        if(r.ok){
-          if(r.upgrade){ // migración transparente a PBKDF2: re-guardar y subir a la nube
-            user.pinHash = r.upgrade; save();
-            _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
+        try{
+          const ce = _pinCryptoUnavailableMsg();
+          if(ce){ pinError(ce); return; }
+          const r = await verifyPINHash(pin, user.id, user.pinHash);
+          if(r.ok){
+            if(r.upgrade){ // migración transparente a PBKDF2: re-guardar y subir a la nube
+              user.pinHash = r.upgrade; save();
+              _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
+            }
+            closePinPad(); res(true);
+          } else {
+            attempts++;
+            pinError(attempts>=3 ? 'Pídele al admin que te resetee el PIN' : 'PIN incorrecto');
           }
-          closePinPad(); res(true);
-        } else {
-          attempts++;
-          pinError(attempts>=3 ? 'Pídele al admin que te resetee el PIN' : 'PIN incorrecto');
+        }catch(e){
+          pinError('No se pudo verificar el PIN: ' + (e && e.message ? e.message : e));
         }
       },
       onCancel: ()=>res(false)

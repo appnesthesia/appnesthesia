@@ -22,7 +22,6 @@ const ASSETS = [
   './icon-512.png',
   './icon-maskable.png',
   './logo.png',
-  './logo.svg',
   './logo-aria.png',
   './configs/aria-conocimiento.json',
   './configs/index.json',
