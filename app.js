@@ -9769,6 +9769,11 @@ function getAdminVirtualUser(){
       activityLog: []
     };
   }
+  // Defensivo: si state.adminUser vino de la nube, llega SIN activityLog ni
+  // preferences (son campos privados del dispositivo que no se sincronizan).
+  // Hay que reponerlos o el login revienta en 'admin.activityLog.unshift'.
+  if(!Array.isArray(state.adminUser.activityLog)) state.adminUser.activityLog = [];
+  if(!state.adminUser.preferences) state.adminUser.preferences = {notifications:true, hideOthers:false};
   return state.adminUser;
 }
 
