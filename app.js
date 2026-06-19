@@ -394,6 +394,17 @@ async function pushRemoteState(){
       if(rr.ok) remote = await rr.json();
     }catch(e){ /* sin conexión: se maneja abajo */ }
 
+    // SEGURIDAD CRÍTICA (anti-pérdida de datos): si NO pudimos leer el estado
+    // remoto, NO escribimos. Un POST es "reemplazo completo": sobrescribir a
+    // ciegas con lo local borraría las solicitudes que otros enviaron y que
+    // este dispositivo todavía no tiene. Mejor reintentar más tarde.
+    // (Aplica a admin y a usuarios por igual.)
+    if(!remote){
+      _pendingPush = true;
+      _setSyncStatus('offline');
+      return false;
+    }
+
     // 2) Armar el payload a enviar.
     let payload;
     const isAdmin = state && state.isAdmin;
@@ -512,12 +523,19 @@ function _flushSyncNow(){
       // puede tocar protocolos/eventos/staff desde la UI.
       payload = _extractSharedState();
     } else {
-      // Usuario normal: solo flusheamos vacaciones/intercambios (lo único
-      // que pueden editar). No tenemos remoto cargado acá, así que
-      // mandamos NUESTRA versión y el merge ocurrirá en el siguiente push
-      // regular cuando volvamos a abrir la app.
-      payload = { vacations: state.vacations || [], exchanges: state.exchanges || [] };
+      // Usuario normal: nada que flushear por esta vía (ver abajo).
+      payload = {};
     }
+    // ANTI-PISADO: en el flush de cierre NO leemos el estado remoto, así que
+    // mandar las colecciones de usuario las haría REEMPLAZAR lo guardado y
+    // podría borrar envíos de otros. Por eso NO se mandan aquí: vacaciones e
+    // intercambios se suben con confirmación en su propio guardado
+    // (saveVacation / intercambios) y se reintegran con merge en el próximo
+    // push regular al reabrir. El flush solo sirve para el resto del estado
+    // del admin (staff, eventos, etc.).
+    delete payload.vacations;
+    delete payload.exchanges;
+    if(!payload || Object.keys(payload).length === 0){ _pendingPush = false; return; }
     // Nunca borrar PINs ya registrados en la nube (caché de la última lectura)
     _mergePinsFromCache(payload);
     if(Array.isArray(payload.staff)) payload.staff = _stripDevicePrivateStaff(payload.staff);
