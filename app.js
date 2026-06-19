@@ -10029,39 +10029,52 @@ function openStaffPicker(){
 function renderStaffPickerList(){ try{ renderInlineUserList(); }catch(e){} }
 
 async function selectAdmin(){
-  // Antes de tratar como "primera vez", revisar si el PIN ya existe en la nube
-  if(adminSetupNeeded()){
-    try{ await _syncAdminPinFromCloud(); }catch(e){}
-  }
-  // Primera vez: configurar PIN admin
-  if(adminSetupNeeded()){
-    const ok = await promptSetAdminPin();
-    if(!ok) return;
-  } else {
-    const ok = await promptVerifyAdminPin();
-    if(!ok) return;
-  }
-  state.currentUserId = ADMIN_USER_ID;
-  state.isAdmin = true;
-  const admin = getAdminVirtualUser();
-  admin.activityLog.unshift({type:'login', text:'Inicio de sesión como Administrador', at:new Date().toISOString()});
-  if(admin.activityLog.length>50) admin.activityLog = admin.activityLog.slice(0,50);
-  save();
-  hideUserPicker();
-  updateInstitutionUI();
-  updateAdminUI();
-  updateWelcomeName();
-  showHome();
-  try{ updateEventBadge(); }catch(e){}
-  try{ checkReminders(); }catch(e){}
-  // Aviso de nuevas solicitudes de agendamiento (solo admin) + polling
-  try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
-  // Pedir permiso de notificaciones para los avisos de solicitudes
+  // Diagnóstico opcional: abrir la app con ?diag=1 muestra en pantalla cada
+  // paso del login de admin (para depurar en dispositivos donde no hay consola).
+  const _DIAG = (location.search.indexOf('diag') !== -1);
+  const _dlog = (m)=>{ if(_DIAG){ try{ alert('[diag] ' + m); }catch(e){} } };
   try{
-    if(notifSupported() && Notification.permission === 'default'){
-      setTimeout(()=>{ try{ requestNotifPermission(); }catch(e){} }, 1500);
+    _dlog('inicio · setupNeeded=' + adminSetupNeeded() + ' · secureCtx=' + window.isSecureContext + ' · cryptoSubtle=' + !!(window.crypto && window.crypto.subtle));
+    // Antes de tratar como "primera vez", revisar si el PIN ya existe en la nube
+    if(adminSetupNeeded()){
+      try{ await _syncAdminPinFromCloud(); _dlog('syncCloud OK · setupNeeded ahora=' + adminSetupNeeded()); }
+      catch(e){ _dlog('syncCloud ERROR: ' + (e && e.message ? e.message : e)); }
     }
-  }catch(e){}
+    let ok;
+    if(adminSetupNeeded()){
+      _dlog('rama: CREAR PIN (no hay hash ni local ni en la nube)');
+      ok = await promptSetAdminPin();
+    } else {
+      _dlog('rama: VERIFICAR PIN');
+      ok = await promptVerifyAdminPin();
+    }
+    if(!ok){ _dlog('resultado: cancelado / no-ok'); return; }
+    state.currentUserId = ADMIN_USER_ID;
+    state.isAdmin = true;
+    const admin = getAdminVirtualUser();
+    admin.activityLog.unshift({type:'login', text:'Inicio de sesión como Administrador', at:new Date().toISOString()});
+    if(admin.activityLog.length>50) admin.activityLog = admin.activityLog.slice(0,50);
+    save();
+    hideUserPicker();
+    updateInstitutionUI();
+    updateAdminUI();
+    updateWelcomeName();
+    showHome();
+    _dlog('login completado ✔');
+    try{ updateEventBadge(); }catch(e){}
+    try{ checkReminders(); }catch(e){}
+    // Aviso de nuevas solicitudes de agendamiento (solo admin) + polling
+    try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
+    // Pedir permiso de notificaciones para los avisos de solicitudes
+    try{
+      if(notifSupported() && Notification.permission === 'default'){
+        setTimeout(()=>{ try{ requestNotifPermission(); }catch(e){} }, 1500);
+      }
+    }catch(e){}
+  }catch(e){
+    // Nunca fallar en silencio: si algo del flujo de login revienta, avisar.
+    try{ alert('No se pudo ingresar como administrador: ' + (e && e.message ? e.message : e)); }catch(_){}
+  }
 }
 function showUserPicker(){
   renderUserPicker();

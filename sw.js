@@ -10,7 +10,7 @@
 // ⚠️ SUBIR ESTE NÚMERO EN CADA DEPLOY (v72 → v73 → …). Es lo que hace que el
 // navegador detecte un service worker nuevo y muestre el aviso "Nueva versión
 // disponible". Si no cambia, la app NO se entera de que hay una actualización.
-const CACHE = 'anestesia-v75';
+const CACHE = 'anestesia-v76';
 const ASSETS = [
   './',
   './index.html',
@@ -49,10 +49,17 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
-  // Navegaciones HTML → network-first (siempre intenta versión fresca)
+  // El código principal (app.js) y el HTML van SIEMPRE network-first: así un
+  // deploy nuevo se ve en la siguiente visita y nunca queda código viejo
+  // pegado en caché. (La caché solo se usa como respaldo offline.)
+  let _isAppScript = false;
+  try { _isAppScript = new URL(e.request.url).pathname.replace(/\/+$/,'').endsWith('/app.js'); } catch (err) {}
+
+  // Navegaciones HTML + app.js → network-first (siempre intenta versión fresca)
   if (
     e.request.mode === 'navigate' ||
-    e.request.destination === 'document'
+    e.request.destination === 'document' ||
+    _isAppScript
   ) {
     e.respondWith(
       fetch(e.request)
