@@ -1,6 +1,6 @@
 {
   "_ayuda": "Base de conocimiento de ARIA. Cada entrada: id (único), titulo, fuente (guía/paper de origen que ARIA citará), keywords (palabras que la activan) y contenido. Sube este archivo a configs/ en GitHub tras editarlo.",
-  "version": 4,
+  "version": 6,
   "entradas": [
     {
       "id": "ayuno",
@@ -775,6 +775,221 @@
         "gina"
       ],
       "contenido": "Optimizar antes de cirugía electiva: control de síntomas, continuar broncodilatadores/corticoides inhalados, tratar infección/exacerbación (diferir si activa). Considerar corticoides sistémicos preop en asma mal controlada. Intraop: profundizar anestesia antes de instrumentar la vía aérea, considerar lidocaína/opioide para atenuar reflejo, preferir agentes broncodilatadores (sevoflurano, ketamina, propofol), evitar desflurano (irritante) y fármacos liberadores de histamina. Broncoespasmo: profundizar, salbutamol en el circuito, adrenalina IV si severo, magnesio, hidrocortisona. Extubar idealmente con paciente despierto y broncodilatado o en plano profundo según riesgo de aspiración."
+    },
+    {
+      "id": "antidiabeticos_otros",
+      "titulo": "Antidiabéticos orales restantes (DPP-4, pioglitazona, sulfonilureas/glinidas, acarbosa, insulinas)",
+      "keywords": [
+        "dpp4",
+        "dpp-4",
+        "gliptina",
+        "sitagliptina",
+        "vildagliptina",
+        "linagliptina",
+        "saxagliptina",
+        "alogliptina",
+        "pioglitazona",
+        "tiazolidinediona",
+        "tzd",
+        "glitazona",
+        "sulfonilurea",
+        "glibenclamida",
+        "glimepirida",
+        "gliclazida",
+        "glinida",
+        "repaglinida",
+        "nateglinida",
+        "acarbosa",
+        "tipos de insulina",
+        "glargina",
+        "degludec",
+        "detemir",
+        "nph",
+        "lispro",
+        "aspartica",
+        "aspártica",
+        "glulisina",
+        "premezclada"
+      ],
+      "contenido": "Complementa la entrada de manejo glicémico (metformina/insulina basal) con las demás clases. DPP-4 / gliptinas (sitagliptina, vildagliptina, linagliptina, saxagliptina, alogliptina): MANTENER — bajo riesgo de hipoglicemia y perfil seguro perioperatorio; pueden tomarse el día de la cirugía (algunos protocolos omiten solo la dosis de la mañana). Pioglitazona (TZD): SUSPENDER el día de la cirugía — retención hídrica y edema, riesgo de descompensar IC; reiniciar al recuperar ingesta y estabilidad hemodinámica. Sulfonilureas (glibenclamida, glimepirida, gliclazida) y glinidas (repaglinida, nateglinida): OMITIR el día de la cirugía y mientras esté en ayuno — riesgo de hipoglicemia; glibenclamida es la de mayor riesgo por su larga duración. Acarbosa (inhibidor de alfa-glucosidasa): omitir mientras no haya ingesta oral de carbohidratos (solo actúa con comida); reiniciar al alimentarse. INSULINAS — ajuste fino en ayuno: basal de acción prolongada (glargina, detemir) reducir a ~75-80% de la dosis habitual; degludec (ultralarga) mantener; NPH reducir ~50-75%; prandiales/rápidas (lispro, aspártica, glulisina, regular) SUSPENDER mientras esté en ayuno; premezcladas ajustar/reducir según protocolo. Control con HGT cada 1-2 h y corrección con insulina rápida IV/SC. Ver también: manejo glicémico perioperatorio, GLP-1 e iSGLT2.",
+      "fuente": "SAMBA/SPAQI consensus (Anesthesiology); Joint British Diabetes Societies (JBDS); CPOC perioperative diabetes guideline"
+    },
+    {
+      "id": "tabaquismo",
+      "titulo": "Tabaquismo perioperatorio y cesación",
+      "keywords": [
+        "tabaquismo",
+        "tabaco",
+        "fumador",
+        "fumar",
+        "cigarro",
+        "cigarrillo",
+        "cesacion",
+        "cesación",
+        "dejar de fumar",
+        "nicotina",
+        "trn",
+        "reemplazo de nicotina",
+        "parche",
+        "vareniclina",
+        "champix",
+        "bupropion",
+        "bupropión",
+        "carboxihemoglobina",
+        "factor de riesgo cardiovascular"
+      ],
+      "contenido": "Riesgo: el tabaquismo activo aumenta complicaciones pulmonares (broncoespasmo, atelectasias, neumonía, ventilación difícil), infección y dehiscencia de herida, peor cicatrización, y eventos cardiovasculares; el CO eleva la carboxihemoglobina y reduce el aporte de O2. TIMING óptimo: cesar idealmente ≥4 semanas antes (mejor ≥8 semanas) reduce complicaciones respiratorias y de herida; la carboxihemoglobina y los efectos de la nicotina caen en 12-24 h, mejorando el aporte de O2 desde el primer día. MITO desmentido: dejar de fumar pocas semanas antes NO aumenta las complicaciones postoperatorias — siempre se debe aconsejar dejar de fumar en cualquier momento previo a la cirugía; nunca desalentar la cesación. La consulta preoperatoria es una ventana de oportunidad para la cesación definitiva. FÁRMACOS: terapia de reemplazo de nicotina (parche/chicle/comprimido) es segura y recomendada en el perioperatorio — mantener. Vareniclina: en cirugía electiva no cardíaca aumenta la abstinencia a 3, 6 y 12 meses sin aumentar eventos adversos serios (náusea es el efecto adverso más frecuente); iniciar idealmente ~1 semana antes de cesar. Bupropión: alternativa, con precaución por reducción del umbral convulsivo e interacciones. Lo más efectivo es consejería intensiva + TRN (± vareniclina). El tabaquismo es factor de riesgo cardiovascular mayor: integrar a la evaluación CV (ver algoritmo AHA/ACC y betabloqueo/estatinas).",
+      "fuente": "Anaesthesia 2023 (meta-análisis de cesación perioperatoria); Anesthesiology 2012 (RCT vareniclina perioperatoria); guías de cesación tabáquica perioperatoria"
+    },
+    {
+      "id": "caprini_tev",
+      "titulo": "Riesgo de tromboembolismo venoso quirúrgico — Score de Caprini (2005) y profilaxis",
+      "keywords": [
+        "caprini",
+        "tev",
+        "tvp",
+        "tromboembolismo",
+        "trombosis venosa",
+        "profilaxis tev",
+        "tromboprofilaxis",
+        "riesgo trombotico",
+        "embolia pulmonar profilaxis",
+        "heparina profilactica",
+        "compresion neumatica"
+      ],
+      "contenido": "El Caprini RAM (2005) estratifica el riesgo de TEV en cirugía. Factores: 1 punto c/u — edad 41-60, cirugía menor, IMC>25, piernas edematosas, várices, sepsis (<1 mes), enfermedad pulmonar grave/neumonía (<1 mes), anticonceptivos orales/THR, embarazo o postparto (<1 mes), aborto recurrente/inexplicado, IAM, ICC (<1 mes), paciente médico en reposo, EII, EPOC, función pulmonar anormal. 2 puntos c/u — edad 61-74, artroscopía, cirugía mayor abierta (>45 min), laparoscopía (>45 min), neoplasia maligna, reposo en cama >72 h, yeso inmovilizador, acceso venoso central. 3 puntos c/u — edad ≥75, TEV previo, historia familiar de TEV, factor V Leiden, protrombina 20210A, anticoagulante lúpico, anticardiolipinas, homocisteína elevada, TIH, otra trombofilia. 5 puntos c/u — ACV (<1 mes), artroplastía electiva mayor de extremidad inferior, fractura de cadera/pelvis/pierna (<1 mes), lesión medular aguda (<1 mes), politrauma (<1 mes). ESTRATOS Y CONDUCTA (ACCP): 0 = muy bajo (<0,5%) → deambulación precoz; 1-2 = bajo (~1,5%) → profilaxis mecánica (compresión neumática intermitente); 3-4 = moderado (~3%) → profilaxis farmacológica (HBPM o HNF) o mecánica si alto riesgo de sangrado; ≥5 = alto (~6%) → profilaxis farmacológica + mecánica. En cirugía de cáncer abdominopélvico mayor y artroplastía/fractura de cadera considerar profilaxis extendida (~4 semanas). Ajustar por riesgo hemorrágico. IMPORTANTE: coordinar el timing de la HBPM/HNF con bloqueos neuroaxiales y catéteres según ASRA (ver sección Coagulación). Si hay alto riesgo de sangrado: priorizar mecánica hasta que sea seguro iniciar farmacológica.",
+      "fuente": "Caprini 2005 RAM; ACCP (Gould, Chest 2012); guías de tromboprofilaxis quirúrgica"
+    },
+    {
+      "id": "ariscat",
+      "titulo": "Riesgo de complicaciones pulmonares postoperatorias — Score ARISCAT",
+      "keywords": [
+        "ariscat",
+        "complicaciones pulmonares",
+        "cpp",
+        "riesgo respiratorio",
+        "atelectasia",
+        "neumonia postoperatoria",
+        "insuficiencia respiratoria postop",
+        "spo2 preoperatorio"
+      ],
+      "contenido": "ARISCAT predice complicaciones pulmonares postoperatorias (insuficiencia respiratoria, infección, derrame, atelectasia, neumotórax, broncoespasmo, neumonitis por aspiración). Variables y puntaje: EDAD ≤50 = 0, 51-80 = 3, >80 = 16. SpO2 PREOP ≥96% = 0, 91-95% = 8, ≤90% = 24. INFECCIÓN RESPIRATORIA en el último mes = 17. ANEMIA preop (Hb ≤10 g/dL) = 11. INCISIÓN: periférica = 0, abdominal alta = 15, intratorácica = 24. DURACIÓN cirugía <2 h = 0, 2-3 h = 16, >3 h = 23. CIRUGÍA DE URGENCIA = 8. ESTRATOS: <26 bajo (~1,6%), 26-44 intermedio (~13%), ≥45 alto (~42%). CONDUCTA en riesgo intermedio/alto: optimizar (cesación tabáquica, tratar anemia/infección, fisioterapia respiratoria/incentivómetro), ventilación protectora intraoperatoria (Vt 6-8 mL/kg peso ideal, PEEP, maniobras de reclutamiento juiciosas), evitar bloqueo neuromuscular residual (revertir y monitorizar TOF), analgesia regional para reducir opioides, considerar CPAP/VNI y monitorización postop. Ver también: ventilación protectora, tabaquismo, asma/EPOC.",
+      "fuente": "Canet, Anesthesiology 2010 (cohorte ARISCAT); validación PERISCOPE"
+    },
+    {
+      "id": "apfel",
+      "titulo": "Riesgo de náuseas y vómitos postoperatorios — Score de Apfel",
+      "keywords": [
+        "apfel",
+        "nvpo",
+        "nauseas",
+        "vomitos",
+        "ponv",
+        "profilaxis antiemetica",
+        "antiemeticos",
+        "riesgo emetico"
+      ],
+      "contenido": "El score de Apfel estima el riesgo de NVPO en el adulto con 4 factores (1 punto c/u): sexo femenino, no fumador, antecedente de NVPO o cinetosis (mareo por movimiento), y uso esperado de opioides postoperatorios. Riesgo aproximado: 0 factores ≈10%, 1 ≈20%, 2 ≈40%, 3 ≈60%, 4 ≈80%. CONDUCTA (consenso 2020): aplicar manejo multimodal proporcional al riesgo y, en la práctica, profilaxis a casi todos los pacientes con ≥1-2 factores. Estrategias: reducir riesgo basal (anestesia regional o TIVA con propofol, evitar/minimizar volátiles y óxido nitroso, minimizar opioides con analgesia multimodal, hidratación adecuada). Profilaxis combinada con fármacos de distintas clases: dexametasona (4-8 mg al inicio), antagonista 5-HT3 (ondansetrón 4 mg al final), droperidol/haloperidol dosis baja, y considerar aprepitant o parche de escopolamina en alto riesgo. Rescate: usar una clase distinta a la usada en profilaxis. Ver también: entrada de profilaxis de NVPO.",
+      "fuente": "Apfel, Anesthesiology 1999; Cuarto Consenso de manejo de NVPO (Anesth Analg 2020)"
+    },
+    {
+      "id": "psicofarmacos_periop",
+      "titulo": "Psicofármacos perioperatorios (ISRS/IRSN, IMAO, litio, antipsicóticos, benzodiacepinas, tricíclicos)",
+      "keywords": [
+        "psicofarmacos",
+        "antidepresivo",
+        "isrs",
+        "irsn",
+        "fluoxetina",
+        "sertralina",
+        "venlafaxina",
+        "duloxetina",
+        "imao",
+        "tranilcipromina",
+        "fenelzina",
+        "litio",
+        "antipsicotico",
+        "quetiapina",
+        "risperidona",
+        "benzodiacepina",
+        "tricíclico",
+        "amitriptilina",
+        "sindrome serotoninergico"
+      ],
+      "contenido": "ISRS/IRSN (fluoxetina, sertralina, escitalopram, venlafaxina, duloxetina): por lo general MANTENER (suspensión brusca = síndrome de descontinuación); pueden ↑ sangrado (disfunción plaquetaria) y riesgo de síndrome serotoninérgico — evitar/usar con cautela combinaciones serotoninérgicas (tramadol, petidina/meperidina, metilenazul, fentanilo en exceso, linezolid). IMAO (tranilcipromina, fenelzina, moclobemida): clásicamente se suspendían 2-3 semanas antes, pero hoy se prefiere MANTENER y usar técnica 'segura para IMAO' — EVITAR petidina/meperidina y simpaticomiméticos indirectos (efedrina); usar vasopresores directos titulados (fenilefrina/noradrenalina a dosis reducida); riesgo de crisis hipertensiva y de síndrome serotoninérgico. Coordinar con psiquiatría si se considera suspender. LITIO: mantener; suspender ~24-72 h antes en cirugía mayor con grandes cambios de volumen; controlar litemia, función renal, Na y estado hídrico; prolonga relajantes neuromusculares (reducir dosis y monitorizar TOF); riesgo de toxicidad con deshidratación, AINE, IECA y diuréticos. ANTIPSICÓTICOS: mantener (suspender ↑ recaída); vigilar QT (riesgo de torsades, especialmente con otros fármacos que prolongan QT), hipotensión y síndrome neuroléptico maligno (distinguir de hipertermia maligna). BENZODIACEPINAS: mantener para evitar abstinencia; cuidado con sedación aditiva. TRICÍCLICOS (amitriptilina, imipramina): mantener; efectos anticolinérgicos, arritmias y potenciación de simpaticomiméticos. Regla general: la mayoría de los psicofármacos se MANTIENEN; el riesgo de descompensación psiquiátrica por suspender suele superar el riesgo de interacción, que se maneja con técnica adecuada.",
+      "fuente": "SPAQI consensus (psychotropics, Mayo Clin Proc); revisiones de manejo perioperatorio de psicofármacos"
+    },
+    {
+      "id": "hierbas_suplementos",
+      "titulo": "Hierbas y suplementos a suspender antes de cirugía",
+      "keywords": [
+        "hierbas",
+        "suplementos",
+        "fitoterapia",
+        "ginkgo",
+        "ginseng",
+        "ajo",
+        "garlic",
+        "jengibre",
+        "ginger",
+        "hierba de san juan",
+        "kava",
+        "valeriana",
+        "equinacea",
+        "efedra",
+        "ma huang",
+        "omega 3",
+        "vitamina e",
+        "curcuma"
+      ],
+      "contenido": "Recomendación general: suspender hierbas y suplementos ~1-2 semanas antes de la cirugía (la mayoría no se declaran espontáneamente: preguntar dirigidamente). Las '4 G' aumentan riesgo de SANGRADO: Ginkgo biloba (inhibe PAF; suspender ~36 h-7 días antes), Ginseng (↓ glicemia y efecto antiplaquetario; ~7 días), Garlic/ajo en dosis altas (antiplaquetario; ~7 días), Ginger/jengibre (antiplaquetario en dosis altas). También con riesgo hemorrágico: vitamina E en dosis altas, aceite de pescado/omega-3, cúrcuma, dong quai. HIERBA DE SAN JUAN (St John's wort): inductor potente de CYP3A4 y P-gp → ↓ niveles de muchos fármacos (ciclosporina, anticoagulantes, anticonceptivos, algunos opioides) y riesgo serotoninérgico; suspender ~5 días antes. KAVA y VALERIANA: potencian sedación/GABA (efecto tipo anestésico, posible abstinencia con valeriana de uso crónico); suspender ~24 h-1 semana. EFEDRA / ma huang: simpaticomimético — arritmias, HTA, IAM, interacción con anestésicos; suspender ≥24 h (idealmente evitar). EQUINÁCEA: posible hepatotoxicidad e inmunomodulación; precaución en uso prolongado. Documentar todo consumo de suplementos en la evaluación preanestésica.",
+      "fuente": "ASA 'What you should know about herbal and dietary supplement use and anesthesia'; JAMA 2001 (Ang-Lee); revisiones perioperatorias"
+    },
+    {
+      "id": "dislipidemia_periop",
+      "titulo": "Dislipidemia perioperatoria (estatinas, ezetimibe, fibratos, iPCSK9, ácido bempedoico, icosapento)",
+      "keywords": [
+        "dislipidemia",
+        "colesterol",
+        "estatina",
+        "estatinas",
+        "ezetimibe",
+        "fibrato",
+        "gemfibrozilo",
+        "fenofibrato",
+        "pcsk9",
+        "evolocumab",
+        "alirocumab",
+        "inclisiran",
+        "acido bempedoico",
+        "icosapento",
+        "omega 3 receta",
+        "hipolipemiante"
+      ],
+      "contenido": "ESTATINAS: MANTENER siempre en el perioperatorio (no suspender por la cirugía); reducen eventos cardiovasculares perioperatorios y la suspensión brusca se asocia a efecto rebote. En cirugía vascular y pacientes con indicación propia, considerar iniciar/continuar. Vigilar miopatía/rabdomiólisis si hay lesión renal o interacciones. EZETIMIBE: mantener; sin impacto perioperatorio relevante, puede omitirse en ayuno prolongado sin consecuencia. FIBRATOS (gemfibrozilo, fenofibrato): generalmente suspender peri-operatoriamente — ↑ riesgo de miopatía/rabdomiólisis al combinarse con estatinas, especialmente con disfunción renal; reiniciar al recuperar ingesta y función renal estable. iPCSK9 (evolocumab, alirocumab — SC c/2-4 sem; inclisirán c/6 meses): mantener su esquema; no requieren ajuste perioperatorio y no aumentan sangrado. ÁCIDO BEMPEDOICO: mantener; vigilar interacción con dosis altas de simvastatina/pravastatina. ICOSAPENTO DE ETILO (EPA, omega-3 de prescripción a dosis alta): puede prolongar levemente el tiempo de sangría y se asoció a más fibrilación auricular/sangrado en ensayos — considerar suspender en cirugía de alto riesgo hemorrágico (criterio individual; no hay consenso firme). Mensaje clave: la estatina se mantiene; los demás hipolipemiantes rara vez generan problemas, salvo fibratos (miopatía) e icosapento (sangrado). Integrar a la evaluación de riesgo cardiovascular global.",
+      "fuente": "AHA/ACC; ESC 2022 (cirugía no cardíaca); fichas de hipolipemiantes y revisiones perioperatorias"
+    },
+    {
+      "id": "hta_clases",
+      "titulo": "Antihipertensivos por clase en el perioperatorio (detalle) y riesgo cardiovascular",
+      "keywords": [
+        "antihipertensivo",
+        "ieca",
+        "ara ii",
+        "clonidina",
+        "agonista alfa2",
+        "betabloqueador perioperatorio",
+        "calcioantagonista",
+        "diuretico",
+        "espironolactona",
+        "mra",
+        "hidralazina",
+        "minoxidil",
+        "rebote hipertensivo",
+        "riesgo cardiovascular"
+      ],
+      "contenido": "Complementa la entrada de HTA preoperatoria. IECA/ARA-II (enalapril, losartán, valsartán): considerar SUSPENDER la dosis de la mañana (24 h antes) por hipotensión refractaria a la inducción y vasoplejía; MANTENER si la indicación es IC con FE reducida (decisión individual); reiniciar precozmente postop cuando la volemia y la función renal lo permitan. BETABLOQUEADORES (bisoprolol, metoprolol, atenolol, carvedilol): MANTENER en usuario crónico (suspender = rebote, taquicardia, isquemia); NO iniciar de novo en dosis altas el día previo (POISE: ↑ ACV y mortalidad). CALCIOANTAGONISTAS (amlodipino, diltiazem, verapamilo): mantener. DIURÉTICOS (tiazidas, furosemida): habitualmente omitir la dosis de la mañana (hipovolemia/hipokalemia); controlar electrolitos. ANTAGONISTAS DE ALDOSTERONA/MRA (espironolactona, eplerenona): mantener si es por IC; vigilar potasio (riesgo de hiperkalemia con ayuno, IECA/ARA-II, lesión renal). AGONISTAS ALFA-2 CENTRALES (clonidina, metildopa): NO suspender bruscamente — riesgo de crisis hipertensiva de rebote; mantener o usar parche/puente; la clonidina puede potenciar sedación e hipotensión. HIDRALAZINA, MINOXIDIL: mantener; minoxidil causa taquicardia refleja y retención hídrica. Reglas: betabloqueadores y alfa-2 NUNCA suspender bruscamente (rebote); IECA/ARA-II y diuréticos suelen omitirse la mañana de la cirugía. El control de la HTA y el daño de órgano blanco son parte de la estratificación de riesgo cardiovascular (ver algoritmo AHA/ACC y RCRI).",
+      "fuente": "ACC/AHA; ESC 2022 cirugía no cardíaca; POISE (Lancet 2008); revisiones de manejo perioperatorio de antihipertensivos"
     }
   ]
 }
