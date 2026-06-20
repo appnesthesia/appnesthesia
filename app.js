@@ -1545,7 +1545,7 @@ function selectExchKind(kind){
     ? 'Pido intercambio: cambio mi turno por otro'
     : 'Cedo este turno: alguien lo toma sin devolverme nada';
 }
-function saveExch(){
+async function saveExch(){
   const _now = new Date().toISOString();
   const e = {
     id:'e'+Date.now(),
@@ -1565,9 +1565,10 @@ function saveExch(){
   if(cu){ e.staffId = cu.id; e.offeredBy = cu.id; }
   state.exchanges.unshift(e);
   if(typeof logActivity==='function') logActivity('exchange_offered', 'Publicaste '+(e.kind==='swap'?'cambio':'cesión')+' · '+e.type+' · '+formatDate(e.date));
-  save(); closeModal(); renderExchanges(); toast('Oferta publicada');
+  save(); closeModal(); renderExchanges();
+  await _confirmSharedPush('Oferta publicada', 'la oferta');
 }
-function takeExch(id){
+async function takeExch(id){
   const cu = getCurrentUser ? getCurrentUser() : null;
   const taker = cu ? cu.name : prompt('Tu nombre:');
   if(!taker) return;
@@ -1577,7 +1578,19 @@ function takeExch(id){
   e.updatedAt=new Date().toISOString();
   if(cu) e.takenById = cu.id;
   if(typeof logActivity==='function') logActivity('exchange_taken', 'Tomaste un turno · '+e.type+' · '+formatDate(e.date));
-  save(); renderExchanges(); toast('Turno tomado. Avisa al colega.');
+  save(); renderExchanges();
+  await _confirmSharedPush('Turno tomado. Avisa al colega.', 'el cambio');
+}
+// Empuja el estado compartido y CONFIRMA: avisa "ok" solo si llegó a la nube;
+// si no, deja claro que quedó local y se reintentará. (Para intercambios.)
+async function _confirmSharedPush(okMsg, queCosa){
+  const base = getBackendURL();
+  if(!base){ toast(okMsg + ' (solo en este dispositivo)'); return; }
+  toast('Sincronizando…');
+  if(typeof _syncTimer !== 'undefined' && _syncTimer){ clearTimeout(_syncTimer); _syncTimer = null; }
+  let ok = false;
+  try{ ok = await pushRemoteState(); }catch(e){ ok = false; }
+  toast(ok ? ('✅ ' + okMsg) : ('⚠️ Guardado en este equipo, pero NO se pudo enviar ' + queCosa + ' a la nube. Se reintentará al reabrir.'));
 }
 function proposeExch(id){
   const note = prompt('¿Qué turno ofrecés a cambio? (ej: viernes 23/5 mañana)');
@@ -2158,7 +2171,7 @@ function deleteStaff(id){
 // ============================================================
 function renderProtocols(){
   const list = document.getElementById('protoList');
-  list.innerHTML = state.protocols.map(p=>{
+  list.innerHTML = (state.protocols||[]).filter(p=>!p.deleted).map(p=>{
     const hasFile = p.fileUrl && p.fileUrl.length>0;
     const fileBlock = hasFile
       ? `<div class="btn-row" style="margin-top:8px">
@@ -2215,21 +2228,31 @@ function clearProtoFile(){
 }
 function editProto(id){ const p = state.protocols.find(x=>x.id===id); if(p) openProtoModal(p); }
 function saveProto(id, isNew){
+  const now = new Date().toISOString();
   const data = {
     id,
     title: document.getElementById('pr_title').value,
     body: document.getElementById('pr_body').value,
     fileUrl: document.getElementById('pr_file_url').value,
     fileName: document.getElementById('pr_file_name').value,
+    updatedAt: now,
   };
   if(!data.title){toast('Falta el título');return;}
-  if(isNew) state.protocols.push(data);
-  else state.protocols = state.protocols.map(p=>p.id===id?data:p);
+  state.protocols = state.protocols || [];
+  if(isNew){ data.createdAt = now; state.protocols.push(data); }
+  else {
+    const prev = state.protocols.find(p=>p.id===id) || {};
+    data.createdAt = prev.createdAt || now;
+    state.protocols = state.protocols.map(p=>p.id===id?data:p);
+  }
   save(); closeModal(); renderProtocols(); toast('Guardado');
 }
 function deleteProto(id){
   if(!confirm('¿Eliminar este protocolo?')) return;
-  state.protocols = state.protocols.filter(p=>p.id!==id);
+  // Tombstone (no quitar del arreglo): así el borrado se sincroniza a la nube
+  // y no reaparece al fusionar con otros dispositivos.
+  const now = new Date().toISOString();
+  state.protocols = (state.protocols||[]).map(p=> p.id===id ? {...p, deleted:true, updatedAt:now} : p);
   save(); renderProtocols(); toast('Eliminado');
 }
 
@@ -7052,26 +7075,30 @@ async function agendSyncNow(){
   _agendSyncing = true;
   try{
     let remoteData = {};
+    // 1) LEER el estado remoto. Si la lectura falla, NO escribimos a ciegas
+    //    (igual que el estado principal) y devolvemos false.
     try{
       const r = await fetch(base + '/api/state/' + encodeURIComponent(id), _stateGetOpts());
-      if(r.ok){
-        const remote = await r.json();
-        if(remote && !remote._empty && remote.data) remoteData = remote.data;
-      }
-    }catch(e){ /* sin conexión: merge con {} no rompe nada */ return false; }
+      if(!r.ok) return false;
+      const remote = await r.json();
+      if(remote && !remote._empty && remote.data) remoteData = remote.data;
+    }catch(e){ return false; }
     // Sanear lo que viene de la nube (puede traer nombres/RUT antiguos) antes de fusionar
     _agendSanitizeAll(remoteData);
     const merged = _agendSanitizeAll(_agendMergeData(remoteData, agendLoadData()));
     agendSaveData(merged);
     const token = getBackendToken();
-    if(token){
-      await fetch(base + '/api/state/' + encodeURIComponent(id), {
+    if(!token) return false;
+    // 2) ESCRIBIR y CONFIRMAR de verdad: el resultado de agendSyncNow refleja si
+    //    el POST llegó (antes se tragaba el error y devolvía true igual).
+    try{
+      const pr = await fetch(base + '/api/state/' + encodeURIComponent(id), {
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
         body: JSON.stringify({ data: merged })
-      }).catch(()=>{});
-    }
-    return true;
+      });
+      return pr.ok;
+    }catch(e){ return false; }
   }catch(e){ console.warn('agendSyncNow', e); return false; }
   finally{ _agendSyncing = false; }
 }
@@ -8389,7 +8416,7 @@ function _agendTriagePairs(req){
   return out;
 }
 
-function agendSubmitSolicitud(ev){
+async function agendSubmitSolicitud(ev){
   if(ev) ev.preventDefault();
   const salaId = AGEND_STATE.salaId;
   const dateStr = AGEND_STATE.selectedDate;
@@ -8543,13 +8570,26 @@ function agendSubmitSolicitud(ev){
   data[salaId][dateStr].push(req);
   data[salaId][dateStr].sort((a,b) => a.startMin - b.startMin);
   agendSaveData(data);
-  agendScheduleSync(); // subir la nueva solicitud a la nube
-  notifyAdminsOfNewRequest(); // push real al admin (si está configurado)
-  // Limpiar flag Extra
   AGEND_STATE.formIsExtra = false;
-  alert(isExtra
-    ? 'Solicitud EXTRA enviada. Requiere visado del administrador.'
-    : 'Solicitud enviada. El Servicio de Anestesia será notificado.');
+  // CONFIRMACIÓN REAL: solo decimos "enviada" cuando de verdad llegó a la nube.
+  // Si falla, avisamos claramente (queda guardada local y se reintenta), para
+  // que NADIE crea que envió algo que no llegó al administrador.
+  const _base = getBackendURL();
+  if(!_base){
+    alert('Solicitud guardada en este dispositivo.\n\n(No hay conexión a la nube configurada — avisa directamente al Servicio de Anestesia.)');
+    agendOpenDia(dateStr);
+    return;
+  }
+  let _ok = false;
+  try{ _ok = await agendSyncNow(); }catch(e){ _ok = false; }
+  if(_ok){
+    try{ notifyAdminsOfNewRequest(); }catch(e){}
+    alert(isExtra
+      ? '✅ Solicitud EXTRA enviada y registrada en la nube. Requiere visado del administrador.'
+      : '✅ Solicitud enviada y registrada en la nube. El Servicio de Anestesia será notificado.');
+  } else {
+    alert('⚠️ La solicitud quedó guardada en este dispositivo, pero NO se pudo registrar en la nube (revisa tu conexión).\n\nSe reintentará al reabrir. Si es urgente, avisa directamente al Servicio de Anestesia.');
+  }
   agendOpenDia(dateStr);
 }
 
@@ -9323,7 +9363,7 @@ function formatDateLong(iso){
 function expandedEvents(){
   ensureAllUserDefaults();
   const out = [];
-  (state.events||[]).forEach(e=>{
+  (state.events||[]).filter(e=>!e.deleted).forEach(e=>{
     out.push({
       kind:'event',
       id:e.id,
@@ -9595,12 +9635,16 @@ function saveEvent(id, isNew){
     location: document.getElementById('evt_location').value.trim(),
     description: document.getElementById('evt_desc').value.trim(),
     createdBy: state.currentUserId || null,
-    createdAt: new Date().toISOString()
+    updatedAt: new Date().toISOString()
   };
   state.events = state.events||[];
   if(isNew==='true' || isNew===true){
+    ev.createdAt = ev.updatedAt;
     state.events.unshift(ev);
   } else {
+    const prev = state.events.find(x=>x.id===id) || {};
+    ev.createdAt = prev.createdAt || ev.updatedAt;
+    if(!ev.createdBy) ev.createdBy = prev.createdBy || null;
     state.events = state.events.map(x=>x.id===id?ev:x);
   }
   save();
@@ -9613,7 +9657,9 @@ function saveEvent(id, isNew){
 function editEvent(id){ openEventModal(id); }
 function deleteEvent(id){
   if(!confirm('¿Eliminar este evento?')) return;
-  state.events = (state.events||[]).filter(e=>e.id!==id);
+  // Tombstone (no quitar del arreglo): el borrado se sincroniza y no reaparece.
+  const now = new Date().toISOString();
+  state.events = (state.events||[]).map(e=> e.id===id ? {...e, deleted:true, updatedAt:now} : e);
   save();
   renderEventos();
   updateEventBadge();
