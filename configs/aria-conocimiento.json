@@ -1,6 +1,6 @@
 {
   "_ayuda": "Base de conocimiento de ARIA. Cada entrada: id (único), titulo, fuente (guía/paper de origen que ARIA citará), keywords (palabras que la activan) y contenido. Sube este archivo a configs/ en GitHub tras editarlo.",
-  "version": 8,
+  "version": 9,
   "entradas": [
     {
       "id": "ayuno",
@@ -1038,8 +1038,8 @@
         "4 mets",
         "nt-probnp capacidad"
       ],
-      "contenido": "La capacidad funcional orienta la necesidad de estudios cardíacos antes de cirugía no cardíaca. Umbral clásico: 4 METs = subir un piso de escaleras o caminar a ~6 km/h sin síntomas. EVIDENCIA (estudio METS, Lancet 2018): la estimación SUBJETIVA del médico (a ojo) NO predijo bien las complicaciones; en cambio el cuestionario DASI (Duke Activity Status Index) y el NT-proBNP sí se asociaron a infarto/injuria miocárdica y mortalidad. Por eso AHA/ACC 2024 y ESC 2022 recomiendan OBJETIVAR la capacidad funcional con DASI (un puntaje DASI <34 identifica mayor riesgo de injuria miocárdica y complicaciones) y/o biomarcadores (NT-proBNP) en lugar de la apreciación informal. Conducta: si la capacidad funcional es <4 METs o desconocida y el riesgo quirúrgico es elevado → considerar NT-proBNP y, SOLO si va a cambiar la conducta, test de isquemia. El CPET (test de ejercicio cardiopulmonar) es el patrón de referencia objetivo donde esté disponible. Ver RCRI y biomarcadores/MINS.",
-      "fuente": "Wijeysundera et al., METS study (Lancet 2018); AHA/ACC 2024; ESC 2022"
+      "contenido": "La capacidad funcional orienta la necesidad de estudios cardíacos antes de cirugía no cardíaca. Umbral clásico: 4 METs = subir un piso de escaleras o caminar a ~6 km/h sin síntomas. EVIDENCIA (estudio METS, Lancet 2018): la estimación SUBJETIVA del médico (a ojo) NO predijo bien las complicaciones; en cambio el cuestionario DASI (Duke Activity Status Index) y el NT-proBNP sí se asociaron a infarto/injuria miocárdica y mortalidad. La ESAIC 2025 DESACONSEJA usar los METs subjetivos para la decisión clínica (correlacionan mal con la capacidad medida por test de esfuerzo) y recomienda COMBINAR NT-proBNP + DASI para evaluar la reserva cardíaca en pacientes de alto riesgo sometidos a cirugía de alto riesgo. AHA/ACC 2024 y ESC 2022 también recomiendan OBJETIVAR la capacidad funcional (DASI; un puntaje DASI <34 identifica mayor riesgo) y/o biomarcadores en lugar de la apreciación informal. Conducta: si la capacidad funcional es <4 METs o desconocida y el riesgo quirúrgico es elevado → considerar NT-proBNP y, SOLO si va a cambiar la conducta, test de isquemia. El CPET (test de ejercicio cardiopulmonar) es el patrón de referencia objetivo donde esté disponible. Ver evaluación cardiovascular preoperatoria, RCRI y biomarcadores/MINS.",
+      "fuente": "Wijeysundera et al., METS study (Lancet 2018); ESAIC 2025; AHA/ACC 2024; ESC 2022"
     },
     {
       "id": "eras",
@@ -1459,15 +1459,65 @@
         "examenes preop",
         "laboratorio preoperatorio",
         "ecg preoperatorio",
+        "ecocardiograma preoperatorio",
         "rx torax preoperatoria",
+        "radiografia torax",
         "coagulacion preoperatoria",
+        "tp inr ttpa",
+        "grupo sanguineo",
+        "pruebas cruzadas",
         "test embarazo",
-        "nice",
+        "espirometria preoperatoria",
+        "hba1c preoperatoria",
+        "biomarcadores preoperatorios",
+        "nice ng45",
+        "esaic",
         "choosing wisely",
-        "pruebas de rutina"
+        "pruebas de rutina",
+        "grados de cirugia"
       ],
-      "contenido": "Principio (ASA, NICE NG45, Choosing Wisely): NO solicitar exámenes de RUTINA en el paciente sano para cirugía de bajo riesgo; pedirlos según la CONDICIÓN del paciente, sus fármacos y el RIESGO de la cirugía. Los exámenes indiscriminados no mejoran los resultados y generan hallazgos falsos y demoras. Orientación: ECG si hay enfermedad cardiovascular o factores de riesgo, o cirugía de riesgo intermedio-alto (no por la edad sola). HEMOGLOBINA/Hto si se espera anemia, sangrado significativo o hay síntomas. FUNCIÓN RENAL y electrolitos si ERC, uso de diuréticos/IECA/ARA-II, DM o cirugía mayor. GLICEMIA/HbA1c en diabéticos (la HbA1c orienta la optimización). PRUEBAS DE COAGULACIÓN solo con historia de sangrado, hepatopatía o anticoagulación (no de rutina). TEST DE EMBARAZO en mujeres en edad fértil cuando corresponda. RX DE TÓRAX no de rutina (solo en enfermedad cardiopulmonar activa o aguda). Ecocardiograma y pruebas de función respiratoria solo con indicación clínica. No repetir exámenes recientes normales si la condición no ha cambiado. La app tiene una calculadora de exámenes (Portal Preanestésico → Exámenes). Ver ASA-PS, capacidad funcional, RCRI y anemia.",
-      "fuente": "ASA; NICE NG45 (preoperative tests); Choosing Wisely"
+      "contenido": "PRINCIPIO (ASA; ESAIC 2018 y actualización 2025; NICE NG45; Choosing Wisely): los exámenes NO se piden de rutina ni 'por protocolo' en el paciente sano; se solicitan DIRIGIDOS según la condición y comorbilidades del paciente, sus fármacos y el RIESGO/magnitud de la cirugía (menor / intermedia / mayor). El tamizaje indiscriminado no mejora resultados y genera falsos positivos, ansiedad, demoras y costos. Regla de oro: pedir solo si el resultado puede CAMBIAR la conducta. POR EXAMEN: ECG → enfermedad cardiovascular conocida o factores de riesgo (HTA, DM, ERC, enfermedad vascular) y/o cirugía de riesgo intermedio-alto; NO por la edad sola, NO en cirugía menor de bajo riesgo. HEMOGRAMA/Hb → si se anticipa sangrado significativo, cirugía mayor, anemia, síntomas o enfermedad renal/hematológica (tratar la anemia ANTES de la electiva). FUNCIÓN RENAL y ELP → ERC, DM, HTA, uso de diuréticos/IECA/ARA-II/AINE, edad avanzada con cirugía mayor o riesgo de injuria renal. GLICEMIA/HbA1c → en diabéticos (la HbA1c orienta la optimización; idealmente <8-8,5% para electiva mayor). PRUEBAS DE COAGULACIÓN (TP/INR, TTPA) → NO de rutina; solo con historia de sangrado/coagulopatía, hepatopatía, anticoagulación, o neuroaxial con factores. GRUPO Rh y pruebas cruzadas → según el sangrado esperado de la cirugía. TEST DE EMBARAZO → ofrecer a mujeres en edad fértil cuando el resultado pueda cambiar la conducta. RADIOGRAFÍA DE TÓRAX → NO de rutina (cambia la conducta en ~0,1%); solo con signos/síntomas respiratorios nuevos o no explicados, o enfermedad cardiopulmonar activa. ECOCARDIOGRAMA en reposo → NO de rutina (NICE); solo ante soplo nuevo con síntomas, disnea no aclarada, IC nueva/descompensada o sospecha de valvulopatía significativa. ESPIROMETRÍA/PFR y GASES ARTERIALES → NO de rutina; reservados a síntomas respiratorios no explicados o sospecha fuerte de patología pulmonar (ver evaluación pulmonar preoperatoria). BIOMARCADORES (NT-proBNP, troponina) → ver evaluación cardiovascular preoperatoria (NT-proBNP útil para riesgo; troponina NO de rutina preop). NO repetir exámenes recientes normales si la condición clínica no cambió. La app tiene una calculadora de exámenes (Portal Preanestésico → Exámenes). Ver ASA-PS, capacidad funcional/DASI, evaluación cardiovascular y pulmonar preoperatoria, RCRI y anemia.",
+      "fuente": "ASA Practice Advisory for Preanesthesia Evaluation; ESAIC 2018 y actualización 2025; NICE NG45; Choosing Wisely"
+    },
+    {
+      "id": "evaluacion_cv_preop",
+      "titulo": "Evaluación cardiovascular preoperatoria — qué estudio pedir y cuándo",
+      "keywords": [
+        "evaluacion cardiovascular preoperatoria",
+        "riesgo cardiaco preoperatorio",
+        "ecg preoperatorio",
+        "ecocardiograma preoperatorio",
+        "test de esfuerzo",
+        "eco estres",
+        "perfusion miocardica",
+        "nt-probnp preoperatorio",
+        "troponina preoperatoria",
+        "algoritmo escalonado",
+        "cuando derivar cardiologia",
+        "estudios cardiacos preop"
+      ],
+      "contenido": "Enfoque ESCALONADO (AHA/ACC 2024; ESC 2022): 1) ¿Cirugía de EMERGENCIA? → a pabellón y manejar el riesgo perioperatorio, sin estudios que la retrasen. 2) ¿CONDICIÓN CARDÍACA ACTIVA? (síndrome coronario agudo, IC descompensada, arritmia significativa, valvulopatía severa sintomática) → diferir la electiva y derivar a Cardiología. 3) ¿Cirugía de BAJO riesgo (<1%)? → proceder sin más estudios. 4) Si el riesgo es elevado: estimar con RCRI/NSQIP y evaluar la CAPACIDAD FUNCIONAL. ESTUDIOS, solo si CAMBIAN la conducta: ECG → enfermedad CV conocida o factores de riesgo y cirugía intermedia-alta (no por edad sola, no en cirugía menor de bajo riesgo). CAPACIDAD FUNCIONAL → objetivar con DASI; la ESAIC 2025 desaconseja los METs subjetivos por su mala correlación; capacidad adecuada (≈≥4 METs) y asintomático → proceder. BIOMARCADORES → NT-proBNP/BNP preoperatorio ÚTIL para estratificar riesgo en pacientes de riesgo (ESAIC 2023; combinar con DASI en alto riesgo, ESAIC 2025). Troponina preoperatoria NO de rutina (solo ante sospecha clínica de evento agudo); en cambio, VIGILANCIA de troponina POSTOPERATORIA (basal, 24, 48, 72 h) para detectar MINS en pacientes de riesgo. Los biomarcadores estratifican riesgo, no guían el tratamiento. ECOCARDIOGRAMA en reposo → NO de rutina; solo ante soplo nuevo con síntomas, disnea no aclarada, IC nueva o sospecha de valvulopatía/miocardiopatía. TEST DE ISQUEMIA NO INVASIVO (eco estrés con dobutamina, perfusión miocárdica) → solo si capacidad funcional <4 METs o desconocida CON riesgo elevado Y el resultado modificará la conducta (revascularización, cambio de técnica, postergar). NO en bajo riesgo ni con buena capacidad funcional. Coronariografía/revascularización profiláctica solo para 'pasar' la cirugía: NO mejora resultados. Mantener betabloqueo y estatinas crónicos. Ver RCRI, capacidad funcional/DASI, biomarcadores/MINS, AHA/ACC 2024 y betabloqueo/estatinas.",
+      "fuente": "AHA/ACC 2024 perioperative CV; ESC 2022 non-cardiac surgery; ESAIC 2023 (biomarcadores) y 2025 (evaluación preoperatoria)"
+    },
+    {
+      "id": "evaluacion_pulmonar_preop",
+      "titulo": "Evaluación pulmonar preoperatoria y prevención de complicaciones",
+      "keywords": [
+        "evaluacion pulmonar preoperatoria",
+        "complicaciones pulmonares postoperatorias",
+        "cpp",
+        "espirometria preoperatoria",
+        "pruebas de funcion respiratoria",
+        "radiografia torax preoperatoria",
+        "gases arteriales preoperatorios",
+        "ariscat",
+        "optimizacion respiratoria",
+        "riesgo respiratorio",
+        "prehabilitacion respiratoria",
+        "incentivometro"
+      ],
+      "contenido": "El riesgo pulmonar se evalúa sobre todo CLÍNICAMENTE (historia y examen), no con tests de rutina. FACTORES de complicaciones pulmonares postoperatorias (CPP): edad avanzada, EPOC/asma, tabaquismo, infección respiratoria reciente, SAOS, insuficiencia cardíaca, desnutrición/hipoalbuminemia, anemia, dependencia funcional, y factores quirúrgicos (incisión abdominal alta o torácica, duración prolongada, urgencia). Estratificar con ARISCAT (ver entrada). ESTUDIOS (no de rutina): RADIOGRAFÍA DE TÓRAX → NO de rutina (cambia la conducta en ~0,1%); solo con signos/síntomas respiratorios NUEVOS o no explicados, o enfermedad cardiopulmonar activa. ESPIROMETRÍA/PRUEBAS DE FUNCIÓN RESPIRATORIA → NO de rutina en cirugía no torácica; indicadas ante disnea o tos no explicadas, o para caracterizar un EPOC/asma de control incierto (no predicen bien las CPP por sí solas). Relevantes en cirugía de resección pulmonar/torácica. GASES ARTERIALES → NO de rutina; útiles en enfermedad pulmonar avanzada o como basal postoperatorio. OPTIMIZACIÓN (reduce CPP): CESACIÓN TABÁQUICA (idealmente ≥4 semanas — ver tabaquismo); tratar infección respiratoria y broncoespasmo y optimizar EPOC/asma antes de la electiva; fisioterapia respiratoria, INCENTIVÓMETRO y ejercicios de expansión pulmonar; prehabilitación; manejo del SAOS (CPAP); y medidas intraoperatorias (ventilación protectora, evitar bloqueo neuromuscular residual, analgesia regional ahorradora de opioides). Ver ARISCAT, tabaquismo, asma/EPOC, SAOS y ventilación protectora.",
+      "fuente": "Literatura de evaluación pulmonar preoperatoria (ACP); ARISCAT (Canet, Anesthesiology 2010); NICE NG45"
     }
   ]
 }
