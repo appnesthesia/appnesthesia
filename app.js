@@ -4519,7 +4519,7 @@ const SEARCH_INDEX = [
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
   { ico:'❤️', label:'Riesgo Cardiovascular (RCRI/METs)', hint:'Portal Preanestésico', kw:'riesgo cardiovascular rcri mets cardiologia', go:()=>_goPortal('gpRiesgoCv') },
-  { ico:'🩸', label:'Riesgo de TEV (Caprini)', hint:'Portal Preanestésico', kw:'caprini tev tromboembolismo trombosis tromboprofilaxis profilaxis tvp tep', go:()=>_goPortal('gpRiesgoTev') },
+  { ico:'🩸', label:'Riesgo TVP/TEP (Caprini)', hint:'Portal Preanestésico', kw:'caprini tev tromboembolismo trombosis venosa profunda tromboembolismo pulmonar tromboprofilaxis profilaxis tvp tep', go:()=>_goPortal('gpRiesgoTev') },
   { ico:'🤢', label:'Riesgo de NVPO (Apfel)', hint:'Calculadoras Perioperatorias', kw:'apfel nvpo nauseas vomitos ponv antiemetico', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('apfel'); }catch(e){} },60); }catch(e){} } },
   { ico:'🫁', label:'Riesgo pulmonar (ARISCAT)', hint:'Calculadoras Perioperatorias', kw:'ariscat complicaciones pulmonares riesgo respiratorio atelectasia neumonia', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('ariscat'); }catch(e){} },60); }catch(e){} } },
 ];
@@ -5890,7 +5890,7 @@ const _GP_SECTIONS_META = {
     },
     calc: {
       label: 'Abrir calculadora Caprini',
-      title: 'Calculadora de riesgo de TEV · Caprini 2005',
+      title: 'Calculadora de riesgo de TVP/TEP · Caprini 2005',
       ico: '🩸',
       render: () => _renderCapriniCalcCard()
     }
@@ -6447,7 +6447,7 @@ function _renderCapriniCalcCard(){
 function _gpCapriniResumenTexto(r){
   const checkedList = r.items.filter(x=>x.checked).map(x=>'  • '+x.label+' ('+x.p+')').join('\n');
   return [
-    'Score de Caprini (2005) — Riesgo de TEV',
+    'Score de Caprini (2005) — Riesgo de TVP/TEP',
     `Puntaje: ${r.score} · Riesgo: ${r.riesgoPct} (${r.categoria})`,
     '',
     'Factores presentes:',
@@ -6510,7 +6510,7 @@ function renderGuiasRiesgoTev(){
   if(!cont) return;
   const intro = `
     <div class="gp-callout" style="margin-bottom:14px">
-      <strong>🩸 Objetivo:</strong> estimar el riesgo de <strong>tromboembolismo venoso (TEV)</strong> en el paciente quirúrgico con el <em>Score de Caprini (2005)</em> y orientar la <strong>tromboprofilaxis</strong> según los estratos <em>ACCP</em>.
+      <strong>🩸 Objetivo:</strong> estimar el riesgo de <strong>trombosis venosa profunda (TVP) y tromboembolismo pulmonar (TEP)</strong> —en conjunto, tromboembolismo venoso (TEV)— en el paciente quirúrgico con el <em>Score de Caprini (2005)</em> y orientar la <strong>tromboprofilaxis</strong> según los estratos <em>ACCP</em>.
     </div>
     <div class="gp-callout info" style="margin-bottom:14px">
       <strong>🧮 Calculadora Caprini disponible.</strong> Usa el botón <strong>«Abrir calculadora Caprini»</strong> (abajo a la derecha) para sumar los factores y ver la profilaxis sugerida.
