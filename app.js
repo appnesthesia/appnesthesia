@@ -652,6 +652,66 @@ function scheduleSyncPush(){
   _syncTimer = setTimeout(()=>{ _syncTimer = null; pushRemoteState(); }, 1500);
 }
 
+// ===== Parche anti-concurrencia: VERIFICAR tras enviar + REINTENTAR =====
+// El almacenamiento (KV) no es atómico: si dos personas envían en el mismo
+// instante, una escritura puede pisar a la otra aunque ambas respondan 200.
+// Para que NADA se pierda: tras empujar, releemos la nube y confirmamos que
+// nuestro dato quedó; si no, reintentamos (con espera aleatoria para no volver
+// a chocar). No es perfecto como Durable Objects, pero reduce la pérdida casi a
+// cero en la práctica.
+function _sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+async function _getMainCloud(){
+  try{
+    const base = getBackendURL(); if(!base || !INSTITUTION) return null;
+    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id) + '?cb=' + Date.now(), _stateGetOpts());
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+// predicate(cloudState) → true si nuestro dato quedó bien guardado en la nube.
+async function _pushMainVerified(predicate, tries){
+  tries = tries || 6;
+  let confirmed = false;
+  for(let i=0; i<tries; i++){
+    let ok = false;
+    try{ ok = await pushRemoteState(); }catch(e){ ok = false; }
+    if(ok){
+      const cloud = await _getMainCloud();
+      try{ if(cloud && predicate(cloud)){ confirmed = true; } }catch(e){}
+    }
+    // Aunque ya esté confirmado, hacemos un par de pasadas más: si una escritura
+    // concurrente lo pisó DESPUÉS de confirmar, lo detectamos y reponemos.
+    if(confirmed && i >= 2){
+      const c2 = await _getMainCloud();
+      try{ if(c2 && predicate(c2)) return true; }catch(e){}
+    }
+    await _sleep(300 + Math.floor(Math.random()*900)); // jitter anti-colisión
+  }
+  const c = await _getMainCloud();
+  try{ return !!(c && predicate(c)); }catch(e){ return false; }
+}
+// Igual, para el agendamiento (estado envuelto en {data:{sala:{fecha:[...]}}}).
+async function _agendSyncVerified(salaId, dateStr, reqId, tries){
+  tries = tries || 4;
+  for(let i=0; i<tries; i++){
+    let ok = false;
+    try{ ok = await agendSyncNow(); }catch(e){ ok = false; }
+    if(ok){
+      try{
+        const base = getBackendURL(); const id = _agendRemoteId();
+        const r = await fetch(base + '/api/state/' + encodeURIComponent(id) + '?cb=' + Date.now(), _stateGetOpts());
+        if(r.ok){
+          const j = await r.json(); const d = (j && j.data) || {};
+          const arr = (d[salaId] && d[salaId][dateStr]) || [];
+          if(arr.some(x => x && x.id === reqId)) return true;
+        }
+      }catch(e){}
+    }
+    await _sleep(250 + Math.floor(Math.random()*600));
+  }
+  return false;
+}
+
 async function bootSync(){
   const base = getBackendURL();
   if(!base){ _setSyncStatus('disabled'); return; }
@@ -1610,7 +1670,7 @@ async function saveExch(){
   state.exchanges.unshift(e);
   if(typeof logActivity==='function') logActivity('exchange_offered', 'Publicaste '+(e.kind==='swap'?'cambio':'cesión')+' · '+e.type+' · '+formatDate(e.date));
   save(); closeModal(); renderExchanges();
-  await _confirmSharedPush('Oferta publicada', 'la oferta');
+  await _confirmSharedPush('Oferta publicada', 'la oferta', c => (c.exchanges||[]).some(x => x && x.id === e.id));
 }
 async function takeExch(id){
   const cu = getCurrentUser ? getCurrentUser() : null;
@@ -1623,17 +1683,19 @@ async function takeExch(id){
   if(cu) e.takenById = cu.id;
   if(typeof logActivity==='function') logActivity('exchange_taken', 'Tomaste un turno · '+e.type+' · '+formatDate(e.date));
   save(); renderExchanges();
-  await _confirmSharedPush('Turno tomado. Avisa al colega.', 'el cambio');
+  await _confirmSharedPush('Turno tomado. Avisa al colega.', 'el cambio', c => { const x=(c.exchanges||[]).find(y=>y&&y.id===id); return !!x && x.status==='taken'; });
 }
 // Empuja el estado compartido y CONFIRMA: avisa "ok" solo si llegó a la nube;
 // si no, deja claro que quedó local y se reintentará. (Para intercambios.)
-async function _confirmSharedPush(okMsg, queCosa){
+async function _confirmSharedPush(okMsg, queCosa, verifyPredicate){
   const base = getBackendURL();
   if(!base){ toast(okMsg + ' (solo en este dispositivo)'); return; }
   toast('Sincronizando…');
   if(typeof _syncTimer !== 'undefined' && _syncTimer){ clearTimeout(_syncTimer); _syncTimer = null; }
   let ok = false;
-  try{ ok = await pushRemoteState(); }catch(e){ ok = false; }
+  // Si se da un verificador, empuja Y confirma en la nube (reintentando ante
+  // colisión); si no, push simple.
+  try{ ok = verifyPredicate ? await _pushMainVerified(verifyPredicate) : await pushRemoteState(); }catch(e){ ok = false; }
   toast(ok ? ('✅ ' + okMsg) : ('⚠️ Guardado en este equipo, pero NO se pudo enviar ' + queCosa + ' a la nube. Se reintentará al reabrir.'));
 }
 function proposeExch(id){
@@ -1837,7 +1899,9 @@ async function saveVacation(id, isNew){
   toast(isNew?'Guardada · sincronizando…':'Actualizando…');
   if(_syncTimer){ clearTimeout(_syncTimer); _syncTimer = null; } // forzamos el push ahora
   let ok = false;
-  try{ ok = await pushRemoteState(); }catch(e){ ok = false; }
+  // Empuja Y verifica que la solicitud quedó en la nube (reintenta si una
+  // escritura concurrente la pisó).
+  try{ ok = await _pushMainVerified(c => (c.vacations||[]).some(x => x && x.id === v.id)); }catch(e){ ok = false; }
   if(ok){
     toast(isNew ? '✅ Solicitud enviada' : '✅ Cambios sincronizados');
     // Aviso push al admin solo si la solicitud realmente llegó a la nube.
@@ -1885,7 +1949,7 @@ async function decideVacation(id, decision){
   v.updatedAt = new Date().toISOString();
   save(); closeModal(); renderVacations();
   // Confirmar que la decisión llegó a la nube (para que la unidad la vea).
-  await _confirmSharedPush(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada', 'la decisión');
+  await _confirmSharedPush(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada', 'la decisión', c => { const x=(c.vacations||[]).find(y=>y&&y.id===id); return !!x && x.status===decision; });
 }
 async function deleteVacation(id){
   if(!confirm('¿Eliminar esta solicitud?')) return;
@@ -1899,7 +1963,7 @@ async function deleteVacation(id){
     state.vacations = state.vacations.filter(x=>x.id!==id);
   }
   save(); renderVacations();
-  await _confirmSharedPush('Eliminada', 'la eliminación');
+  await _confirmSharedPush('Eliminada', 'la eliminación', c => { const x=(c.vacations||[]).find(y=>y&&y.id===id); return !!x && x.deleted===true; });
 }
 
 // ============================================================
@@ -8900,7 +8964,8 @@ async function agendSubmitSolicitud(ev){
     return;
   }
   let _ok = false;
-  try{ _ok = await agendSyncNow(); }catch(e){ _ok = false; }
+  // Empuja Y verifica que la solicitud quedó en la nube (reintenta ante colisión).
+  try{ _ok = await _agendSyncVerified(salaId, dateStr, req.id); }catch(e){ _ok = false; }
   if(_ok){
     try{ notifyAdminsOfNewRequest(); }catch(e){}
     alert(isExtra
