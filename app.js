@@ -162,6 +162,7 @@ function save(){
     _pendingPush = true;
   }
   try{ updateHomeBadges(); }catch(e){}
+  try{ updateAgendAdminNotice(); }catch(e){}
   scheduleSyncPush();
 }
 // Igual que save() pero NO marca "dirty" ni timestamp local. Sirve para
@@ -338,6 +339,7 @@ function _applyRemoteState(remote){
     if(remote._updatedAt) _lastRemoteUpdatedAt = remote._updatedAt;
     localStorage.setItem(LS_KEY, JSON.stringify(state));
     try{ updateHomeBadges(); }catch(e){}
+  try{ updateAgendAdminNotice(); }catch(e){}
     return true;
   } finally {
     _isApplyingRemote = false;
@@ -850,6 +852,7 @@ function showView(name){
   document.getElementById('hdrTitle').textContent = titles[name] || titles.home;
   // Actualizar badges de notificación en la home (vacaciones / intercambios)
   try{ updateHomeBadges(); }catch(e){}
+  try{ updateAgendAdminNotice(); }catch(e){}
   if(name==='calendario'){
     renderCalendar();
     renderSourceStatus();
@@ -5115,6 +5118,7 @@ function updateInstitutionUI(){
   if(elEq) elEq.textContent = INSTITUTION.name + (INSTITUTION.city?' · '+INSTITUTION.city:'');
   try{ updateAiButtons(); }catch(e){}
   try{ updateHomeBadges(); }catch(e){}
+  try{ updateAgendAdminNotice(); }catch(e){}
 }
 
 function renderInstitutionPicker(institutions){
