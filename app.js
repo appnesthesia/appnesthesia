@@ -4385,6 +4385,9 @@ const SEARCH_INDEX = [
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
   { ico:'❤️', label:'Riesgo Cardiovascular (RCRI/METs)', hint:'Portal Preanestésico', kw:'riesgo cardiovascular rcri mets cardiologia', go:()=>_goPortal('gpRiesgoCv') },
+  { ico:'🩸', label:'Riesgo de TEV (Caprini)', hint:'Portal Preanestésico', kw:'caprini tev tromboembolismo trombosis tromboprofilaxis profilaxis tvp tep', go:()=>_goPortal('gpRiesgoTev') },
+  { ico:'🤢', label:'Riesgo de NVPO (Apfel)', hint:'Calculadoras Perioperatorias', kw:'apfel nvpo nauseas vomitos ponv antiemetico', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('apfel'); }catch(e){} },60); }catch(e){} } },
+  { ico:'🫁', label:'Riesgo pulmonar (ARISCAT)', hint:'Calculadoras Perioperatorias', kw:'ariscat complicaciones pulmonares riesgo respiratorio atelectasia neumonia', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('ariscat'); }catch(e){} },60); }catch(e){} } },
 ];
 
 // Menú compacto del encabezado (agrupa buscar, ayuda/ajustes y config admin)
@@ -4508,6 +4511,8 @@ const CALC_LIST = [
   { key:'vaso', ico:'💧', name:'Drogas vasoactivas', desc:'µg/kg/min ↔ mL/h' },
   { key:'vfg',  ico:'🫘', name:'Función renal (VFG)', desc:'Cockcroft-Gault · CKD-EPI' },
   { key:'mabl', ico:'🩸', name:'Pérdida sanguínea', desc:'Volemia y MABL permitida' },
+  { key:'apfel', ico:'🤢', name:'Riesgo de NVPO (Apfel)', desc:'Náuseas/vómitos · profilaxis' },
+  { key:'ariscat', ico:'🫁', name:'Riesgo pulmonar (ARISCAT)', desc:'Complicaciones pulmonares postop' },
 ];
 let _calcSel = null;
 
@@ -4545,7 +4550,7 @@ function calcSelect(key){
   const c = CALC_LIST.find(x=>x.key===key);
   document.getElementById('calcTitle').textContent = c ? c.name : 'Calculadora';
   document.getElementById('calcBackBtn').style.display = '';
-  const r = { al:_calcAL, peso:_calcPeso, vaso:_calcVaso, vfg:_calcVFG, mabl:_calcMABL }[key];
+  const r = { al:_calcAL, peso:_calcPeso, vaso:_calcVaso, vfg:_calcVFG, mabl:_calcMABL, apfel:_calcApfel, ariscat:_calcAriscat }[key];
   document.getElementById('calcBody').innerHTML = r ? r() : '';
 }
 function _cNum(id){ const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(',','.')); return isNaN(v)?null:v; }
@@ -4793,6 +4798,74 @@ window._doMABL = function(){
       <div style="font-size:12px">Hasta caer de Hto ${_cFmt(hi,0)} % a ${_cFmt(hf,0)} %</div>
     </div>
     <div class="gp-calc-block nota">Estimación; el umbral transfusional se individualiza (comorbilidad, sangrado activo, signos de hipoperfusión). Considerar ácido tranexámico y recuperador celular.</div>`);
+};
+
+// 6) Riesgo de NVPO — Score de Apfel ----------------------------------------
+function _calcApfel(){
+  return `
+   <p class="calc-detail-sub">Estima el riesgo de náuseas y vómitos postoperatorios (NVPO) en el adulto con 4 factores (Apfel).</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doApfel();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Sexo femenino</span><select id="apSexo"><option value="0">No</option><option value="1">Sí</option></select></label>
+       <label class="gp-calc-field"><span>No fumador</span><select id="apNoFuma"><option value="0">No (fuma)</option><option value="1">Sí (no fuma)</option></select></label>
+       <label class="gp-calc-field"><span>Antecedente de NVPO o cinetosis</span><select id="apHist"><option value="0">No</option><option value="1">Sí</option></select></label>
+       <label class="gp-calc-field"><span>Uso de opioides postoperatorios</span><select id="apOpio"><option value="1">Sí (esperado)</option><option value="0">No</option></select></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doApfel = function(){
+  const f = ['apSexo','apNoFuma','apHist','apOpio'].reduce((a,id)=>a + (parseInt(_cVal(id),10)||0), 0);
+  const pct = {0:'~10 %',1:'~20 %',2:'~40 %',3:'~60 %',4:'~80 %'}[f];
+  const cat = f>=3 ? 'Alto' : (f===2 ? 'Moderado' : 'Bajo');
+  let conducta;
+  if(f<=1) conducta='Riesgo bajo. Medidas basales (minimizar opioides, hidratación). Considerar 1 antiemético si hay factores quirúrgicos.';
+  else if(f===2) conducta='Riesgo moderado. Profilaxis con 2 fármacos de clases distintas (p. ej. dexametasona 4-8 mg al inicio + ondansetrón 4 mg al final).';
+  else conducta='Riesgo alto. Estrategia multimodal: reducir riesgo basal (TIVA con propofol, evitar volátiles/N₂O, analgesia multimodal ahorradora de opioides) + 2-3 antieméticos de clases distintas (dexametasona + ondansetrón + droperidol/haloperidol; considerar aprepitant o escopolamina).';
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Score de Apfel</strong>
+      <div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin:3px 0">${f} / 4 · ${pct}</div>
+      <div style="font-size:12px;color:var(--muted)">Riesgo ${cat} de NVPO</div>
+    </div>
+    <div class="gp-calc-block"><strong>Conducta sugerida</strong><div style="font-size:12.5px;line-height:1.5;margin-top:3px">${conducta}</div></div>
+    <div class="gp-calc-block nota">Rescate: usar una clase distinta a la usada en profilaxis. Referencia: Apfel 1999 / Consenso NVPO 2020. La decisión es del anestesiólogo a cargo.</div>`);
+};
+
+// 7) Riesgo pulmonar postoperatorio — ARISCAT -------------------------------
+function _calcAriscat(){
+  return `
+   <p class="calc-detail-sub">Estima el riesgo de complicaciones pulmonares postoperatorias (ARISCAT).</p>
+   <form class="gp-calc-form" onsubmit="event.preventDefault();window._doAriscat();return false;">
+     <div class="gp-calc-grid">
+       <label class="gp-calc-field"><span>Edad</span><select id="arEdad"><option value="0">≤ 50 años</option><option value="3">51-80 años</option><option value="16">&gt; 80 años</option></select></label>
+       <label class="gp-calc-field"><span>SpO₂ preoperatoria</span><select id="arSpo2"><option value="0">≥ 96 %</option><option value="8">91-95 %</option><option value="24">≤ 90 %</option></select></label>
+       <label class="gp-calc-field"><span>Infección respiratoria (último mes)</span><select id="arInf"><option value="0">No</option><option value="17">Sí</option></select></label>
+       <label class="gp-calc-field"><span>Anemia preop (Hb ≤ 10 g/dL)</span><select id="arAnemia"><option value="0">No</option><option value="11">Sí</option></select></label>
+       <label class="gp-calc-field"><span>Incisión quirúrgica</span><select id="arInc"><option value="0">Periférica</option><option value="15">Abdominal alta</option><option value="24">Intratorácica</option></select></label>
+       <label class="gp-calc-field"><span>Duración de la cirugía</span><select id="arDur"><option value="0">&lt; 2 h</option><option value="16">2-3 h</option><option value="23">&gt; 3 h</option></select></label>
+       <label class="gp-calc-field"><span>Cirugía de urgencia</span><select id="arUrg"><option value="0">No</option><option value="8">Sí</option></select></label>
+     </div>
+     <div class="gp-calc-actions"><button type="submit" class="gp-calc-btn primary">🧮 Calcular</button></div>
+   </form>
+   <div id="calcOut"></div>`;
+}
+window._doAriscat = function(){
+  const s = ['arEdad','arSpo2','arInf','arAnemia','arInc','arDur','arUrg'].reduce((a,id)=>a + (parseInt(_cVal(id),10)||0), 0);
+  let cat, pct, conducta;
+  if(s < 26){ cat='Bajo'; pct='~ 1,6 %';
+    conducta='Cuidados estándar. Movilización precoz y fisioterapia respiratoria según necesidad.'; }
+  else if(s <= 44){ cat='Intermedio'; pct='~ 13 %';
+    conducta='Optimizar: cesación tabáquica, tratar anemia/infección, fisioterapia respiratoria e incentivómetro. Ventilación protectora intraop (Vt 6-8 mL/kg peso ideal, PEEP). Evitar bloqueo neuromuscular residual (revertir + TOF). Analgesia regional ahorradora de opioides.'; }
+  else { cat='Alto'; pct='~ 42 %';
+    conducta='Todas las medidas previas + considerar manejo postop monitorizado (intermedio/UCI), CPAP/VNI precoz, y planificación multidisciplinaria. Optimización preoperatoria intensiva.'; }
+  _cResult(`
+    <div class="gp-calc-block pedir"><strong>Puntaje ARISCAT</strong>
+      <div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin:3px 0">${s} pts · ${pct}</div>
+      <div style="font-size:12px;color:var(--muted)">Riesgo ${cat} de complicaciones pulmonares</div>
+    </div>
+    <div class="gp-calc-block"><strong>Conducta sugerida</strong><div style="font-size:12.5px;line-height:1.5;margin-top:3px">${conducta}</div></div>
+    <div class="gp-calc-block nota">Estratos: &lt;26 bajo · 26-44 intermedio · ≥45 alto. Referencia: Canet, Anesthesiology 2010. La decisión es del anestesiólogo a cargo.</div>`);
 };
 
 // ============================================================
@@ -5673,6 +5746,20 @@ const _GP_SECTIONS_META = {
       ico: '❤️',
       render: () => _renderRcriCalcCard()
     }
+  },
+  gpRiesgoTev: {
+    bodyId: 'gpRiesgoTevBody',
+    render: () => renderGuiasRiesgoTev(),
+    hero: {
+      label: 'Caprini 2005 · referencia',
+      chips: ['0 → muy bajo', '1-2 → bajo', '3-4 → moderado', '≥5 → alto', 'Coordinar ASRA']
+    },
+    calc: {
+      label: 'Abrir calculadora Caprini',
+      title: 'Calculadora de riesgo de TEV · Caprini 2005',
+      ico: '🩸',
+      render: () => _renderCapriniCalcCard()
+    }
   }
 };
 const _GP_SECTIONS = Object.keys(_GP_SECTIONS_META);
@@ -6123,6 +6210,192 @@ window.resetRCRI = function(){
   const out = document.getElementById('rcriResultado');
   if(out) out.innerHTML = '';
 };
+
+// ============================================================
+// RIESGO DE TEV — SCORE DE CAPRINI (2005) + PROFILAXIS (ACCP)
+// ============================================================
+// Referencia: Caprini 2005 RAM · estratificación y conducta ACCP
+// (Gould, Chest 2012). REFERENCIA — la decisión es del anestesiólogo.
+const CAPRINI_FACTORS = [
+  // pts 1
+  { p:1, g:'1 punto', label:'Edad 41-60 años' },
+  { p:1, g:'1 punto', label:'Cirugía menor programada' },
+  { p:1, g:'1 punto', label:'IMC > 25 kg/m²' },
+  { p:1, g:'1 punto', label:'Piernas edematosas (actual)' },
+  { p:1, g:'1 punto', label:'Várices' },
+  { p:1, g:'1 punto', label:'Sepsis (< 1 mes)' },
+  { p:1, g:'1 punto', label:'Enfermedad pulmonar grave / neumonía (< 1 mes)' },
+  { p:1, g:'1 punto', label:'Función pulmonar anormal / EPOC' },
+  { p:1, g:'1 punto', label:'IAM agudo' },
+  { p:1, g:'1 punto', label:'Insuficiencia cardíaca congestiva (< 1 mes)' },
+  { p:1, g:'1 punto', label:'Enfermedad inflamatoria intestinal' },
+  { p:1, g:'1 punto', label:'Paciente médico en reposo en cama' },
+  { p:1, g:'1 punto', label:'Anticonceptivos orales o terapia hormonal' },
+  { p:1, g:'1 punto', label:'Embarazo o postparto (< 1 mes)' },
+  { p:1, g:'1 punto', label:'Aborto recurrente o inexplicado' },
+  // pts 2
+  { p:2, g:'2 puntos', label:'Edad 61-74 años' },
+  { p:2, g:'2 puntos', label:'Cirugía artroscópica' },
+  { p:2, g:'2 puntos', label:'Cirugía mayor abierta (> 45 min)' },
+  { p:2, g:'2 puntos', label:'Cirugía laparoscópica (> 45 min)' },
+  { p:2, g:'2 puntos', label:'Neoplasia maligna (presente o previa)' },
+  { p:2, g:'2 puntos', label:'Reposo en cama > 72 h' },
+  { p:2, g:'2 puntos', label:'Yeso inmovilizador (< 1 mes)' },
+  { p:2, g:'2 puntos', label:'Acceso venoso central' },
+  // pts 3
+  { p:3, g:'3 puntos', label:'Edad ≥ 75 años' },
+  { p:3, g:'3 puntos', label:'TEV previo (TVP/TEP)' },
+  { p:3, g:'3 puntos', label:'Historia familiar de TEV' },
+  { p:3, g:'3 puntos', label:'Factor V Leiden' },
+  { p:3, g:'3 puntos', label:'Mutación protrombina 20210A' },
+  { p:3, g:'3 puntos', label:'Anticoagulante lúpico' },
+  { p:3, g:'3 puntos', label:'Anticuerpos anticardiolipina' },
+  { p:3, g:'3 puntos', label:'Homocisteína sérica elevada' },
+  { p:3, g:'3 puntos', label:'Trombocitopenia inducida por heparina (TIH)' },
+  { p:3, g:'3 puntos', label:'Otra trombofilia congénita o adquirida' },
+  // pts 5
+  { p:5, g:'5 puntos', label:'ACV (< 1 mes)' },
+  { p:5, g:'5 puntos', label:'Artroplastía electiva mayor de extremidad inferior' },
+  { p:5, g:'5 puntos', label:'Fractura de cadera, pelvis o pierna (< 1 mes)' },
+  { p:5, g:'5 puntos', label:'Lesión medular aguda con paresia (< 1 mes)' },
+  { p:5, g:'5 puntos', label:'Politraumatismo (< 1 mes)' },
+];
+
+function calcCaprini(flags){
+  const items = CAPRINI_FACTORS.map((f,i)=>({ ...f, checked: !!flags[i] }));
+  const score = items.filter(x=>x.checked).reduce((a,x)=>a+x.p, 0);
+  let riesgoPct, categoria, badgeClass, prof;
+  if(score === 0){
+    riesgoPct='< 0,5 %'; categoria='Muy bajo'; badgeClass='ok';
+    prof='Deambulación precoz y frecuente. No requiere profilaxis farmacológica ni mecánica específica.';
+  } else if(score <= 2){
+    riesgoPct='~ 1,5 %'; categoria='Bajo'; badgeClass='ok';
+    prof='Profilaxis MECÁNICA: compresión neumática intermitente (CNI) preferida ± medias de compresión graduada, mientras dure la hospitalización / inmovilidad.';
+  } else if(score <= 4){
+    riesgoPct='~ 3 %'; categoria='Moderado'; badgeClass='warn';
+    prof='Profilaxis FARMACOLÓGICA (HBPM o HNF a dosis baja) o, si hay alto riesgo de sangrado, profilaxis MECÁNICA (CNI) hasta que sea seguro iniciar la farmacológica.';
+  } else {
+    riesgoPct='~ 6 % o más'; categoria='Alto'; badgeClass='danger';
+    prof='Profilaxis FARMACOLÓGICA (HBPM o HNF) + MECÁNICA (CNI) combinadas. En cáncer abdominopélvico mayor y artroplastía/fractura de cadera considerar profilaxis EXTENDIDA (~4 semanas).';
+  }
+  const recs = {
+    profilaxis: prof,
+    sangrado: 'Si el riesgo hemorrágico es alto, priorizar profilaxis mecánica (CNI) y diferir la farmacológica hasta lograr hemostasia adecuada.',
+    neuroaxial: 'Coordinar el timing de HBPM/HNF con bloqueos neuroaxiales y retiro de catéteres según ASRA (ver sección Coagulación de la app).',
+    duracion: (score>=5 ? 'Considerar profilaxis extendida (hasta ~4 semanas) en cirugía oncológica abdominopélvica mayor y artroplastía/fractura de cadera.' : 'Mantener profilaxis mientras persista el riesgo (hospitalización / inmovilidad).')
+  };
+  return { score, items, riesgoPct, categoria, badgeClass, recs };
+}
+
+function _renderCapriniCalcCard(){
+  let html = `
+    <p class="gp-calc-sub" style="margin-top:0">Marca los factores de riesgo presentes. El Caprini RAM (2005) estima el riesgo de tromboembolismo venoso y orienta la profilaxis (estratos ACCP).</p>
+    <form id="capriniForm" class="gp-calc-form" onsubmit="event.preventDefault();window.calcularCaprini();return false;">`;
+  let lastG = null;
+  html += '<div class="gp-calc-chips gp-rcri-chips">';
+  CAPRINI_FACTORS.forEach((f, i) => {
+    if(f.g !== lastG){
+      html += `</div><div class="gp-calc-section-title">${_gpEsc(f.g + (f.p===1?' cada uno':' cada uno'))}</div><div class="gp-calc-chips gp-rcri-chips">`;
+      lastG = f.g;
+    }
+    html += `<label class="gp-chk gp-chk-rcri"><input type="checkbox" id="capChk${i}"><span>${_gpEsc(f.label)}</span></label>`;
+  });
+  html += `</div>
+      <div class="gp-calc-actions">
+        <button type="submit" class="gp-calc-btn primary">🧮 Calcular puntaje y profilaxis</button>
+        <button type="button" class="gp-calc-btn secondary" onclick="window.resetCaprini()">↺ Limpiar</button>
+      </div>
+    </form>
+    <div id="capriniResultado"></div>`;
+  return html;
+}
+
+function _gpCapriniResumenTexto(r){
+  const checkedList = r.items.filter(x=>x.checked).map(x=>'  • '+x.label+' ('+x.p+')').join('\n');
+  return [
+    'Score de Caprini (2005) — Riesgo de TEV',
+    `Puntaje: ${r.score} · Riesgo: ${r.riesgoPct} (${r.categoria})`,
+    '',
+    'Factores presentes:',
+    (checkedList || '  (ninguno)'),
+    '',
+    `Profilaxis sugerida: ${r.recs.profilaxis}`,
+    `Riesgo de sangrado: ${r.recs.sangrado}`,
+    `Neuroaxial/ASRA: ${r.recs.neuroaxial}`,
+    `Duración: ${r.recs.duracion}`,
+    '',
+    'REFERENCIA (ACCP). La decisión final es del anestesiólogo a cargo.',
+    'Generado por Appnesthesia · Portal Preanestésico'
+  ].join('\n');
+}
+
+window.calcularCaprini = function(){
+  const flags = CAPRINI_FACTORS.map((_,i)=>{
+    const el = document.getElementById('capChk'+i);
+    return el ? !!el.checked : false;
+  });
+  const r = calcCaprini(flags);
+  const out = document.getElementById('capriniResultado');
+  if(!out) return;
+  const flagsList = r.items.filter(x=>x.checked).map(x=>`<li>${_gpEsc(x.label)} <em>(${x.p})</em></li>`).join('') || '<li><em>Ningún factor seleccionado</em></li>';
+  out.innerHTML = `
+    <div class="gp-calc-result gp-calc-${r.badgeClass}">
+      <div class="gp-calc-score-row">
+        <div class="gp-calc-score-big">${r.score}<span> pts</span></div>
+        <div class="gp-calc-score-meta">
+          <div class="gp-calc-pct">${_gpEsc(r.riesgoPct)}</div>
+          <div class="gp-calc-cat">Riesgo ${_gpEsc(r.categoria)}</div>
+        </div>
+      </div>
+      <div class="gp-calc-flags">
+        <strong>Factores presentes:</strong>
+        <ul>${flagsList}</ul>
+      </div>
+      <div class="gp-calc-recs">
+        <div class="gp-calc-rec"><strong>Profilaxis sugerida:</strong> ${_gpEsc(r.recs.profilaxis)}</div>
+        <div class="gp-calc-rec"><strong>Riesgo de sangrado:</strong> ${_gpEsc(r.recs.sangrado)}</div>
+        <div class="gp-calc-rec"><strong>Neuroaxial / ASRA:</strong> ${_gpEsc(r.recs.neuroaxial)}</div>
+        <div class="gp-calc-rec"><strong>Duración:</strong> ${_gpEsc(r.recs.duracion)}</div>
+      </div>
+      <button type="button" class="gp-copy-btn" onclick="_gpCopyToClipboard(window._lastCapriniText, this)">📋 Copiar resumen al portapapeles</button>
+    </div>`;
+  window._lastCapriniText = _gpCapriniResumenTexto(r);
+};
+
+window.resetCaprini = function(){
+  for(let i=0;i<CAPRINI_FACTORS.length;i++){
+    const el = document.getElementById('capChk'+i);
+    if(el) el.checked = false;
+  }
+  const out = document.getElementById('capriniResultado');
+  if(out) out.innerHTML = '';
+};
+
+function renderGuiasRiesgoTev(){
+  const cont = document.getElementById('gpRiesgoTevBody');
+  if(!cont) return;
+  const intro = `
+    <div class="gp-callout" style="margin-bottom:14px">
+      <strong>🩸 Objetivo:</strong> estimar el riesgo de <strong>tromboembolismo venoso (TEV)</strong> en el paciente quirúrgico con el <em>Score de Caprini (2005)</em> y orientar la <strong>tromboprofilaxis</strong> según los estratos <em>ACCP</em>.
+    </div>
+    <div class="gp-callout info" style="margin-bottom:14px">
+      <strong>🧮 Calculadora Caprini disponible.</strong> Usa el botón <strong>«Abrir calculadora Caprini»</strong> (abajo a la derecha) para sumar los factores y ver la profilaxis sugerida.
+    </div>`;
+  let tabla = '<table class="gp-table"><thead><tr><th>Puntaje</th><th>Riesgo</th><th>Profilaxis sugerida</th></tr></thead><tbody>';
+  tabla += '<tr><td><strong>0</strong></td><td>Muy bajo (&lt; 0,5 %)</td><td>Deambulación precoz</td></tr>';
+  tabla += '<tr><td><strong>1-2</strong></td><td>Bajo (~ 1,5 %)</td><td>Mecánica (compresión neumática intermitente)</td></tr>';
+  tabla += '<tr><td><strong>3-4</strong></td><td>Moderado (~ 3 %)</td><td>Farmacológica (HBPM/HNF) o mecánica si alto riesgo de sangrado</td></tr>';
+  tabla += '<tr><td><strong>≥ 5</strong></td><td>Alto (~ 6 % o más)</td><td>Farmacológica + mecánica; considerar profilaxis extendida</td></tr>';
+  tabla += '</tbody></table>';
+  const notas = `
+    <div class="gp-callout warning" style="margin-top:12px">
+      <strong>⚠ Coordinar con ASRA:</strong> ajustar el <strong>timing de HBPM/HNF</strong> con los bloqueos neuroaxiales y el retiro de catéteres (ver sección <strong>Coagulación</strong>). Si el riesgo de sangrado es alto, priorizar la profilaxis mecánica hasta lograr hemostasia.
+    </div>
+    <div class="gp-callout" style="margin-top:10px;font-size:12px;color:var(--muted)">
+      Fuente: Caprini 2005 RAM · estratificación y conducta ACCP (Gould, Chest 2012). Referencia de apoyo — la decisión final es del anestesiólogo a cargo.
+    </div>`;
+  cont.innerHTML = intro + tabla + notas;
+}
 
 // ============================================================
 // CALCULADORA DE EXÁMENES PREOPERATORIOS
