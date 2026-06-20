@@ -10,7 +10,7 @@
 // ⚠️ SUBIR ESTE NÚMERO EN CADA DEPLOY (v72 → v73 → …). Es lo que hace que el
 // navegador detecte un service worker nuevo y muestre el aviso "Nueva versión
 // disponible". Si no cambia, la app NO se entera de que hay una actualización.
-const CACHE = 'anestesia-v81';
+const CACHE = 'anestesia-v84';
 const ASSETS = [
   './',
   './index.html',
@@ -24,9 +24,13 @@ const ASSETS = [
   './logo.png',
   './logo-aria.png',
   './configs/aria-conocimiento.json',
+  './configs/protocolos.json',
   './configs/index.json',
   './configs/andes.json',
   './protocolos/ERAS-Colon-y-Bariatrica.pdf',
+  './protocolos/Protocolo-Ayuno-2026.pdf',
+  './protocolos/Guia-Suspension-Farmacos-2026.pdf',
+  './protocolos/PROCORT-Cirugia-Ortognatica.pdf',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 ];

@@ -144,7 +144,14 @@ function load(){
   }catch(e){return JSON.parse(JSON.stringify(DEFAULT_STATE));}
 }
 function save(){
-  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  // Protegido: si el estado excede la cuota de localStorage (p. ej. un PDF
+  // grande en Base64), NO lanzamos excepción —que rompía el guardado y la
+  // sincronización—; avisamos y seguimos para no perder el resto del estado.
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  }catch(e){
+    try{ toast('⚠️ No se pudo guardar local (¿archivo muy grande?). Para protocolos permanentes usa GitHub.'); }catch(_){}
+  }
   // Marca el "timestamp de cambio local" para que bootSync sepa si lo nuestro
   // es MÁS NUEVO que el remoto. Sin esto, una recarga rápida (antes de que
   // el debounce de 1.5s dispare el push) sobreescribía los cambios locales
@@ -2279,23 +2286,67 @@ function deleteStaff(id){
 // ============================================================
 // PROTOCOLOS
 // ============================================================
+// --- Protocolos institucionales (configs/protocolos.json en GitHub) ---
+// Permanentes y de solo lectura: viven en el repo, NO en el estado sincronizado,
+// por lo que no pueden "caerse". ARIA los lee como contexto (campo "texto").
+let _protocolosInst = null;
+async function loadProtocolosInst(){
+  if(_protocolosInst !== null) return _protocolosInst;
+  try{
+    const r = await fetch('configs/protocolos.json', {cache:'no-cache'});
+    if(r.ok){
+      const data = await r.json();
+      _protocolosInst = Array.isArray(data.protocolos) ? data.protocolos.filter(p=>p && !p.deleted) : [];
+    } else { _protocolosInst = []; }
+  }catch(e){ _protocolosInst = []; }
+  return _protocolosInst;
+}
+
+function _protoFileBlock(p){
+  const hasFile = p.fileUrl && p.fileUrl.length>0;
+  return hasFile
+    ? `<div class="btn-row" style="margin-top:8px">
+         <a class="btn sm accent" href="${p.fileUrl}" target="_blank" rel="noopener">📄 Abrir PDF${p.fileName?' · '+p.fileName.replace(/</g,'&lt;'):''}</a>
+         <a class="btn sm secondary" href="${p.fileUrl}" download>⬇ Descargar</a>
+       </div>`
+    : '';
+}
+
 function renderProtocols(){
   const list = document.getElementById('protoList');
-  list.innerHTML = (state.protocols||[]).filter(p=>!p.deleted).map(p=>{
-    const hasFile = p.fileUrl && p.fileUrl.length>0;
-    const fileBlock = hasFile
-      ? `<div class="btn-row" style="margin-top:8px">
-           <a class="btn sm accent" href="${p.fileUrl}" target="_blank" rel="noopener">📄 Abrir PDF${p.fileName?' · '+p.fileName.replace(/</g,'&lt;'):''}</a>
-           <a class="btn sm secondary" href="${p.fileUrl}" download>⬇ Descargar</a>
-         </div>`
-      : '';
+  if(!list) return;
+  // Carga diferida de los institucionales; re-render cuando lleguen.
+  if(_protocolosInst === null){
+    loadProtocolosInst().then(()=>{ try{ renderProtocols(); }catch(e){} });
+  }
+  const inst = _protocolosInst || [];
+  const instIds = new Set(inst.map(p=>p.id));
+
+  // 1) Institucionales (GitHub) — solo lectura, con distintivo.
+  const instHtml = inst.map(p=>{
+    const titulo = (p.titulo||p.title||'').replace(/</g,'&lt;');
+    const cuerpo = (p.resumen||p.body||p.texto||'');
+    const fuente = p.fuente ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Fuente: ${String(p.fuente).replace(/</g,'&lt;')}${p.vigencia?' · '+String(p.vigencia).replace(/</g,'&lt;'):''}</div>` : '';
+    return `<div class="detail-card" style="border-left:4px solid var(--green-forest)">
+      <div class="head">${titulo} <span style="font-size:10.5px;font-weight:700;color:var(--green-deep);background:#dcfce7;border-radius:6px;padding:1px 7px;margin-left:4px;vertical-align:middle">📌 INSTITUCIONAL</span></div>
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${cuerpo}</div>
+      ${_protoFileBlock(p)}
+      ${fuente}
+    </div>`;
+  }).join('');
+
+  // 2) Protocolos del estado (subidos por la app), excluyendo los que ya
+  //    existen como institucionales (dedupe por id).
+  const stateHtml = (state.protocols||[]).filter(p=>!p.deleted && !instIds.has(p.id)).map(p=>{
     return `<div class="detail-card">
       <div class="head">${p.title}</div>
       <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${p.body||''}</div>
-      ${fileBlock}
+      ${_protoFileBlock(p)}
       ${state.isAdmin?`<div class="btn-row"><button class="btn sm secondary" onclick="editProto('${p.id}')">Editar</button><button class="btn sm danger" onclick="deleteProto('${p.id}')">Eliminar</button></div>`:''}
     </div>`;
   }).join('');
+
+  list.innerHTML = instHtml + stateHtml;
 }
 function openProtoModal(p){
   const isNew = !p;
@@ -2307,7 +2358,7 @@ function openProtoModal(p){
     <div class="field">
       <label>Archivo PDF (opcional)</label>
       <input type="file" accept="application/pdf,.pdf" id="pr_file" onchange="loadProtoFile(event)">
-      <div class="help">Adjuntá un PDF y se guardará en la App (vía Base64 en este navegador).</div>
+      <div class="help">Adjuntá un PDF y se guardará en la App (vía Base64 en este navegador). ⚠️ Para protocolos institucionales PERMANENTES, mejor súbelos por GitHub (no se pierden ni dependen de este navegador); los PDF grandes aquí pueden no persistir.</div>
       <div id="pr_file_info" style="margin-top:6px;font-size:13px;color:var(--text)">${p.fileUrl?`Actual: <b>${(p.fileName||'archivo.pdf').replace(/</g,'&lt;')}</b> · <a href="${p.fileUrl}" target="_blank">ver</a> · <button class="btn sm danger" onclick="clearProtoFile()" style="margin-left:6px">Quitar</button>`:'Sin archivo'}</div>
       <input type="hidden" id="pr_file_url" value="${(p.fileUrl||'').replace(/"/g,'&quot;')}">
       <input type="hidden" id="pr_file_name" value="${(p.fileName||'').replace(/"/g,'&quot;')}">
@@ -4218,6 +4269,24 @@ function _aiBuildContext(question){
     scored.forEach(({e})=> matches.push('[Guía: ' + (e.titulo||e.id) + (e.fuente ? ' — FUENTE: ' + e.fuente : '') + '] ' + e.contenido));
   }catch(e){}
 
+  // 4b) PROTOCOLOS INSTITUCIONALES (configs/protocolos.json) — prioridad alta.
+  // Se anteponen para que ARIA cruce la respuesta con el protocolo local.
+  try{
+    const inst = (_protocolosInst||[]).filter(p=>p && (p.texto||p.resumen||p.body));
+    const scoredP = [];
+    inst.forEach(p=>{
+      const texto = p.texto || p.resumen || p.body || '';
+      const kws = (p.keywords||[]).map(_gpNorm);
+      const hayTitulo = _gpNorm((p.titulo||p.title||'') + ' ' + texto);
+      let score = 0;
+      kws.forEach(kw=>{ if(!kw) return; if(q.includes(kw)) score += 2; else if(words.some(w=> kw.includes(w) || w.includes(kw))) score += 1; });
+      words.forEach(w=>{ if(hayTitulo.includes(w)) score += 1; });
+      if(score > 0) scoredP.push({ score, p, texto });
+    });
+    scoredP.sort((a,b)=> b.score - a.score);
+    scoredP.forEach(({p, texto})=> matches.unshift('[PROTOCOLO INSTITUCIONAL — ' + ((INSTITUTION&&INSTITUTION.shortName)||'Clínica Universidad de los Andes') + ' · ' + (p.titulo||p.title||p.id) + (p.fuente?' — '+p.fuente:'') + '] ' + texto));
+  }catch(e){}
+
   // 5) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
   if(/riesgo|mets?|rcri|cardiolog|isquemia|esfuerzo|dobutamina/.test(q)){
     try{
@@ -4307,6 +4376,7 @@ async function _aiCall(payload){
 function openAiChat(){
   if(!aiAvailable()){ alert('El asistente de IA aún no está configurado.\n\nDespliega el Worker de la carpeta worker-ia y agrega "aiURL" en configs/andes.json.'); return; }
   try{ loadAriaKB(); }catch(e){}
+  try{ loadProtocolosInst(); }catch(e){}
   document.getElementById('aiChatOverlay').classList.remove('hidden');
   _aiRenderMessages();
   setTimeout(()=>{ try{ document.getElementById('aiChatInput').focus(); }catch(e){} }, 150);
