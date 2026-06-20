@@ -500,8 +500,14 @@ canvas{max-width:100%}
 .help{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
 
 /* Selector de institución (boot) */
-.inst-picker{position:fixed;inset:0;background:linear-gradient(180deg,var(--tint1) 0%,var(--tint1) 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',-apple-system,system-ui,sans-serif}
+.inst-picker{position:fixed;inset:0;background:linear-gradient(180deg,var(--tint1) 0%,var(--tint1) 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',-apple-system,system-ui,sans-serif;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+.inst-picker::-webkit-scrollbar{width:0;height:0;display:none}
 .inst-picker.hidden{display:none!important}
+/* Mientras el selector de institución o el de módulos está visible, bloquear el
+   scroll del documento de fondo: evita la barra lateral "fantasma" (no hay nada
+   que desplazar, el overlay ocupa toda la pantalla). */
+html:has(#institutionPicker:not(.hidden)),
+html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .inst-picker-card{background:var(--card);border-radius:22px;padding:32px 26px;max-width:440px;width:100%;box-shadow:0 18px 48px rgba(15,68,53,.18),0 4px 12px rgba(15,68,53,.08);border:1px solid var(--green-pale)}
 .inst-picker-logo{width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));margin:0 auto 14px;box-shadow:0 8px 22px -2px rgba(14,125,117,.45),0 2px 6px rgba(14,125,117,.18);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:36px;font-family:'Manrope','Inter',sans-serif;overflow:hidden}
 .inst-picker-logo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -2554,6 +2560,6 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=81"></script>
+<script src="app.js?v=82"></script>
 </body>
 </html>

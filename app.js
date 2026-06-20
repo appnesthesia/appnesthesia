@@ -4393,7 +4393,7 @@ function _aiRenderMessages(){
   if(!box) return;
   let html = `
     <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular y más. Respondo usando las tablas y guías de la app (AHA/ACC, ESC, ASRA, ASA…) y <b>cito siempre la fuente</b>.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
+      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular, profilaxis ATB y TVP, y más. Respondo usando las tablas y guías de la app (AHA/ACC, ESC, ASRA, ASA…) y <b>cito siempre la fuente</b>.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
     </div>`;
   _aiMessages.forEach(m=>{
     const cls = m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
@@ -4650,6 +4650,7 @@ const CALC_LIST = [
   { key:'mabl', ico:'🩸', name:'Pérdida sanguínea', desc:'Volemia y MABL permitida' },
   { key:'apfel', ico:'🤢', name:'Riesgo de NVPO (Apfel)', desc:'Náuseas/vómitos · profilaxis' },
   { key:'ariscat', ico:'🫁', name:'Riesgo pulmonar (ARISCAT)', desc:'Complicaciones pulmonares postop' },
+  { key:'caprini', ico:'🩸', name:'Riesgo TVP/TEP (Caprini)', desc:'Tromboembolismo venoso · profilaxis' },
 ];
 let _calcSel = null;
 
@@ -4687,7 +4688,7 @@ function calcSelect(key){
   const c = CALC_LIST.find(x=>x.key===key);
   document.getElementById('calcTitle').textContent = c ? c.name : 'Calculadora';
   document.getElementById('calcBackBtn').style.display = '';
-  const r = { al:_calcAL, peso:_calcPeso, vaso:_calcVaso, vfg:_calcVFG, mabl:_calcMABL, apfel:_calcApfel, ariscat:_calcAriscat }[key];
+  const r = { al:_calcAL, peso:_calcPeso, vaso:_calcVaso, vfg:_calcVFG, mabl:_calcMABL, apfel:_calcApfel, ariscat:_calcAriscat, caprini:_renderCapriniCalcCard }[key];
   document.getElementById('calcBody').innerHTML = r ? r() : '';
 }
 function _cNum(id){ const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(',','.')); return isNaN(v)?null:v; }
