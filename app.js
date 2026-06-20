@@ -249,7 +249,7 @@ function _renderSyncIndicator(){
   el.style.display = '';
   el.innerHTML = `<span class="sync-dot ${extra}" style="background:${color}"></span><span class="sync-lbl">${label}</span>`;
 }
-function _setSyncStatus(s){ _syncStatus = s; _renderSyncIndicator(); }
+function _setSyncStatus(s){ _syncStatus = s; _renderSyncIndicator(); try{ _renderPendingBadge(); }catch(e){} }
 
 // Campos PRIVADOS por dispositivo de cada staff que NUNCA suben a la nube
 // (preferences/activityLog = privados por dispositivo)
@@ -600,6 +600,50 @@ function _bindFlushHandlers(){
       if(document.visibilityState === 'hidden') _flushSyncNow();
     });
   }catch(e){}
+  _startSyncRetry();
+}
+
+// ===== Reintento activo de sincronización + aviso "sin sincronizar" =====
+// Si un envío del estado principal (vacaciones, intercambios, decisiones del
+// admin) no llegó a la nube, se reintenta solo: cada 45 s, al recuperar
+// conexión, y al volver a primer plano. Además se muestra un aviso tocable.
+let _syncRetryTimer = null;
+function _startSyncRetry(){
+  if(_syncRetryTimer) return;
+  _syncRetryTimer = setInterval(_retryPendingSync, 45000);
+  try{ window.addEventListener('online', _retryPendingSync); }catch(e){}
+  try{
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'visible') _retryPendingSync();
+    });
+  }catch(e){}
+}
+function _retryPendingSync(){
+  try{
+    if(_pendingPush && getBackendURL() && navigator.onLine !== false && !_isApplyingRemote){
+      pushRemoteState().then(()=>{ try{ _renderPendingBadge(); }catch(e){} }).catch(()=>{});
+    }
+  }catch(e){}
+  try{ _renderPendingBadge(); }catch(e){}
+}
+function _renderPendingBadge(){
+  // Solo se muestra si hay cambios pendientes Y el último intento de sync tuvo
+  // problema (sin conexión / error / token). Durante un sync normal y exitoso
+  // NO aparece, para no molestar.
+  const problema = (_syncStatus === 'offline' || _syncStatus === 'error' || _syncStatus === 'unauthorized' || _syncStatus === 'disabled');
+  const show = !!_pendingPush && !!getBackendURL() && problema;
+  let b = document.getElementById('pendingSyncBadge');
+  if(!b){
+    if(!show) return;
+    b = document.createElement('div');
+    b.id = 'pendingSyncBadge';
+    b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));z-index:99999;background:#f59e0b;color:#fff;font:600 12.5px/1.2 -apple-system,system-ui,sans-serif;padding:9px 15px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:7px;cursor:pointer;max-width:92vw;text-align:center';
+    b.textContent = '⏳ Cambios sin sincronizar — toca para reintentar';
+    b.onclick = ()=>{ b.textContent = '⏳ Reintentando…'; _retryPendingSync(); };
+    document.body.appendChild(b);
+  }
+  if(show){ b.style.display = 'flex'; if(b.textContent.indexOf('Reintentando')<0) b.textContent='⏳ Cambios sin sincronizar — toca para reintentar'; }
+  else { b.style.display = 'none'; }
 }
 
 function scheduleSyncPush(){
@@ -1830,7 +1874,7 @@ function viewVacation(id){
     </div>
   `);
 }
-function decideVacation(id, decision){
+async function decideVacation(id, decision){
   const note = prompt(decision==='approved'
     ? 'Comentario para la aprobación (opcional):'
     : 'Motivo del rechazo (opcional):') || '';
@@ -1840,9 +1884,10 @@ function decideVacation(id, decision){
   v.decidedAt = new Date().toISOString();
   v.updatedAt = new Date().toISOString();
   save(); closeModal(); renderVacations();
-  toast(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada');
+  // Confirmar que la decisión llegó a la nube (para que la unidad la vea).
+  await _confirmSharedPush(decision==='approved'?'Solicitud aprobada':'Solicitud rechazada', 'la decisión');
 }
-function deleteVacation(id){
+async function deleteVacation(id){
   if(!confirm('¿Eliminar esta solicitud?')) return;
   // Borrado lógico (soft-delete): se marca como eliminada en vez de quitarla.
   // Así la eliminación se propaga a todos los dispositivos por la nube.
@@ -1853,7 +1898,8 @@ function deleteVacation(id){
   } else {
     state.vacations = state.vacations.filter(x=>x.id!==id);
   }
-  save(); renderVacations(); toast('Eliminada');
+  save(); renderVacations();
+  await _confirmSharedPush('Eliminada', 'la eliminación');
 }
 
 // ============================================================
@@ -8770,7 +8816,7 @@ function agendOpenDetalle(reqId){
     </div>`;
 }
 
-function agendVisarSolicitud(reqId, nuevoEstado){
+async function agendVisarSolicitud(reqId, nuevoEstado){
   const found = _agendFindRequest(reqId);
   if(!found) return;
   let comentario = '';
@@ -8810,7 +8856,15 @@ function agendVisarSolicitud(reqId, nuevoEstado){
   // contrapropuesta vigente para no dejar un recuadro de propuesta huérfano.
   if(slot.propuesta) delete slot.propuesta;
   agendSaveData(data);
-  agendScheduleSync(); // propagar el visado a la nube
+  // Confirmar que el visado llegó a la nube ANTES de avisar al solicitante.
+  const _vb = getBackendURL();
+  if(_vb){
+    let _vok = false;
+    try{ _vok = await agendSyncNow(); }catch(e){ _vok = false; }
+    if(!_vok){
+      alert('⚠️ El visado quedó guardado en este dispositivo, pero NO se pudo registrar en la nube (revisa tu conexión). Se reintentará al reabrir el módulo de Agendamiento.');
+    }
+  }
   // Al aprobar: abrir correo de confirmación al solicitante con copia a las
   // secretarías de pabellón (todas las salas, incluida Endoscopía Paralela).
   if(nuevoEstado === 'aprobada'){
