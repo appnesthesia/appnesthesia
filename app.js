@@ -4519,12 +4519,12 @@ const SEARCH_INDEX = [
   { ico:'🤖', label:'ARIA · Asistente IA', hint:'Pregunta en lenguaje natural', kw:'aria ia asistente inteligencia pregunta', go:()=>{ _searchCloseAll(); try{ openAiChat(); }catch(e){} } },
   { ico:'🗓️', label:'Agendamiento de procedimientos', hint:'Solicitar / visar', kw:'agendamiento agenda procedimiento solicitud sala resonancia picc', go:()=>{ _searchCloseAll(); try{ showModulesScreen(); setTimeout(()=>{ try{ openAgendamientoModule(); }catch(e){} },60); }catch(e){} } },
   { ico:'🩺', label:'Portal Preanestésico', hint:'Preparación del paciente', kw:'portal preanestesico preanestesia preparacion', go:()=>_goPortal(null) },
-  { ico:'📨', label:'Interconsultas a Anestesiología', hint:'Portal Preanestésico', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>_goPortal('gpInterconsulta') },
+  { ico:'✉️', label:'Interconsultas a Anestesiología', hint:'Portal Preanestésico', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>_goPortal('gpInterconsulta') },
   { ico:'🍽️', label:'Ayuno Preoperatorio', hint:'Portal Preanestésico', kw:'ayuno preoperatorio glp ozempic', go:()=>_goPortal('gpAyuno') },
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
   { ico:'❤️', label:'Riesgo Cardiovascular (RCRI/METs)', hint:'Portal Preanestésico', kw:'riesgo cardiovascular rcri mets cardiologia', go:()=>_goPortal('gpRiesgoCv') },
-  { ico:'🩸', label:'Riesgo TVP/TEP (Caprini)', hint:'Portal Preanestésico', kw:'caprini tev tromboembolismo trombosis venosa profunda tromboembolismo pulmonar tromboprofilaxis profilaxis tvp tep', go:()=>_goPortal('gpRiesgoTev') },
+  { ico:'🦵', label:'Riesgo TVP/TEP (Caprini)', hint:'Portal Preanestésico', kw:'caprini tev tromboembolismo trombosis venosa profunda tromboembolismo pulmonar tromboprofilaxis profilaxis tvp tep', go:()=>_goPortal('gpRiesgoTev') },
   { ico:'🤢', label:'Riesgo de NVPO (Apfel)', hint:'Calculadoras Perioperatorias', kw:'apfel nvpo nauseas vomitos ponv antiemetico', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('apfel'); }catch(e){} },60); }catch(e){} } },
   { ico:'🫁', label:'Riesgo pulmonar (ARISCAT)', hint:'Calculadoras Perioperatorias', kw:'ariscat complicaciones pulmonares riesgo respiratorio atelectasia neumonia', go:()=>{ _searchCloseAll(); try{ openCalculadoras(); setTimeout(()=>{ try{ calcSelect('ariscat'); }catch(e){} },60); }catch(e){} } },
 ];
@@ -4652,7 +4652,7 @@ const CALC_LIST = [
   { key:'mabl', ico:'🩸', name:'Pérdida sanguínea', desc:'Volemia y MABL permitida' },
   { key:'apfel', ico:'🤢', name:'Riesgo de NVPO (Apfel)', desc:'Náuseas/vómitos · profilaxis' },
   { key:'ariscat', ico:'🫁', name:'Riesgo pulmonar (ARISCAT)', desc:'Complicaciones pulmonares postop' },
-  { key:'caprini', ico:'🩸', name:'Riesgo TVP/TEP (Caprini)', desc:'Tromboembolismo venoso · profilaxis' },
+  { key:'caprini', ico:'🦵', name:'Riesgo TVP/TEP (Caprini)', desc:'Tromboembolismo venoso · profilaxis' },
 ];
 let _calcSel = null;
 
@@ -5902,7 +5902,7 @@ const _GP_SECTIONS_META = {
     calc: {
       label: 'Abrir calculadora Caprini',
       title: 'Calculadora de riesgo de TVP/TEP · Caprini 2005',
-      ico: '🩸',
+      ico: '🦵',
       render: () => _renderCapriniCalcCard()
     }
   }
@@ -10923,7 +10923,7 @@ const IC_TIPOS = [
   { v:'otro',          label:'Otra (especificar)',                ico:'📋' }
 ];
 const IC_PRIOS = [
-  { v:'rutinaria',  label:'Rutinaria',  color:'#0d9488', bg:'#ccfbf1' },
+  { v:'rutinaria',  label:'Rutinaria',  color:'#2e8b6b', bg:'#dcefe7' },
   { v:'preferente', label:'Preferente', color:'#b45309', bg:'#fef3c7' },
   { v:'urgente',    label:'Urgente',    color:'#b91c1c', bg:'#fee2e2' }
 ];
