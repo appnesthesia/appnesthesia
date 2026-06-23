@@ -678,7 +678,21 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 
 /* ===== Módulo Interconsultas (dentro del Portal Preanestésico) ===== */
 .ic-wrap{display:flex;flex-direction:column;gap:12px;animation:gpFadeIn .2s ease}
-.ic-intro{font-size:13px;color:var(--muted);line-height:1.5;background:var(--tint1);border:1.5px solid #bbf7d0;border-radius:12px;padding:12px 14px}
+.ic-intro{font-size:13px;color:var(--muted);line-height:1.5;background:var(--tint1);border:1.5px solid var(--green-pale);border-radius:12px;padding:12px 14px}
+/* Landing de 2 vías (Solicitar / Administrador) */
+.ic-land-btn{display:flex;align-items:center;gap:13px;width:100%;text-align:left;font-family:inherit;background:var(--card);border:1.5px solid var(--border);border-radius:15px;padding:16px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s,box-shadow .2s,border-color .15s}
+.ic-land-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(15,68,53,.14);border-color:var(--green-light)}
+.ic-land-btn:active{transform:scale(.99)}
+.ic-land-ico{width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;box-shadow:0 4px 11px -2px rgba(15,68,53,.4),inset 0 1.5px 0 rgba(255,255,255,.35)}
+.ic-land-btn.admin .ic-land-ico{background:linear-gradient(135deg,#0a3b2c,#1e6b54)}
+.ic-land-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ic-land-tx b{font-size:15.5px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif}
+.ic-land-tx span{font-size:12px;color:var(--muted);line-height:1.4}
+.ic-land-arrow{color:var(--green-forest);font-size:20px;font-weight:700;flex-shrink:0}
+/* Cabecera de modo dentro de la lista */
+.ic-modehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ic-mode-pill{font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:999px;background:var(--tint1);color:var(--green-forest);border:1.5px solid var(--green-pale)}
+.ic-mode-pill.admin{background:#fff7ed;color:#b45309;border-color:#fed7aa}
 .ic-newbtn{background:linear-gradient(135deg,var(--green-deep),var(--green-forest));color:#fff;border:none;border-radius:13px;padding:14px 16px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 16px -3px rgba(15,68,53,.4);transition:transform .12s,box-shadow .2s}
 .ic-newbtn:hover{transform:translateY(-1px);box-shadow:0 8px 20px -3px rgba(15,68,53,.46)}
 .ic-newbtn:active{transform:scale(.98)}
@@ -1608,6 +1622,14 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
+      <button type="button" class="mod-item" onclick="openIcModule()">
+        <div class="mod-item-ico">✉️</div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Interconsultas <span id="icModBadge" style="display:none;font-size:10px;background:#dc2626;color:#fff;padding:2px 7px;border-radius:9px;font-weight:700"></span></div>
+          <div class="mod-item-desc">Solicita evaluación del Servicio de Anestesiología: dolor, preanestésica, procedimientos</div>
+        </div>
+        <div class="mod-item-arrow">›</div>
+      </button>
       <button type="button" class="mod-item" onclick="openAgendamientoModule()">
         <div class="mod-item-ico">📅</div>
         <div class="mod-item-body">
@@ -1640,6 +1662,21 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
   </div>
 </div>
 
+<!-- INTERCONSULTAS (módulo propio, oculto hasta abrirse desde el selector de módulo) -->
+<div id="icScreen" class="guias-screen hidden">
+  <div class="guias-head">
+    <button type="button" class="back-btn" onclick="icBack()">‹ Volver</button>
+    <div class="logo"><img src="icon-192.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div style="flex:1;min-width:0">
+      <h1>Interconsultas</h1>
+      <div class="guias-sub" id="icHeadSub">Servicio de Anestesiología</div>
+    </div>
+  </div>
+  <div class="guias-body">
+    <div id="icModuleBody"></div>
+  </div>
+</div>
+
 <!-- PORTAL PREANESTÉSICO (oculto hasta que se abra desde el selector de módulo) -->
 <div id="guiasScreen" class="guias-screen hidden">
   <div class="guias-head">
@@ -1667,12 +1704,6 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
       <div id="gpPortalHome">
         <div class="gp-hint">Explora las secciones del Portal:</div>
         <div class="gp-portal-grid">
-          <button type="button" class="gp-portal-card gpc-ic" onclick="openGuiasSection('gpInterconsulta')">
-            <span class="gp-card-badge" id="icCardBadge" style="display:none">0</span>
-            <div class="gp-portal-card-ico"><span>✉️</span></div>
-            <h3 class="gp-portal-card-title">Interconsultas</h3>
-            <p class="gp-portal-card-desc">Solicita interconsultas del Servicio de Anestesiología: dolor, evaluación preanestésica, evaluación para procedimiento y otras.</p>
-          </button>
           <button type="button" class="gp-portal-card gpc1" onclick="openGuiasSection('gpConsulta')">
             <div class="gp-portal-card-ico"><span>📅</span></div>
             <h3 class="gp-portal-card-title">Consulta Presencial</h3>
@@ -1723,17 +1754,6 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 
       <div class="mini-credit" id="gpHomeCredit">© 2026 Appnesthesia · Dr. Fernando Rojas — Todos los derechos reservados<br><a href="privacy.html" target="_blank" rel="noopener">Privacidad</a> · <a href="terms.html" target="_blank" rel="noopener">Términos</a></div>
       <!-- SUB-VISTAS: una activa a la vez (full content por sección) -->
-      <div id="gpInterconsulta" class="gp-section-view">
-        <div class="gp-section-view-head">
-          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
-          <div class="gp-section-view-titlewrap">
-            <div class="gp-section-view-ico">✉️</div>
-            <div class="gp-section-view-title">Interconsultas a Anestesiología <span id="icPendBadge" style="display:none;font-size:11px;background:var(--accent,#dc2626);color:#fff;padding:2px 8px;border-radius:9px;margin-left:4px;vertical-align:middle">0</span></div>
-          </div>
-        </div>
-        <div id="gpInterconsultaBody"></div>
-      </div>
-
       <div id="gpConsulta" class="gp-section-view">
         <div class="gp-section-view-head">
           <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>

@@ -4519,7 +4519,7 @@ const SEARCH_INDEX = [
   { ico:'🤖', label:'ARIA · Asistente IA', hint:'Pregunta en lenguaje natural', kw:'aria ia asistente inteligencia pregunta', go:()=>{ _searchCloseAll(); try{ openAiChat(); }catch(e){} } },
   { ico:'🗓️', label:'Agendamiento de procedimientos', hint:'Solicitar / visar', kw:'agendamiento agenda procedimiento solicitud sala resonancia picc', go:()=>{ _searchCloseAll(); try{ showModulesScreen(); setTimeout(()=>{ try{ openAgendamientoModule(); }catch(e){} },60); }catch(e){} } },
   { ico:'🩺', label:'Portal Preanestésico', hint:'Preparación del paciente', kw:'portal preanestesico preanestesia preparacion', go:()=>_goPortal(null) },
-  { ico:'✉️', label:'Interconsultas a Anestesiología', hint:'Portal Preanestésico', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>_goPortal('gpInterconsulta') },
+  { ico:'✉️', label:'Interconsultas a Anestesiología', hint:'Módulo · Solicitar / Administrar', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>{ _searchCloseAll(); try{ openIcModule(); }catch(e){} } },
   { ico:'🍽️', label:'Ayuno Preoperatorio', hint:'Portal Preanestésico', kw:'ayuno preoperatorio glp ozempic', go:()=>_goPortal('gpAyuno') },
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
@@ -5238,6 +5238,8 @@ function showModulesScreen(){
   // Mostrar
   const mods = document.getElementById('modulesScreen');
   if(mods) mods.classList.remove('hidden');
+  // Refrescar el badge de Interconsultas (cuántas nuevas sin ver) con la nube.
+  try{ updateIcBadges(); icSyncNow().then(()=>{ updateIcBadges(); }).catch(()=>{}); }catch(e){}
 }
 
 // Botón "Staff" del selector de módulo → abre el picker de usuarios existente.
@@ -5828,10 +5830,6 @@ function renderGuiasSearchResults(query){
 // ============================================================
 // Cada sección define: bodyId, render, hero (label + chips), y opcional calc {label, render}.
 const _GP_SECTIONS_META = {
-  gpInterconsulta: {
-    bodyId: 'gpInterconsultaBody',
-    render: () => openIcSection()
-  },
   gpConsulta: {
     bodyId: 'gpConsultaBody',
     render: () => renderGuiasConsultaPreanestesica(),
@@ -11060,20 +11058,14 @@ function _icNewUnseen(){ const seen = _icSeenTs(); return _icPendientes().filter
 
 // Badge numérico sobre la tarjeta del Portal (solo admin) + badge de pendientes
 // dentro del módulo. "Nuevas sin ver" se limpia al abrir el módulo.
+// Badge numérico (nuevas interconsultas sin ver) sobre el botón del módulo
+// en el selector de pantallas. Se limpia al abrir el módulo (icMarkSeen).
 function updateIcBadges(){
-  const isAdmin = !!(state && state.isAdmin);
-  const nuevas = isAdmin ? _icNewUnseen().length : 0;
-  const b = document.getElementById('icCardBadge');
-  if(b){
-    if(nuevas > 0){ b.textContent = nuevas > 99 ? '99+' : String(nuevas); b.style.display = 'flex'; }
-    else { b.style.display = 'none'; }
-  }
-  const hb = document.getElementById('icPendBadge');
-  if(hb){
-    const p = _icPendientes().length;
-    if(p > 0){ hb.textContent = p; hb.style.display = 'inline-flex'; }
-    else { hb.style.display = 'none'; }
-  }
+  const b = document.getElementById('icModBadge');
+  if(!b) return;
+  const n = _icNewUnseen().length;
+  if(n > 0){ b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'inline-block'; }
+  else { b.style.display = 'none'; }
 }
 
 // Chequeo periódico (solo admin): baja de la nube y avisa si hay nuevas.
@@ -11165,36 +11157,136 @@ function icDeleteRequest(id){
 }
 
 // ============================================================
-// INTERCONSULTAS · UI (se renderiza dentro del Portal Preanestésico)
+// INTERCONSULTAS · UI (módulo propio, pantalla #icScreen)
 // ============================================================
-const IC_UI = { view:'home', tab:'pendiente', calYear:0, calMonth:0, selectedDate:null, detailId:null };
+// admin = true solo tras desbloquear con el PIN de administrador (o si la
+// sesión principal ya es el usuario Administrador). Las acciones de gestión
+// (Realizada / Reabrir / Borrar) dependen de ESTE flag, no del estado global.
+const IC_UI = { view:'landing', tab:'pendiente', admin:false, calYear:0, calMonth:0, selectedDate:null, detailId:null };
 
-// Llamado por openGuiasSection('gpInterconsulta')
-function openIcSection(){
-  IC_UI.view = 'home';
+// Abre el módulo Interconsultas (overlay fullscreen, desde el selector de módulos).
+function openIcModule(){
+  const mod = document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
+  const g = document.getElementById('guiasScreen'); if(g) g.classList.add('hidden');
+  const s = document.getElementById('icScreen'); if(s) s.classList.remove('hidden');
+  IC_UI.view = 'landing';
+  IC_UI.admin = false;
   IC_UI.tab = 'pendiente';
   IC_UI.detailId = null;
   const t = new Date();
   IC_UI.calYear = t.getFullYear();
   IC_UI.calMonth = t.getMonth();
   IC_UI.selectedDate = null;
+  _icUpdateHeadSub();
+  renderIcModule();
+  // Refresco desde la nube (no bloquea la UI)
+  icSyncNow().then(()=>{
+    const sc = document.getElementById('icScreen');
+    if(sc && !sc.classList.contains('hidden')) renderIcModule();
+    updateIcBadges();
+  }).catch(()=>{});
+}
+
+// Volver desde Interconsultas al selector de módulos.
+function closeIcModule(){
+  const s = document.getElementById('icScreen'); if(s) s.classList.add('hidden');
+  showModulesScreen();
+}
+
+// Botón "‹ Volver" del header: navegación contextual.
+function icBack(){
+  if(IC_UI.view === 'cal' || IC_UI.view === 'detail'){ IC_UI.view = 'home'; renderIcModule(); return; }
+  if(IC_UI.view === 'form'){ IC_UI.view = 'cal'; renderIcModule(); return; }
+  if(IC_UI.view === 'home'){ icOpenLanding(); return; }
+  closeIcModule();
+}
+
+function icOpenLanding(){
+  IC_UI.view = 'landing';
+  IC_UI.admin = false;
+  IC_UI.detailId = null;
+  _icUpdateHeadSub();
+  renderIcModule();
+}
+
+// Vía solicitante (igual que la entrada actual: cualquiera puede pedir).
+function icEnterSolicitar(){
+  IC_UI.admin = false;
+  IC_UI.view = 'home';
+  IC_UI.tab = 'pendiente';
+  _icUpdateHeadSub();
   renderIcModule();
   icMarkSeen();
-  // Refresco desde la nube (no bloquea la UI)
-  icSyncNow().then(()=>{ renderIcModule(); updateIcBadges(); }).catch(()=>{});
+}
+
+// Vía administrador: requiere el PIN de administrador (mismo de la app).
+async function icEnterAdmin(){
+  // 1) Si la sesión principal YA es el usuario Administrador → entrar directo.
+  if(state && typeof ADMIN_USER_ID !== 'undefined' && state.currentUserId === ADMIN_USER_ID){
+    _icGrantAdmin(); return;
+  }
+  // 2) Si no hay PIN configurado, intentar bajarlo de la nube; si sigue sin haber, avisar.
+  if(typeof adminSetupNeeded === 'function' && adminSetupNeeded()){
+    try{ await _syncAdminPinFromCloud(); }catch(e){}
+  }
+  if(typeof adminSetupNeeded === 'function' && adminSetupNeeded()){
+    alert('Aún no hay un PIN de Administrador configurado.\n\nCréalo en la pantalla principal → Staff → Administrador (4 dígitos) y vuelve aquí.');
+    return;
+  }
+  // 3) Pedir el PIN in-place.
+  let ok = false;
+  try{ ok = await promptVerifyAdminPin(); }catch(e){ ok = false; }
+  if(!ok) return;
+  _icGrantAdmin();
+}
+function _icGrantAdmin(){
+  IC_UI.admin = true;
+  IC_UI.view = 'home';
+  IC_UI.tab = 'pendiente';
+  _icUpdateHeadSub();
+  renderIcModule();
+  icMarkSeen();
+}
+
+function _icUpdateHeadSub(){
+  const el = document.getElementById('icHeadSub');
+  if(!el) return;
+  if(IC_UI.view === 'landing') el.textContent = 'Servicio de Anestesiología';
+  else el.textContent = IC_UI.admin ? '🔒 Administrador · gestión' : '✉️ Solicitar interconsulta';
 }
 
 function renderIcModule(){
-  const body = document.getElementById('gpInterconsultaBody');
+  const body = document.getElementById('icModuleBody');
   if(!body) return;
   let html;
-  if(IC_UI.view === 'cal') html = _icRenderCal();
+  if(IC_UI.view === 'landing') html = _icRenderLanding();
+  else if(IC_UI.view === 'cal') html = _icRenderCal();
   else if(IC_UI.view === 'form') html = _icRenderForm();
   else if(IC_UI.view === 'detail') html = _icRenderDetail();
   else html = _icRenderHome();
   body.innerHTML = html;
-  const wrap = document.querySelector('#guiasScreen .guias-body');
+  _icUpdateHeadSub();
+  const wrap = document.querySelector('#icScreen .guias-body');
   if(wrap){ try{ wrap.scrollTo({top:0, behavior:'instant'}); }catch(e){ wrap.scrollTop = 0; } }
+}
+
+function _icRenderLanding(){
+  const pend = _icPendientes().length;
+  const adminSub = 'Anestesiología: revisar, marcar realizada y borrar' + (pend ? ` · ${pend} pendiente${pend>1?'s':''}` : '');
+  return `
+    <div class="ic-wrap">
+      <div class="ic-intro">Canal de interconsultas al <b>Servicio de Anestesiología</b>. Elige cómo quieres entrar.</div>
+      <button type="button" class="ic-land-btn" onclick="icEnterSolicitar()">
+        <div class="ic-land-ico">✉️</div>
+        <div class="ic-land-tx"><b>Solicitar interconsulta</b><span>Para unidades que piden evaluación · por día, datos anonimizados</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
+      <button type="button" class="ic-land-btn admin" onclick="icEnterAdmin()">
+        <div class="ic-land-ico">🔒</div>
+        <div class="ic-land-tx"><b>Administrador</b><span>${_icEsc(adminSub)}</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
+    </div>`;
 }
 
 function _icFmtFechaLarga(ds){
@@ -11208,12 +11300,23 @@ function _icPrioChip(v){
 }
 
 function _icRenderHome(){
-  const isAdmin = !!(state && state.isAdmin);
+  const isAdmin = !!IC_UI.admin;
   const pend = _icPendientes();
   const real = _icRealizadas();
   const list = IC_UI.tab === 'realizada' ? real : pend;
 
-  const intro = `
+  const modehead = `
+    <div class="ic-modehead">
+      <button type="button" class="ic-back" onclick="icOpenLanding()">‹ Inicio</button>
+      <span class="ic-mode-pill ${isAdmin?'admin':''}">${isAdmin?'🔒 Administrador':'✉️ Solicitar'}</span>
+    </div>`;
+
+  const intro = isAdmin ? `
+    <div class="ic-intro">
+      Gestión de interconsultas. Marca <b>Realizada</b> para archivarlas o <b>Borrar</b>
+      para liberar espacio. También puedes crear una nueva.
+    </div>
+    <button type="button" class="ic-newbtn" onclick="icGoNew()">+ Nueva interconsulta</button>` : `
     <div class="ic-intro">
       Envía una solicitud de interconsulta al Servicio de Anestesiología.
       Elige un <b>día</b> en el calendario (sin tomar hora). Los datos del paciente
@@ -11234,7 +11337,7 @@ function _icRenderHome(){
     cards = list.map(r => _icRenderCard(r, isAdmin)).join('');
   }
 
-  return `<div class="ic-wrap">${intro}${tabs}<div class="ic-list">${cards}</div></div>`;
+  return `<div class="ic-wrap">${modehead}${intro}${tabs}<div class="ic-list">${cards}</div></div>`;
 }
 
 function _icRenderCard(r, isAdmin){
@@ -11347,7 +11450,7 @@ function _icRenderForm(){
 function _icRenderDetail(){
   const r = icLoadData().find(x => x && x.id === IC_UI.detailId);
   if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button><div class="ic-empty"><span>❓</span>Interconsulta no encontrada.</div></div>`; }
-  const isAdmin = !!(state && state.isAdmin);
+  const isAdmin = !!IC_UI.admin;
   const tm = _icTipoMeta(r.tipo);
   const tipoLabel = r.tipo === 'otro' ? (r.tipoOtro || 'Otra') : tm.label;
   const realizada = r.estado === 'realizada';
@@ -11463,9 +11566,9 @@ async function icSubmitForm(ev){
   IC_UI.view='home'; IC_UI.tab='pendiente'; renderIcModule(); updateIcBadges();
 }
 
-// --- Acciones de administrador ---
+// --- Acciones de administrador (requieren haber entrado por la vía Administrador) ---
 async function icDoRealizada(id){
-  if(!(state && state.isAdmin)){ alert('Solo el administrador puede marcar una interconsulta como realizada.'); return; }
+  if(!IC_UI.admin){ alert('Entra por la vía "Administrador" para marcar interconsultas como realizadas.'); return; }
   const nota = prompt('Nota / indicación de la interconsulta (opcional):', '');
   if(nota === null) return; // canceló
   icMarkRealizada(id, (nota||'').trim());
@@ -11473,13 +11576,13 @@ async function icDoRealizada(id){
   try{ await _icSyncVerified(id, r => !!r && r.estado === 'realizada'); }catch(e){}
 }
 async function icDoReabrir(id){
-  if(!(state && state.isAdmin)){ alert('Solo el administrador puede reabrir.'); return; }
+  if(!IC_UI.admin){ alert('Entra por la vía "Administrador" para reabrir.'); return; }
   icReabrir(id);
   renderIcModule(); updateIcBadges();
   try{ await _icSyncVerified(id, r => !!r && r.estado === 'pendiente'); }catch(e){}
 }
 async function icDoDelete(id){
-  if(!(state && state.isAdmin)){ alert('Solo el administrador puede borrar interconsultas.'); return; }
+  if(!IC_UI.admin){ alert('Entra por la vía "Administrador" para borrar interconsultas.'); return; }
   if(!confirm('¿Borrar esta interconsulta definitivamente?\n\nSe quita de la lista para liberar espacio. No se puede deshacer.')) return;
   icDeleteRequest(id);
   IC_UI.view='home'; renderIcModule(); updateIcBadges();
