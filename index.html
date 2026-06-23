@@ -633,8 +633,11 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .gp-section.open .gp-section-body{display:block}
 
 /* ===== Portal Preanestésico · Grid estilo Staff (icon top + título + descripción) ===== */
-.gp-portal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
-@media(max-width:520px){.gp-portal-grid{grid-template-columns:1fr;gap:12px}}
+.gp-portal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:14px}
+/* Como el Portal de Staff: se mantienen DOS columnas separadas también en móvil
+   (antes colapsaban a una sola, quedando uno debajo del otro). */
+@media(max-width:520px){.gp-portal-grid{grid-template-columns:repeat(2,1fr);gap:12px}}
+@media(max-width:330px){.gp-portal-grid{grid-template-columns:1fr;gap:12px}}
 .gp-portal-card{background:var(--card);border-radius:16px;padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .2s,border-color .15s;border:1px solid var(--border);text-align:left;font-family:inherit;color:inherit;font-size:inherit;position:relative;overflow:hidden;display:block}
 .gp-portal-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green-deep),var(--green-sage));opacity:.85}
 .gp-portal-card:hover{box-shadow:0 6px 20px rgba(30,107,84,.14);border-color:var(--green-light);transform:translateY(-1px)}
@@ -668,6 +671,87 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .gp-portal-card.gpc4 .gp-portal-card-ico{background:linear-gradient(135deg,#3d8a76 0%,#4ca085 55%,#6ab19a 100%)}
 .gp-portal-card.gpc5 .gp-portal-card-ico{background:linear-gradient(135deg,#1e6b54 0%,#2e8b6b 55%,#5fb49c 100%)}
 .gp-portal-card.gpc6 .gp-portal-card-ico{background:linear-gradient(135deg,#0a3b2c 0%,#1e6b54 55%,#2e8b6b 100%)}
+.gp-portal-card.gpc-ic .gp-portal-card-ico{background:linear-gradient(135deg,#0e7490 0%,#0ea5e9 55%,#38bdf8 100%)}
+.gp-portal-card.gpc-ic::before{background:linear-gradient(90deg,#0e7490,#38bdf8)}
+/* Badge numérico (nuevas interconsultas sin ver) sobre la tarjeta del Portal */
+.gp-card-badge{position:absolute;top:9px;right:9px;min-width:22px;height:22px;padding:0 6px;background:#dc2626;color:#fff;border-radius:11px;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 2px 6px rgba(220,38,38,.45);z-index:3;animation:notifPop .25s ease}
+
+/* ===== Módulo Interconsultas (dentro del Portal Preanestésico) ===== */
+.ic-wrap{display:flex;flex-direction:column;gap:12px;animation:gpFadeIn .2s ease}
+.ic-intro{font-size:13px;color:var(--muted);line-height:1.5;background:var(--tint1);border:1.5px solid #bbf7d0;border-radius:12px;padding:12px 14px}
+.ic-newbtn{background:linear-gradient(135deg,#0e7490,#0ea5e9);color:#fff;border:none;border-radius:13px;padding:14px 16px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 6px 16px -3px rgba(14,165,233,.45);transition:transform .12s,box-shadow .2s}
+.ic-newbtn:hover{transform:translateY(-1px);box-shadow:0 8px 20px -3px rgba(14,165,233,.5)}
+.ic-newbtn:active{transform:scale(.98)}
+.ic-tabs{display:flex;gap:8px;background:var(--tint1);padding:5px;border-radius:12px;border:1px solid var(--border)}
+.ic-tab{flex:1;background:transparent;border:none;border-radius:9px;padding:9px 8px;font-family:inherit;font-weight:700;font-size:13.5px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,color .15s}
+.ic-tab.active{background:var(--card);color:var(--primary-dark);box-shadow:0 1px 4px rgba(15,68,53,.12)}
+.ic-tabn{background:var(--green-light);color:#fff;border-radius:9px;font-size:11px;font-weight:800;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.ic-tab.active .ic-tabn{background:var(--green-forest)}
+.ic-list{display:flex;flex-direction:column;gap:11px}
+.ic-empty{text-align:center;color:var(--muted);font-size:13.5px;padding:30px 14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.ic-empty span{font-size:30px}
+.ic-card{background:var(--card);border:1.5px solid var(--border);border-left-width:5px;border-radius:13px;padding:13px 14px;cursor:pointer;transition:box-shadow .2s,transform .12s;position:relative}
+.ic-card:hover{box-shadow:0 5px 16px rgba(15,68,53,.1)}
+.ic-card:active{transform:scale(.99)}
+.ic-card.prio-urgente{border-left-color:#dc2626}
+.ic-card.prio-preferente{border-left-color:#d97706}
+.ic-card.prio-rutinaria{border-left-color:#0d9488}
+.ic-card.done{opacity:.72;border-left-color:#94a3b8;background:var(--tint1)}
+.ic-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.ic-card-tipo{font-weight:800;font-size:13.5px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif}
+.ic-chip{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:.2px}
+.ic-chip.done{background:#e2e8f0;color:#475569}
+.ic-card-body{display:flex;flex-direction:column;gap:2px}
+.ic-card-line{font-size:12.5px;color:var(--text);line-height:1.45}
+.ic-card-foot{margin-top:8px;font-size:12px;color:var(--muted)}
+.ic-card-acts{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+.ic-mini-btn{flex:1;min-width:104px;background:var(--card);border:1.5px solid var(--border);border-radius:9px;padding:8px 6px;font-family:inherit;font-weight:700;font-size:12.5px;color:var(--primary-dark);cursor:pointer;transition:background .15s,border-color .15s}
+.ic-mini-btn.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.ic-mini-btn.ok:hover{background:#d1fae5}
+.ic-mini-btn.danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.ic-mini-btn.danger:hover{background:#fee2e2}
+.ic-back{align-self:flex-start;background:var(--card);border:1.5px solid var(--border);color:var(--primary-dark);font-family:inherit;font-weight:700;font-size:13px;padding:8px 13px;border-radius:10px;cursor:pointer}
+.ic-back:hover{background:var(--tint1)}
+/* Calendario */
+.ic-cal-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ic-cal-nav{width:38px;height:38px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--primary-dark);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ic-cal-nav:hover{background:var(--tint1)}
+.ic-cal-title{font-weight:800;font-size:16px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif}
+.ic-cal-hint{font-size:12.5px;color:var(--muted);text-align:center}
+.ic-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.ic-cal-dow{text-align:center;font-size:11px;font-weight:800;color:var(--muted);padding:4px 0}
+.ic-cal-cell{aspect-ratio:1;border:1.5px solid var(--border);border-radius:10px;background:var(--card);color:var(--primary-dark);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+button.ic-cal-cell:hover{background:#e0f2fe;border-color:#7dd3fc}
+.ic-cal-cell.empty{border:none;background:transparent;cursor:default}
+.ic-cal-cell.past{color:#cbd5e1;background:var(--tint1);border-color:transparent;cursor:default}
+.ic-cal-cell.today{border-color:#0ea5e9;box-shadow:inset 0 0 0 1px #0ea5e9}
+/* Formulario */
+.ic-form-date{font-size:13.5px;color:var(--primary-dark);background:#e0f2fe;border:1.5px solid #7dd3fc;border-radius:11px;padding:11px 13px}
+.ic-form{display:flex;flex-direction:column;gap:11px}
+.ic-fsec{font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--green-forest);margin-top:6px;border-bottom:1.5px solid var(--border);padding-bottom:5px}
+.ic-frow{display:flex;gap:10px}
+.ic-frow .ic-field.sm{flex:0 0 34%}
+.ic-frow .ic-field{flex:1;min-width:0}
+.ic-field{display:flex;flex-direction:column;gap:5px}
+.ic-field>span{font-size:12px;font-weight:700;color:var(--primary-dark)}
+.ic-field input,.ic-field select,.ic-field textarea{font-family:inherit;font-size:14px;padding:10px 11px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);width:100%;box-sizing:border-box}
+.ic-field textarea{resize:vertical}
+.ic-field input:focus,.ic-field select:focus,.ic-field textarea:focus{outline:none;border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+.ic-form-actions{display:flex;gap:10px;margin-top:8px}
+.ic-btn-pri{flex:1;background:linear-gradient(135deg,#0e7490,#0ea5e9);color:#fff;border:none;border-radius:12px;padding:14px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.ic-btn-pri:disabled{opacity:.6;cursor:default}
+.ic-btn-sec{flex:0 0 38%;background:var(--card);border:1.5px solid var(--border);color:var(--primary-dark);border-radius:12px;padding:14px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer}
+.ic-btn-danger{flex:0 0 38%;background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:12px;padding:14px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer}
+/* Detalle */
+.ic-d-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ic-d-tipo{font-weight:800;font-size:16px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif}
+.ic-d-card{background:var(--card);border:1.5px solid var(--border);border-radius:13px;overflow:hidden}
+.ic-d-row{display:flex;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border)}
+.ic-d-row:last-child{border-bottom:none}
+.ic-d-lbl{flex:0 0 38%;font-size:12px;font-weight:700;color:var(--muted)}
+.ic-d-val{flex:1;font-size:13.5px;color:var(--text);line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.ic-d-actions{display:flex;gap:10px}
+.ic-d-actions .ic-btn-pri{flex:1}
 
 /* ===== Portal Preanestésico · Sub-vista de sección (full content) ===== */
 .gp-section-view{display:none;animation:gpFadeIn .2s ease}
@@ -1583,9 +1667,15 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
       <div id="gpPortalHome">
         <div class="gp-hint">Explora las secciones del Portal:</div>
         <div class="gp-portal-grid">
+          <button type="button" class="gp-portal-card gpc-ic" onclick="openGuiasSection('gpInterconsulta')">
+            <span class="gp-card-badge" id="icCardBadge" style="display:none">0</span>
+            <div class="gp-portal-card-ico"><span>📨</span></div>
+            <h3 class="gp-portal-card-title">Interconsultas</h3>
+            <p class="gp-portal-card-desc">Solicita evaluación de Anestesiología · por día, pendientes y realizadas</p>
+          </button>
           <button type="button" class="gp-portal-card gpc1" onclick="openGuiasSection('gpConsulta')">
             <div class="gp-portal-card-ico"><span>📅</span></div>
-            <h3 class="gp-portal-card-title">Consulta Preanestésica</h3>
+            <h3 class="gp-portal-card-title">Evaluación Preanestésica</h3>
             <p class="gp-portal-card-desc">Martes, Miércoles y Viernes 08:00–14:00 hrs · Solicite sobrecupo con el botón de abajo</p>
           </button>
           <button type="button" class="gp-portal-card gpc2" onclick="openGuiasSection('gpAyuno')">
@@ -1633,6 +1723,17 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 
       <div class="mini-credit" id="gpHomeCredit">© 2026 Appnesthesia · Dr. Fernando Rojas — Todos los derechos reservados<br><a href="privacy.html" target="_blank" rel="noopener">Privacidad</a> · <a href="terms.html" target="_blank" rel="noopener">Términos</a></div>
       <!-- SUB-VISTAS: una activa a la vez (full content por sección) -->
+      <div id="gpInterconsulta" class="gp-section-view">
+        <div class="gp-section-view-head">
+          <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>
+          <div class="gp-section-view-titlewrap">
+            <div class="gp-section-view-ico">📨</div>
+            <div class="gp-section-view-title">Interconsultas a Anestesiología <span id="icPendBadge" style="display:none;font-size:11px;background:var(--accent,#dc2626);color:#fff;padding:2px 8px;border-radius:9px;margin-left:4px;vertical-align:middle">0</span></div>
+          </div>
+        </div>
+        <div id="gpInterconsultaBody"></div>
+      </div>
+
       <div id="gpConsulta" class="gp-section-view">
         <div class="gp-section-view-head">
           <button type="button" class="gp-section-view-back" onclick="closeGuiasSection()"><span class="gp-back-chev">‹</span> Volver</button>

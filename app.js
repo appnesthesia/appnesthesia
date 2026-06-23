@@ -911,6 +911,7 @@ async function toggleAdmin(){
   save(); updateAdminUI();
   toast && toast('Modo admin activado');
   try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
+  try{ icCheckNewForAdmin(); startIcAdminPolling(); }catch(e){}
 }
 function updateAdminUI(){
   const btn = document.getElementById('adminBtn');
@@ -4518,6 +4519,7 @@ const SEARCH_INDEX = [
   { ico:'🤖', label:'ARIA · Asistente IA', hint:'Pregunta en lenguaje natural', kw:'aria ia asistente inteligencia pregunta', go:()=>{ _searchCloseAll(); try{ openAiChat(); }catch(e){} } },
   { ico:'🗓️', label:'Agendamiento de procedimientos', hint:'Solicitar / visar', kw:'agendamiento agenda procedimiento solicitud sala resonancia picc', go:()=>{ _searchCloseAll(); try{ showModulesScreen(); setTimeout(()=>{ try{ openAgendamientoModule(); }catch(e){} },60); }catch(e){} } },
   { ico:'🩺', label:'Portal Preanestésico', hint:'Preparación del paciente', kw:'portal preanestesico preanestesia preparacion', go:()=>_goPortal(null) },
+  { ico:'📨', label:'Interconsultas a Anestesiología', hint:'Portal Preanestésico', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>_goPortal('gpInterconsulta') },
   { ico:'🍽️', label:'Ayuno Preoperatorio', hint:'Portal Preanestésico', kw:'ayuno preoperatorio glp ozempic', go:()=>_goPortal('gpAyuno') },
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
@@ -5826,6 +5828,10 @@ function renderGuiasSearchResults(query){
 // ============================================================
 // Cada sección define: bodyId, render, hero (label + chips), y opcional calc {label, render}.
 const _GP_SECTIONS_META = {
+  gpInterconsulta: {
+    bodyId: 'gpInterconsultaBody',
+    render: () => openIcSection()
+  },
   gpConsulta: {
     bodyId: 'gpConsultaBody',
     render: () => renderGuiasConsultaPreanestesica(),
@@ -7615,6 +7621,8 @@ function updateAgendAdminNotice(){
       b.style.display = 'none';
     }
   }
+  // Piggyback: refresca también los badges de Interconsultas (mismo ciclo de vida).
+  try{ updateIcBadges(); }catch(e){}
 }
 // Chequeo periódico: baja las solicitudes de la nube y avisa si hay nuevas.
 // Se llama al iniciar sesión admin y cada 3 minutos mientras la app esté abierta.
@@ -10601,6 +10609,8 @@ async function selectAdmin(){
     try{ checkReminders(); }catch(e){}
     // Aviso de nuevas solicitudes de agendamiento (solo admin) + polling
     try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
+    // Aviso de nuevas interconsultas (solo admin) + polling
+    try{ icCheckNewForAdmin(); startIcAdminPolling(); }catch(e){}
     // Pedir permiso de notificaciones para los avisos de solicitudes
     try{
       if(notifSupported() && Notification.permission === 'default'){
@@ -10889,6 +10899,591 @@ function setPref(k,v){
   u.preferences[k] = v;
   save();
   toast && toast('Preferencia guardada');
+}
+
+// ============================================================
+// MÓDULO: INTERCONSULTAS A ANESTESIOLOGÍA
+// ============================================================
+// Vive dentro del Portal Preanestésico. Permite a las unidades enviar una
+// solicitud de interconsulta (evaluación preanestésica, dolor, evaluación para
+// procedimiento, etc.) eligiendo un DÍA en el calendario (sin tomar hora).
+// Los datos del paciente van anonimizados (solo iniciales). Cada envío queda en
+// la nube (canal "<inst>-ic", fusionado por id en el backend) y notifica al
+// administrador (push + badge). El admin puede marcar "Realizada" (se archiva)
+// o "Borrar" (tombstone, libera espacio). Mismo modelo robusto de
+// verify-and-retry del agendamiento: una interconsulta NUNCA se pierde.
+// ============================================================
+const IC_DATA_LS_KEY = 'appx_ic_data_v1';
+const IC_SEEN_LS_KEY = 'appx_ic_seen_v1';
+
+const IC_TIPOS = [
+  { v:'preanestesica', label:'Evaluación preanestésica',          ico:'🩺' },
+  { v:'procedimiento', label:'Evaluación para procedimiento',     ico:'🛌' },
+  { v:'dolor',         label:'Interconsulta de dolor',            ico:'💢' },
+  { v:'otro',          label:'Otra (especificar)',                ico:'📋' }
+];
+const IC_PRIOS = [
+  { v:'rutinaria',  label:'Rutinaria',  color:'#0d9488', bg:'#ccfbf1' },
+  { v:'preferente', label:'Preferente', color:'#b45309', bg:'#fef3c7' },
+  { v:'urgente',    label:'Urgente',    color:'#b91c1c', bg:'#fee2e2' }
+];
+const IC_PRIO_RANK = { urgente:0, preferente:1, rutinaria:2 };
+
+function _icEsc(s){ return _gpEsc(s); }
+function _icRemoteId(){ return INSTITUTION ? (INSTITUTION.id + '-ic') : null; }
+function _icGenId(){ return 'ic_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function _icReqTs(r){ return r ? (r.updatedAt || r.realizadaAt || r.createdAt || 0) : 0; }
+function _icTipoMeta(v){ return IC_TIPOS.find(t=>t.v===v) || IC_TIPOS[IC_TIPOS.length-1]; }
+function _icPrioMeta(v){ return IC_PRIOS.find(p=>p.v===v) || IC_PRIOS[0]; }
+
+// --- Privacidad: garantiza que NUNCA se persista nombre completo ni RUT.
+//     Solo iniciales del paciente. Idempotente. ---
+function _icSanitizeReq(r){
+  if(!r || typeof r !== 'object' || r.deleted) return r;
+  let ch = false;
+  if(r.rut){ delete r.rut; ch = true; }
+  if(r.nombre){ delete r.nombre; ch = true; }
+  if(r.paciente){ delete r.paciente; ch = true; }
+  if(typeof r.iniciales === 'string'){
+    const t = r.iniciales.trim();
+    if(/\s/.test(t) && t.length > 5){
+      const ini = t.split(/[\s.]+/).filter(Boolean).slice(0,3).map(p=>(p[0]||'').toUpperCase()).filter(Boolean).join('.') + '.';
+      if(ini && ini !== r.iniciales){ r.iniciales = ini; ch = true; }
+    } else if(t.length > 6){
+      r.iniciales = t.slice(0,6).toUpperCase(); ch = true;
+    }
+  }
+  if(ch) r.updatedAt = Date.now();
+  return r;
+}
+function _icSanitizeAll(arr){ if(Array.isArray(arr)) arr.forEach(_icSanitizeReq); return arr; }
+
+function icLoadData(){
+  try{
+    const a = JSON.parse(localStorage.getItem(IC_DATA_LS_KEY) || '[]');
+    return _icSanitizeAll(Array.isArray(a) ? a : []);
+  }catch(e){ return []; }
+}
+function icSaveData(arr){
+  try{ localStorage.setItem(IC_DATA_LS_KEY, JSON.stringify(Array.isArray(arr)?arr:[])); }
+  catch(e){ console.error('No se pudo guardar interconsultas', e); }
+}
+
+// Fusiona dos arreglos planos de solicitudes por id (gana el más nuevo).
+// Conserva tombstones (deleted:true) hasta 120 días.
+function _icMergeData(remoteArr, localArr){
+  const map = {};
+  const cutoff = Date.now() - 120*24*3600*1000;
+  (Array.isArray(remoteArr)?remoteArr:[]).forEach(r=>{ if(r && r.id) map[r.id] = r; });
+  (Array.isArray(localArr)?localArr:[]).forEach(r=>{
+    if(!r || !r.id) return;
+    const ex = map[r.id];
+    if(!ex || _icReqTs(r) >= _icReqTs(ex)) map[r.id] = r;
+  });
+  return Object.values(map).filter(r => !(r && r.deleted && (r.deletedAt||0) < cutoff));
+}
+
+// --- Sync: lee la nube, fusiona, guarda local y sube el resultado. ---
+let _icSyncing = false, _icSyncTimer = null;
+async function icSyncNow(){
+  const base = getBackendURL();
+  const id = _icRemoteId();
+  if(!base || !id || _icSyncing) return false;
+  _icSyncing = true;
+  try{
+    let remoteArr = [];
+    try{
+      const r = await fetch(base + '/api/state/' + encodeURIComponent(id), _stateGetOpts());
+      if(!r.ok) return false;
+      const j = await r.json();
+      if(j && !j._empty && Array.isArray(j.data)) remoteArr = j.data;
+    }catch(e){ return false; }
+    _icSanitizeAll(remoteArr);
+    const merged = _icSanitizeAll(_icMergeData(remoteArr, icLoadData()));
+    icSaveData(merged);
+    const token = getBackendToken();
+    if(!token) return false;
+    try{
+      const pr = await fetch(base + '/api/state/' + encodeURIComponent(id), {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ data: merged })
+      });
+      return pr.ok;
+    }catch(e){ return false; }
+  }catch(e){ console.warn('icSyncNow', e); return false; }
+  finally{ _icSyncing = false; }
+}
+function icScheduleSync(onDone){
+  if(_icSyncTimer) clearTimeout(_icSyncTimer);
+  _icSyncTimer = setTimeout(()=>{ _icSyncTimer = null; icSyncNow().then(()=>{ if(typeof onDone==='function') onDone(); }); }, 800);
+}
+
+// Empuja Y verifica que la solicitud quedó (o desapareció) en la nube.
+// predicate(req|undefined) → true cuando el estado deseado está confirmado.
+async function _icSyncVerified(reqId, predicate, tries){
+  tries = tries || 5;
+  for(let i=0;i<tries;i++){
+    let ok = false;
+    try{ ok = await icSyncNow(); }catch(e){ ok = false; }
+    if(ok){
+      try{
+        const base = getBackendURL(); const id = _icRemoteId();
+        const r = await fetch(base + '/api/state/' + encodeURIComponent(id) + '?cb=' + Date.now(), _stateGetOpts());
+        if(r.ok){
+          const j = await r.json();
+          const arr = (j && Array.isArray(j.data)) ? j.data : [];
+          const found = arr.find(x => x && x.id === reqId);
+          if(predicate(found)) return true;
+        }
+      }catch(e){}
+    }
+    await new Promise(res=>setTimeout(res, 250 + Math.floor(Math.random()*600)));
+  }
+  return false;
+}
+
+// --- Consultas en memoria ---
+function _icAll(){ return icLoadData().filter(r => r && !r.deleted); }
+function _icPendientes(){
+  return _icAll().filter(r => r.estado !== 'realizada').sort((a,b)=>
+    (IC_PRIO_RANK[a.prioridad]??2) - (IC_PRIO_RANK[b.prioridad]??2)
+    || String(a.fecha||'').localeCompare(String(b.fecha||''))
+    || (a.createdAt||0) - (b.createdAt||0));
+}
+function _icRealizadas(){
+  return _icAll().filter(r => r.estado === 'realizada').sort((a,b)=>(b.realizadaAt||0)-(a.realizadaAt||0));
+}
+function _icSeenTs(){ try{ return parseInt(localStorage.getItem(IC_SEEN_LS_KEY)||'0',10) || 0; }catch(e){ return 0; } }
+function icMarkSeen(){ try{ localStorage.setItem(IC_SEEN_LS_KEY, String(Date.now())); }catch(e){} try{ updateIcBadges(); }catch(e){} }
+function _icNewUnseen(){ const seen = _icSeenTs(); return _icPendientes().filter(r => (r.createdAt||0) > seen); }
+
+// Badge numérico sobre la tarjeta del Portal (solo admin) + badge de pendientes
+// dentro del módulo. "Nuevas sin ver" se limpia al abrir el módulo.
+function updateIcBadges(){
+  const isAdmin = !!(state && state.isAdmin);
+  const nuevas = isAdmin ? _icNewUnseen().length : 0;
+  const b = document.getElementById('icCardBadge');
+  if(b){
+    if(nuevas > 0){ b.textContent = nuevas > 99 ? '99+' : String(nuevas); b.style.display = 'flex'; }
+    else { b.style.display = 'none'; }
+  }
+  const hb = document.getElementById('icPendBadge');
+  if(hb){
+    const p = _icPendientes().length;
+    if(p > 0){ hb.textContent = p; hb.style.display = 'inline-flex'; }
+    else { hb.style.display = 'none'; }
+  }
+}
+
+// Chequeo periódico (solo admin): baja de la nube y avisa si hay nuevas.
+let _icAdminPollTimer = null;
+async function icCheckNewForAdmin(){
+  if(!state || !state.isAdmin) return;
+  await icSyncNow();
+  const nuevas = _icNewUnseen();
+  updateIcBadges();
+  if(nuevas.length > 0){
+    const tag = 'ic-new-' + nuevas.length;
+    if(window._icLastNotifTag !== tag){
+      window._icLastNotifTag = tag;
+      notify('🩺 Interconsultas',
+        nuevas.length === 1 ? 'Hay 1 nueva interconsulta pendiente' : 'Hay ' + nuevas.length + ' nuevas interconsultas pendientes',
+        'ic-new');
+    }
+  }
+}
+function startIcAdminPolling(){
+  if(_icAdminPollTimer) clearInterval(_icAdminPollTimer);
+  _icAdminPollTimer = setInterval(()=>{ try{ icCheckNewForAdmin(); }catch(e){} }, 3*60*1000);
+}
+
+// --- Mutaciones ---
+function _icCurrentUserName(){
+  try{ const u = (typeof getCurrentUser==='function') ? getCurrentUser() : null; if(u && u.name) return u.name; }catch(e){}
+  return 'Anestesia';
+}
+function icCreateRequest(f){
+  const arr = icLoadData();
+  const now = Date.now();
+  const req = {
+    id: _icGenId(),
+    fecha: f.fecha || '',
+    iniciales: f.iniciales || '',
+    edad: f.edad || '',
+    pieza: f.pieza || '',
+    unidad: f.unidad || '',
+    anexo: f.anexo || '',
+    solicitante: f.solicitante || '',
+    solicitanteRol: f.solicitanteRol || 'medico',
+    tipo: f.tipo || 'preanestesica',
+    tipoOtro: f.tipoOtro || '',
+    prioridad: f.prioridad || 'rutinaria',
+    motivo: f.motivo || '',
+    dgCirugia: f.dgCirugia || '',
+    comorbilidades: f.comorbilidades || '',
+    examenes: f.examenes || '',
+    medicamentos: f.medicamentos || '',
+    estado: 'pendiente',
+    createdAt: now, updatedAt: now,
+    realizadaAt: null, realizadaBy: null, notaRealizada: ''
+  };
+  _icSanitizeReq(req);
+  arr.push(req);
+  icSaveData(arr);
+  return req;
+}
+function icMarkRealizada(id, nota){
+  const arr = icLoadData();
+  const r = arr.find(x => x && x.id === id);
+  if(!r) return null;
+  r.estado = 'realizada';
+  r.realizadaAt = Date.now();
+  r.realizadaBy = _icCurrentUserName();
+  r.notaRealizada = nota || '';
+  r.updatedAt = Date.now();
+  icSaveData(arr);
+  return r;
+}
+function icReabrir(id){
+  const arr = icLoadData();
+  const r = arr.find(x => x && x.id === id);
+  if(!r) return null;
+  r.estado = 'pendiente';
+  r.realizadaAt = null; r.realizadaBy = null;
+  r.updatedAt = Date.now();
+  icSaveData(arr);
+  return r;
+}
+function icDeleteRequest(id){
+  const arr = icLoadData();
+  const r = arr.find(x => x && x.id === id);
+  if(!r) return false;
+  r.deleted = true; r.deletedAt = Date.now(); r.updatedAt = Date.now();
+  icSaveData(arr);
+  return true;
+}
+
+// ============================================================
+// INTERCONSULTAS · UI (se renderiza dentro del Portal Preanestésico)
+// ============================================================
+const IC_UI = { view:'home', tab:'pendiente', calYear:0, calMonth:0, selectedDate:null, detailId:null };
+
+// Llamado por openGuiasSection('gpInterconsulta')
+function openIcSection(){
+  IC_UI.view = 'home';
+  IC_UI.tab = 'pendiente';
+  IC_UI.detailId = null;
+  const t = new Date();
+  IC_UI.calYear = t.getFullYear();
+  IC_UI.calMonth = t.getMonth();
+  IC_UI.selectedDate = null;
+  renderIcModule();
+  icMarkSeen();
+  // Refresco desde la nube (no bloquea la UI)
+  icSyncNow().then(()=>{ renderIcModule(); updateIcBadges(); }).catch(()=>{});
+}
+
+function renderIcModule(){
+  const body = document.getElementById('gpInterconsultaBody');
+  if(!body) return;
+  let html;
+  if(IC_UI.view === 'cal') html = _icRenderCal();
+  else if(IC_UI.view === 'form') html = _icRenderForm();
+  else if(IC_UI.view === 'detail') html = _icRenderDetail();
+  else html = _icRenderHome();
+  body.innerHTML = html;
+  const wrap = document.querySelector('#guiasScreen .guias-body');
+  if(wrap){ try{ wrap.scrollTo({top:0, behavior:'instant'}); }catch(e){ wrap.scrollTop = 0; } }
+}
+
+function _icFmtFechaLarga(ds){
+  if(!ds) return '';
+  try{ const d = _agendParseDateStr(ds); return `${_agendDiasES[d.getDay()]} ${d.getDate()} de ${_agendMesesES[d.getMonth()]}`; }
+  catch(e){ return ds; }
+}
+function _icPrioChip(v){
+  const m = _icPrioMeta(v);
+  return `<span class="ic-chip" style="background:${m.bg};color:${m.color}">${_icEsc(m.label)}</span>`;
+}
+
+function _icRenderHome(){
+  const isAdmin = !!(state && state.isAdmin);
+  const pend = _icPendientes();
+  const real = _icRealizadas();
+  const list = IC_UI.tab === 'realizada' ? real : pend;
+
+  const intro = `
+    <div class="ic-intro">
+      Envía una solicitud de interconsulta al Servicio de Anestesiología.
+      Elige un <b>día</b> en el calendario (sin tomar hora). Los datos del paciente
+      van <b>anonimizados</b> (solo iniciales).
+    </div>
+    <button type="button" class="ic-newbtn" onclick="icGoNew()">+ Nueva interconsulta</button>`;
+
+  const tabs = `
+    <div class="ic-tabs">
+      <button type="button" class="ic-tab ${IC_UI.tab==='pendiente'?'active':''}" onclick="icSetTab('pendiente')">Pendientes <span class="ic-tabn">${pend.length}</span></button>
+      <button type="button" class="ic-tab ${IC_UI.tab==='realizada'?'active':''}" onclick="icSetTab('realizada')">Realizadas <span class="ic-tabn">${real.length}</span></button>
+    </div>`;
+
+  let cards = '';
+  if(list.length === 0){
+    cards = `<div class="ic-empty"><span>${IC_UI.tab==='realizada'?'🗂️':'📭'}</span>${IC_UI.tab==='realizada'?'Aún no hay interconsultas archivadas.':'No hay interconsultas pendientes.'}</div>`;
+  } else {
+    cards = list.map(r => _icRenderCard(r, isAdmin)).join('');
+  }
+
+  return `<div class="ic-wrap">${intro}${tabs}<div class="ic-list">${cards}</div></div>`;
+}
+
+function _icRenderCard(r, isAdmin){
+  const tm = _icTipoMeta(r.tipo);
+  const tipoLabel = r.tipo === 'otro' ? (r.tipoOtro || 'Otra') : tm.label;
+  const realizada = r.estado === 'realizada';
+  const lineas = [];
+  lineas.push(`<b>${_icEsc(r.iniciales||'—')}</b>${r.edad?` · ${_icEsc(String(r.edad))} a`:''}${r.pieza?` · 🛏 ${_icEsc(r.pieza)}`:''}`);
+  if(r.unidad) lineas.push(`🏥 ${_icEsc(r.unidad)}${r.anexo?` · ☎ ${_icEsc(r.anexo)}`:''}`);
+  if(r.solicitante) lineas.push(`${r.solicitanteRol==='enfermera'?'👩‍⚕️ Enf.':'🩺 Dr(a).'} ${_icEsc(r.solicitante)}`);
+  const meta = lineas.map(l=>`<div class="ic-card-line">${l}</div>`).join('');
+  const acts = isAdmin ? `
+    <div class="ic-card-acts" onclick="event.stopPropagation()">
+      ${realizada
+        ? `<button type="button" class="ic-mini-btn" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`
+        : `<button type="button" class="ic-mini-btn ok" onclick="icDoRealizada('${r.id}')">✓ Realizada</button>`}
+      <button type="button" class="ic-mini-btn danger" onclick="icDoDelete('${r.id}')">🗑 Borrar</button>
+    </div>` : '';
+  return `
+    <div class="ic-card ${realizada?'done':''} prio-${r.prioridad}" onclick="icOpenDetail('${r.id}')">
+      <div class="ic-card-top">
+        <div class="ic-card-tipo">${tm.ico} ${_icEsc(tipoLabel)}</div>
+        ${realizada ? '<span class="ic-chip done">✓ Realizada</span>' : _icPrioChip(r.prioridad)}
+      </div>
+      <div class="ic-card-body">${meta}</div>
+      <div class="ic-card-foot">📅 Día preferido: <b>${_icFmtFechaLarga(r.fecha)}</b></div>
+      ${acts}
+    </div>`;
+}
+
+function _icRenderCal(){
+  const y = IC_UI.calYear, mo = IC_UI.calMonth;
+  const first = new Date(y, mo, 1);
+  const startOffset = (first.getDay() + 6) % 7; // lunes = 0
+  const daysInMonth = new Date(y, mo+1, 0).getDate();
+  const todayStr = _agendTodayStr();
+  let cells = '';
+  const dows = ['L','M','M','J','V','S','D'];
+  let head = dows.map(d=>`<div class="ic-cal-dow">${d}</div>`).join('');
+  for(let i=0;i<startOffset;i++) cells += `<div class="ic-cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = _agendDateStr(y, mo, d);
+    const past = ds < todayStr;
+    const isToday = ds === todayStr;
+    cells += past
+      ? `<div class="ic-cal-cell past">${d}</div>`
+      : `<button type="button" class="ic-cal-cell ${isToday?'today':''}" onclick="icPickDay('${ds}')">${d}</button>`;
+  }
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button>
+      <div class="ic-cal-head">
+        <button type="button" class="ic-cal-nav" onclick="icCalMove(-1)">‹</button>
+        <div class="ic-cal-title">${_agendMesesES[mo].charAt(0).toUpperCase()+_agendMesesES[mo].slice(1)} ${y}</div>
+        <button type="button" class="ic-cal-nav" onclick="icCalMove(1)">›</button>
+      </div>
+      <div class="ic-cal-hint">Elige el día para el que solicitas la interconsulta</div>
+      <div class="ic-cal-grid">${head}${cells}</div>
+    </div>`;
+}
+
+function _icRenderForm(){
+  const ds = IC_UI.selectedDate;
+  const tipoOpts = IC_TIPOS.map(t=>`<option value="${t.v}">${t.ico} ${t.label}</option>`).join('');
+  const prioOpts = IC_PRIOS.map(p=>`<option value="${p.v}">${p.label}</option>`).join('');
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="icGoNew()">‹ Cambiar día</button>
+      <div class="ic-form-date">📅 Solicitud para el <b>${_icFmtFechaLarga(ds)}</b></div>
+      <form class="ic-form" onsubmit="icSubmitForm(event)">
+        <div class="ic-fsec">Datos del paciente (anonimizado)</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Iniciales *</span><input id="icfIniciales" type="text" maxlength="6" placeholder="Ej: J.P.R." autocomplete="off" required></label>
+          <label class="ic-field sm"><span>Edad</span><input id="icfEdad" type="text" inputmode="numeric" maxlength="3" placeholder="años"></label>
+        </div>
+        <label class="ic-field"><span>Pieza / Ubicación *</span><input id="icfPieza" type="text" placeholder="Ej: MQ 303 · UPC 478 · Urgencia" required></label>
+
+        <div class="ic-fsec">Unidad solicitante</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Unidad / Servicio *</span><input id="icfUnidad" type="text" placeholder="Ej: Medicina Interna" required></label>
+          <label class="ic-field sm"><span>Anexo</span><input id="icfAnexo" type="text" placeholder="Ej: 2456"></label>
+        </div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Solicitante *</span><input id="icfSolicitante" type="text" placeholder="Nombre del médico o enfermera" required></label>
+          <label class="ic-field sm"><span>Rol</span><select id="icfRol"><option value="medico">Médico</option><option value="enfermera">Enfermera</option></select></label>
+        </div>
+
+        <div class="ic-fsec">Interconsulta</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Tipo *</span><select id="icfTipo" onchange="icOnTipoChange()">${tipoOpts}</select></label>
+          <label class="ic-field sm"><span>Prioridad</span><select id="icfPrio">${prioOpts}</select></label>
+        </div>
+        <label class="ic-field" id="icfOtroWrap" style="display:none"><span>Especificar tipo</span><input id="icfTipoOtro" type="text" placeholder="Describe la interconsulta"></label>
+        <label class="ic-field"><span>Motivo / pregunta clínica</span><textarea id="icfMotivo" rows="2" placeholder="¿Qué se necesita evaluar o resolver?"></textarea></label>
+        <label class="ic-field"><span>Diagnóstico / cirugía propuesta</span><input id="icfDg" type="text" placeholder="Ej: Colelitiasis · Colecistectomía electiva"></label>
+
+        <div class="ic-fsec">Antecedentes</div>
+        <label class="ic-field"><span>Comorbilidades</span><textarea id="icfComorb" rows="2" placeholder="Ej: HTA, DM2, EPOC…"></textarea></label>
+        <label class="ic-field"><span>Exámenes relevantes</span><textarea id="icfExam" rows="2" placeholder="Ej: Hb 9.8, Crea 1.6, ECG…"></textarea></label>
+        <label class="ic-field"><span>Medicamentos en uso</span><textarea id="icfMed" rows="2" placeholder="Ej: Losartán, Metformina, AAS…"></textarea></label>
+
+        <div class="ic-form-actions">
+          <button type="button" class="ic-btn-sec" onclick="icGoHome()">Cancelar</button>
+          <button type="submit" id="icSubmitBtn" class="ic-btn-pri">Enviar interconsulta</button>
+        </div>
+      </form>
+    </div>`;
+}
+
+function _icRenderDetail(){
+  const r = icLoadData().find(x => x && x.id === IC_UI.detailId);
+  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button><div class="ic-empty"><span>❓</span>Interconsulta no encontrada.</div></div>`; }
+  const isAdmin = !!(state && state.isAdmin);
+  const tm = _icTipoMeta(r.tipo);
+  const tipoLabel = r.tipo === 'otro' ? (r.tipoOtro || 'Otra') : tm.label;
+  const realizada = r.estado === 'realizada';
+  const row = (lbl, val) => val ? `<div class="ic-d-row"><div class="ic-d-lbl">${lbl}</div><div class="ic-d-val">${_icEsc(String(val))}</div></div>` : '';
+  const created = r.createdAt ? new Date(r.createdAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const realAt = r.realizadaAt ? new Date(r.realizadaAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const acts = isAdmin ? `
+    <div class="ic-d-actions">
+      ${realizada
+        ? `<button type="button" class="ic-btn-sec" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`
+        : `<button type="button" class="ic-btn-pri" onclick="icDoRealizada('${r.id}')">✓ Marcar realizada</button>`}
+      <button type="button" class="ic-btn-danger" onclick="icDoDelete('${r.id}')">🗑 Borrar</button>
+    </div>` : '';
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button>
+      <div class="ic-d-head">
+        <div class="ic-d-tipo">${tm.ico} ${_icEsc(tipoLabel)}</div>
+        ${realizada ? '<span class="ic-chip done">✓ Realizada</span>' : _icPrioChip(r.prioridad)}
+      </div>
+      <div class="ic-d-card">
+        ${row('Día preferido', _icFmtFechaLarga(r.fecha))}
+        ${row('Iniciales', r.iniciales)}
+        ${row('Edad', r.edad ? r.edad+' años' : '')}
+        ${row('Pieza / Ubicación', r.pieza)}
+        ${row('Unidad solicitante', r.unidad)}
+        ${row('Anexo', r.anexo)}
+        ${row('Solicitante', (r.solicitanteRol==='enfermera'?'Enf. ':'Dr(a). ') + (r.solicitante||''))}
+        ${row('Motivo / pregunta', r.motivo)}
+        ${row('Dg / cirugía', r.dgCirugia)}
+        ${row('Comorbilidades', r.comorbilidades)}
+        ${row('Exámenes', r.examenes)}
+        ${row('Medicamentos', r.medicamentos)}
+        ${row('Enviada', created)}
+        ${realizada ? row('Realizada', realAt + (r.realizadaBy?(' · '+r.realizadaBy):'')) : ''}
+        ${realizada ? row('Nota', r.notaRealizada) : ''}
+      </div>
+      ${acts}
+    </div>`;
+}
+
+// --- Acciones de navegación ---
+function icGoHome(){ IC_UI.view='home'; renderIcModule(); }
+function icGoNew(){
+  const t = new Date();
+  if(!IC_UI.calYear){ IC_UI.calYear = t.getFullYear(); IC_UI.calMonth = t.getMonth(); }
+  IC_UI.view='cal'; renderIcModule();
+}
+function icSetTab(tab){ IC_UI.tab = tab; renderIcModule(); }
+function icCalMove(delta){
+  let m = IC_UI.calMonth + delta, y = IC_UI.calYear;
+  if(m < 0){ m = 11; y--; } else if(m > 11){ m = 0; y++; }
+  IC_UI.calYear = y; IC_UI.calMonth = m; renderIcModule();
+}
+function icPickDay(ds){ IC_UI.selectedDate = ds; IC_UI.view='form'; renderIcModule(); setTimeout(()=>{ const e=document.getElementById('icfIniciales'); if(e) e.focus(); },60); }
+function icOpenDetail(id){ IC_UI.detailId = id; IC_UI.view='detail'; renderIcModule(); }
+function icOnTipoChange(){
+  const sel = document.getElementById('icfTipo');
+  const w = document.getElementById('icfOtroWrap');
+  if(sel && w) w.style.display = (sel.value === 'otro') ? '' : 'none';
+}
+
+// --- Envío del formulario ---
+async function icSubmitForm(ev){
+  if(ev && ev.preventDefault) ev.preventDefault();
+  const g = id => document.getElementById(id);
+  const iniciales = (g('icfIniciales').value||'').trim();
+  const pieza = (g('icfPieza').value||'').trim();
+  const unidad = (g('icfUnidad').value||'').trim();
+  const solicitante = (g('icfSolicitante').value||'').trim();
+  const tipo = g('icfTipo').value;
+  const tipoOtro = (g('icfTipoOtro').value||'').trim();
+  if(!iniciales){ alert('Ingresa las iniciales del paciente.'); return; }
+  if(!pieza){ alert('Ingresa la pieza / ubicación del paciente.'); return; }
+  if(!unidad){ alert('Ingresa la unidad solicitante.'); return; }
+  if(!solicitante){ alert('Ingresa el nombre del solicitante (médico o enfermera).'); return; }
+  if(tipo === 'otro' && !tipoOtro){ alert('Especifica el tipo de interconsulta.'); return; }
+  if(!IC_UI.selectedDate){ alert('Elige un día en el calendario.'); return; }
+
+  const req = icCreateRequest({
+    fecha: IC_UI.selectedDate,
+    iniciales,
+    edad: (g('icfEdad').value||'').trim(),
+    pieza, unidad,
+    anexo: (g('icfAnexo').value||'').trim(),
+    solicitante,
+    solicitanteRol: g('icfRol').value,
+    tipo, tipoOtro,
+    prioridad: g('icfPrio').value,
+    motivo: (g('icfMotivo').value||'').trim(),
+    dgCirugia: (g('icfDg').value||'').trim(),
+    comorbilidades: (g('icfComorb').value||'').trim(),
+    examenes: (g('icfExam').value||'').trim(),
+    medicamentos: (g('icfMed').value||'').trim()
+  });
+
+  const base = getBackendURL();
+  if(!base){
+    alert('Interconsulta guardada en este dispositivo.\n\n(No hay conexión a la nube configurada — avisa directamente al Servicio de Anestesia.)');
+    IC_UI.view='home'; IC_UI.tab='pendiente'; renderIcModule(); updateIcBadges();
+    return;
+  }
+  const btn = g('icSubmitBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+  let ok = false;
+  try{ ok = await _icSyncVerified(req.id, r => !!r && !r.deleted); }catch(e){ ok = false; }
+  if(ok){
+    try{ notifyAdminsPush('interconsulta'); }catch(e){}
+    alert('✅ Interconsulta enviada y registrada en la nube. El Servicio de Anestesia será notificado.');
+  } else {
+    alert('⚠️ La interconsulta quedó guardada en este dispositivo, pero NO se pudo registrar en la nube (revisa tu conexión).\n\nSe reintentará al reabrir. Si es urgente, avisa directamente al Servicio de Anestesia.');
+  }
+  IC_UI.view='home'; IC_UI.tab='pendiente'; renderIcModule(); updateIcBadges();
+}
+
+// --- Acciones de administrador ---
+async function icDoRealizada(id){
+  if(!(state && state.isAdmin)){ alert('Solo el administrador puede marcar una interconsulta como realizada.'); return; }
+  const nota = prompt('Nota / indicación de la interconsulta (opcional):', '');
+  if(nota === null) return; // canceló
+  icMarkRealizada(id, (nota||'').trim());
+  renderIcModule(); updateIcBadges();
+  try{ await _icSyncVerified(id, r => !!r && r.estado === 'realizada'); }catch(e){}
+}
+async function icDoReabrir(id){
+  if(!(state && state.isAdmin)){ alert('Solo el administrador puede reabrir.'); return; }
+  icReabrir(id);
+  renderIcModule(); updateIcBadges();
+  try{ await _icSyncVerified(id, r => !!r && r.estado === 'pendiente'); }catch(e){}
+}
+async function icDoDelete(id){
+  if(!(state && state.isAdmin)){ alert('Solo el administrador puede borrar interconsultas.'); return; }
+  if(!confirm('¿Borrar esta interconsulta definitivamente?\n\nSe quita de la lista para liberar espacio. No se puede deshacer.')) return;
+  icDeleteRequest(id);
+  IC_UI.view='home'; renderIcModule(); updateIcBadges();
+  try{ await _icSyncVerified(id, r => !r || r.deleted === true); }catch(e){}
 }
 
 async function boot(){
