@@ -546,12 +546,11 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .mod-item:not(.disabled):hover{border-color:var(--green-forest);background:linear-gradient(180deg,var(--tint1),var(--tint1));transform:translateY(-1px);box-shadow:0 6px 14px -3px rgba(15,68,53,.18)}
 .mod-item:not(.disabled):active{transform:scale(.985)}
 .mod-item.disabled{cursor:not-allowed;opacity:.55;background:#f3f5f4;border-color:#dde8e3;filter:grayscale(.4)}
-.mod-item-ico{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f4435,#2e8b6b);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 3px 8px rgba(15,68,53,.25),inset 0 1px 0 rgba(255,255,255,.3)}
+.mod-item-ico{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1e6b54,#3d9b78);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 3px 8px rgba(15,68,53,.25),inset 0 1px 0 rgba(255,255,255,.3)}
+.mod-item-ico svg{display:block}
+/* En modo oscuro, verdes un poco más claros para que los símbolos resalten. */
+html[data-theme="dark"] .mod-item-ico{background:linear-gradient(135deg,#268063,#46ad84)}
 .mod-item.disabled .mod-item-ico{background:linear-gradient(135deg,#9aa6a1,#7d8a85);box-shadow:none}
-/* Variante clara y sobria: para íconos cuyo símbolo (fonendoscopio, persona) es
-   gris/oscuro y no se ve bien sobre el verde. Fondo claro fijo (igual en claro y
-   oscuro) con un borde verde tenue para mantener la línea de marca. */
-.mod-item-ico.mi-light{background:linear-gradient(135deg,#ffffff,#e2f0e9);color:var(--green-deep);border:1px solid rgba(15,68,53,.14);box-shadow:0 3px 8px rgba(15,68,53,.16),inset 0 1px 0 rgba(255,255,255,.75)}
 .mod-item-body{flex:1;min-width:0}
 .mod-item-name{font-weight:700;color:var(--primary-dark);font-size:15px;line-height:1.3;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .mod-item.disabled .mod-item-name{color:#5a6b66}
@@ -1619,7 +1618,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
     <p class="mod-card-sub">Elige el módulo de la app</p>
     <div class="mod-list">
       <button type="button" class="mod-item" onclick="openStaffModule()">
-        <div class="mod-item-ico mi-light">🧑‍⚕️</div>
+        <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg"><path d="M4.6 22c0-3.6 3.3-5.4 7.4-5.4S19.4 18.4 19.4 22z" fill="#ffffff"/><path d="M12 16.6l-2.2 1.2L12 21l2.2-3.2z" fill="#cdd9e2"/><path d="M9.5 17.2c-1.9.4-3.1 1.6-3.1 3.4v.5" fill="none" stroke="#3d8a76" stroke-width="1"/><circle cx="6.4" cy="21.2" r="1" fill="#3d8a76"/><rect x="10.3" y="13.2" width="3.4" height="3" rx="1.4" fill="#e3a877"/><circle cx="12" cy="9" r="4.9" fill="#f0bd90"/><path d="M7.2 8.6c0 3.7 2 6.2 4.8 6.2s4.8-2.5 4.8-6.2c-.9.9-2.1 1.3-3.2 1.3h-3.2c-1.1 0-2.3-.4-3.2-1.3z" fill="#1c1c1c"/><path d="M6.9 9.1C6.6 5.5 8.9 3.3 12 3.3s5.4 2.2 5.1 5.8c-.5-2-1.4-3.1-2.4-3.5-.8.6-2 .8-2.7.8s-1.9-.2-2.7-.8C8.3 6 7.4 7.1 6.9 9.1z" fill="#1c1c1c"/><circle cx="10.1" cy="7.8" r=".62" fill="#2b2118"/><circle cx="13.9" cy="7.8" r=".62" fill="#2b2118"/></svg></div>
         <div class="mod-item-body">
           <div class="mod-item-name">Staff</div>
           <div class="mod-item-desc">Acceso para los anestesiólogos del servicio</div>
@@ -1643,7 +1642,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
         <div class="mod-item-arrow">›</div>
       </button>
       <button type="button" class="mod-item" onclick="openGuiasModule()">
-        <div class="mod-item-ico mi-light">🩺</div>
+        <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M6 4.2v3.6a4 4 0 0 0 8 0V4.2"/><path d="M10 11.8v2a6 6 0 0 0 6 6 3 3 0 0 0 3-3v-2"/><circle cx="19" cy="12.8" r="2"/><circle cx="6" cy="4" r="1"/><circle cx="14" cy="4" r="1"/></svg></div>
         <div class="mod-item-body">
           <div class="mod-item-name">Portal Preanestésico</div>
           <div class="mod-item-desc">Prepara a tu paciente: consulta, fármacos, ayuno, exámenes, riesgo CV</div>
