@@ -569,6 +569,11 @@ html[data-theme="dark"] .mod-item-ico{background:linear-gradient(135deg,#268063,
 .guias-head .back-btn:hover{background:rgba(255,255,255,.25)}
 .guias-head .logo{width:34px;height:34px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.2);flex-shrink:0}
 .guias-head .logo img{width:100%;height:100%;object-fit:cover}
+/* El logo de cada cabecera es un botón de "Volver al inicio". */
+.guias-head .logo,.agend-head .logo,header.top .logo{cursor:pointer;transition:transform .12s ease,box-shadow .15s ease,filter .15s ease}
+.guias-head .logo:hover,.agend-head .logo:hover,header.top .logo:hover{transform:scale(1.06);box-shadow:0 0 0 3px rgba(255,255,255,.35)}
+.guias-head .logo:active,.agend-head .logo:active,header.top .logo:active{transform:scale(.92)}
+.guias-head .logo:focus-visible,.agend-head .logo:focus-visible,header.top .logo:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.6)}
 .agend-head .logo{width:34px;height:34px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.2);flex-shrink:0}
 .agend-head .logo img{width:100%;height:100%;object-fit:cover;display:block}
 .guias-head h1{font-size:16px;font-weight:600;margin:0;line-height:1.15}
@@ -1669,7 +1674,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 <div id="icScreen" class="guias-screen hidden">
   <div class="guias-head">
     <button type="button" class="back-btn" onclick="icBack()">‹ Volver</button>
-    <div class="logo"><img src="icon-192.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div class="logo" role="button" tabindex="0" title="Volver al inicio" aria-label="Volver al inicio" onclick="goToInicio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToInicio();}"><img src="icon-192.png?v=39" alt="Volver al inicio" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
     <div style="flex:1;min-width:0">
       <h1>Interconsultas</h1>
       <div class="guias-sub" id="icHeadSub">Servicio de Anestesiología</div>
@@ -1684,7 +1689,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 <div id="guiasScreen" class="guias-screen hidden">
   <div class="guias-head">
     <button type="button" class="back-btn" onclick="guiasBack()">‹ Volver</button>
-    <div class="logo"><img src="icon-192.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div class="logo" role="button" tabindex="0" title="Volver al inicio" aria-label="Volver al inicio" onclick="goToInicio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToInicio();}"><img src="icon-192.png?v=39" alt="Volver al inicio" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
     <div style="flex:1;min-width:0">
       <h1>Portal Preanestésico</h1>
       <div class="guias-sub">Prepara a tu paciente</div>
@@ -1851,7 +1856,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 <div id="agendScreen" class="agend-screen hidden">
   <div class="agend-head">
     <button type="button" class="back-btn" onclick="agendBack()">‹ Volver</button>
-    <div class="logo"><img src="icon-192.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div class="logo" role="button" tabindex="0" title="Volver al inicio" aria-label="Volver al inicio" onclick="goToInicio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToInicio();}"><img src="icon-192.png?v=39" alt="Volver al inicio" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
     <div style="flex:1;min-width:0">
       <h1 id="agendTitle">Agendamiento</h1>
       <div id="agendSub" class="agend-sub"></div>
@@ -2129,7 +2134,7 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 
 <header class="top">
   <button class="back" id="backBtn" onclick="showHome()">‹</button>
-  <div class="logo"><img src="icon-192.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+  <div class="logo" role="button" tabindex="0" title="Volver al inicio" aria-label="Volver al inicio" onclick="goToInicio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToInicio();}"><img src="icon-192.png?v=39" alt="Volver al inicio" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
   <h1 id="hdrTitle">Appnesthesia</h1>
   <div id="syncStatus" class="sync-status" style="display:none" onclick="promptBackendToken()" title="Estado de sincronización con backend"></div>
   <button type="button" class="aria-btn ai-entry-btn" onclick="openAiChat()" title="ARIA · Asistente IA de Appnesthesia"><img src="logo-aria.png?v=49" alt="ARIA"/></button>

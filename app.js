@@ -5242,6 +5242,21 @@ function showModulesScreen(){
   try{ updateIcBadges(); icSyncNow().then(()=>{ updateIcBadges(); }).catch(()=>{}); }catch(e){}
 }
 
+// Botón de "Volver al inicio" (el logo de Appnesthesia arriba a la izquierda en
+// cada cabecera). Desde CUALQUIER módulo —Staff, Portal, Agendamiento,
+// Interconsultas— y desde cualquiera de sus sub-opciones, vuelve al selector de
+// módulos ("¿A dónde quieres entrar?"), que es el inicio de la app.
+function goToInicio(){
+  // Cerrar cualquier panel flotante (calculadoras, etc.)
+  try{ closeCalculadoras && closeCalculadoras(); }catch(e){}
+  // Ocultar los overlays de módulo si estuvieran abiertos
+  try{ const g  = document.getElementById('guiasScreen');  if(g)  g.classList.add('hidden'); }catch(e){}
+  try{ const ic = document.getElementById('icScreen');     if(ic) ic.classList.add('hidden'); }catch(e){}
+  try{ const ag = document.getElementById('agendScreen');  if(ag) ag.classList.add('hidden'); }catch(e){}
+  // Ir siempre al selector de módulos (el inicio).
+  try{ showModulesScreen(); }catch(e){}
+}
+
 // Botón "Staff" del selector de módulo → abre el picker de usuarios existente.
 function openStaffModule(){
   const mods = document.getElementById('modulesScreen');
