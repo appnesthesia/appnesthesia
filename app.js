@@ -5044,6 +5044,26 @@ window.addEventListener('load', ()=>{ try{ applyTheme(); }catch(e){} try{ applyF
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
+    // ¿Ya había un SW controlando? (si no, es la primera visita y el
+    // controllerchange inicial NO debe recargar)
+    const _hadController = !!navigator.serviceWorker.controller;
+    let _swAutoReloaded = false;
+    // AUTO-ACTUALIZACIÓN (jul 2026): cuando el SW nuevo toma control
+    // (skipWaiting es automático en sw.js), recargamos una vez para que el
+    // código nuevo quede activo de inmediato, sin depender de que la persona
+    // toque el banner. Si está a mitad de algo (modal o PIN abiertos), solo
+    // mostramos el aviso.
+    try{
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(!_hadController || _swAutoReloaded) return;
+        _swAutoReloaded = true;
+        const modalOpen = document.querySelector('#modal.open');
+        const pinEl = document.getElementById('pinOverlay');
+        const pinOpen = pinEl && !pinEl.classList.contains('hidden');
+        if(modalOpen || pinOpen){ showUpdateBanner(); return; }
+        location.reload();
+      });
+    }catch(e){}
     navigator.serviceWorker.register('sw.js').then(reg=>{
       if(!reg) return;
       // Detectar una actualización del service worker (= versión nueva)
@@ -5179,6 +5199,14 @@ async function selectInstitution(id){
         showHome();
         try{ updateEventBadge(); }catch(e){}
         try{ checkReminders(); }catch(e){}
+        // FIX jul 2026: al restaurar una sesión de ADMIN también hay que
+        // retomar el polling de solicitudes; antes solo arrancaba en el login
+        // admin o al alternar el modo, y los badges de Agendamiento e
+        // Interconsultas quedaban en cero hasta re-entrar al modo admin.
+        if(state.isAdmin){
+          try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
+          try{ icCheckNewForAdmin(); startIcAdminPolling(); }catch(e){}
+        }
         return;
       } else {
         state.currentUserId = null;
@@ -10678,6 +10706,8 @@ async function selectUser(userId){
   state.currentUserId = userId;
   state.isAdmin = false; // siempre arranca en modo usuario
   logActivity('login', 'Inicio de sesión');
+  // Auto-reparación silenciosa: garantiza que el PIN de esta persona esté en la nube
+  try{ _ensureMyPinInCloud(u); }catch(e){}
   save();
   hideUserPicker();
   updateInstitutionUI();
@@ -10943,6 +10973,24 @@ function _factFmtDate(iso){
   try{ return new Date(iso).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso||''; }
 }
 
+// Auto-reparación: si mi PIN existe en este dispositivo pero falta (o difiere)
+// en la nube —p. ej. un envío antiguo del staff lo pisó con null—, lo re-sube.
+// Mejor esfuerzo: nunca bloquea ni muestra errores.
+async function _ensureMyPinInCloud(user){
+  try{
+    if(!user || !user.pinHash || user.id === ADMIN_USER_ID) return;
+    if(!getBackendURL() || !INSTITUTION) return;
+    const r = await fetch(getBackendURL() + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
+    if(!r.ok) return;
+    const remote = await r.json();
+    if(!remote || remote._empty) return;
+    const me = (remote.staff||[]).find(s=>s && s.id===user.id);
+    if(!me || me.pinHash !== user.pinHash){
+      await _pushMyPinHash(user.id, user.pinHash);
+    }
+  }catch(e){}
+}
+
 // "Proof" para el servidor: el hash del PIN que este dispositivo ya tiene
 // guardado tras el login del usuario. No hace falta re-pedir el PIN: entrar
 // al perfil ya lo exigió. El PIN en texto plano jamás viaja al servidor.
@@ -10986,13 +11034,23 @@ async function billingViewMine(){
   const proof = _billingProofFromStored(u);
   if(!proof){ toast('Tu PIN aún no está registrado en este dispositivo. Cierra sesión y vuelve a entrar.'); return; }
   modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:14px">Consultando…</div>');
-  try{
+  const _fetchMine = async()=>{
     const resp = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/mine', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ staffId: u.id, proof })
     });
     const data = await resp.json().catch(()=>({}));
+    return { resp, data };
+  };
+  try{
+    let { resp, data } = await _fetchMine();
+    if(resp.status === 403 || resp.status === 401){
+      // El PIN de este dispositivo no está (o difiere) en la nube — un envío
+      // antiguo del staff pudo haberlo pisado. Re-subirlo y reintentar una vez.
+      try{ await _pushMyPinHash(u.id, u.pinHash); }catch(e){}
+      ({ resp, data } = await _fetchMine());
+    }
     if(!resp.ok){
       modal('<h3>💰 Monto a facturar</h3><div class="alert warn" style="font-size:13px">'+(data.error||'No se pudo consultar')+'</div>'
         +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
@@ -11269,7 +11327,9 @@ function _icNewUnseen(){ const seen = _icSeenTs(); return _icPendientes().filter
 function updateIcBadges(){
   const b = document.getElementById('icModBadge');
   if(!b) return;
-  const n = _icNewUnseen().length;
+  // Admin: muestra TODAS las pendientes (igual que el badge de Agendamiento).
+  // Resto: solo las nuevas sin ver (se limpia al abrir el módulo).
+  const n = (state && state.isAdmin) ? _icPendientes().length : _icNewUnseen().length;
   if(n > 0){ b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'inline-block'; }
   else { b.style.display = 'none'; }
 }
