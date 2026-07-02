@@ -10,7 +10,7 @@ const DEFAULT_STATE = {
   adminPinHash: null,         // PIN del administrador (configurado al primer ingreso)
   currentUserId: null,        // Usuario logueado actualmente (null = nadie)
   staff: [], // se llena desde configs/<id>.json en boot()
-  seedVersion: 8,
+  seedVersion: 9,
   shifts: [], // {date:'2026-05-13', staffId:'s1', type:'Mañana|Tarde|Guardia|Llamada', notes:''}
   exchanges: [],
   vacations: [], // {id, staffId, from, to, resolved:[{date,type,coveredBy}], pending:[{date,type}], notes, status:'pending|approved|rejected', adminNote, createdAt, decidedAt}
@@ -139,6 +139,14 @@ function load(){
         coberturaLlamada2: !!s.coberturaLlamada2,
       }));
       merged.seedVersion = 7;
+    }
+    // Migración v9: Canepa deja el servicio — quitarlo del staff y de sus registros
+    if((merged.seedVersion||1) < 9){
+      merged.staff = (merged.staff||[]).filter(s=>s.id!=='s_canepa' && (s.name||'').toLowerCase()!=='canepa');
+      merged.shifts = (merged.shifts||[]).filter(s=>s.staffId!=='s_canepa');
+      merged.exchanges = (merged.exchanges||[]).filter(e=>e.staffId!=='s_canepa');
+      merged.vacations = (merged.vacations||[]).filter(v=>v.staffId!=='s_canepa');
+      merged.seedVersion = 9;
     }
     return merged;
   }catch(e){return JSON.parse(JSON.stringify(DEFAULT_STATE));}
@@ -321,7 +329,9 @@ function _applyRemoteState(remote){
       if(k.startsWith('_')) return;
       // Caso especial: para 'staff' fusionamos preservando pinHash/preferences/activityLog locales
       if(k === 'staff' && Array.isArray(remote[k])){
-        state[k] = _mergeStaffPreservingDeviceLocal(remote[k], state[k]||[]);
+        // No reintroducir staff dado de baja si un dispositivo desactualizado lo empuja
+        const remoteStaff = remote[k].filter(s=>s && s.id!=='s_canepa' && (s.name||'').toLowerCase()!=='canepa');
+        state[k] = _mergeStaffPreservingDeviceLocal(remoteStaff, state[k]||[]);
         return;
       }
       // Caso especial: adminUser tiene preferences/activityLog que son del dispositivo
@@ -5065,7 +5075,7 @@ const LEGACY_LS_KEY = 'anestesia_app_v1';
 // Fallback inline (para apertura por file:// donde fetch está bloqueado)
 const INLINE_INSTITUTIONS_INDEX = JSON.parse('{"version":1,"lastUpdated":"2026-05-16","institutions":[{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago"}]}');
 const INLINE_INSTITUTION_CONFIGS = {
-  'andes': JSON.parse('{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago","welcome":"Servicio de Anestesiología","horarioEmbedURL":"https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc","staff":[{"id":"s_arriagada","name":"Arriagada","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_molina","name":"Molina","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_martinez","name":"Martinez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rodriguez","name":"Rodriguez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_guerrero","name":"Guerrero","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_vozmediano","name":"Vozmediano","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_fierro","name":"Fierro","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rojas","name":"Rojas","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_canepa","name":"Canepa","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_duran","name":"Duran","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_cardemil","name":"Cardemil","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_juliov","name":"Julio V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_gonzalez","name":"Gonzalez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larraguibel","name":"Larraguibel","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_barra","name":"Barra","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_biancardi","name":"Biancardi","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_coloma","name":"Coloma","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larosa","name":"La Rosa","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_silva","name":"Silva","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_jara","name":"Jara","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_gallardo","name":"Gallardo","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_hugov","name":"Hugo V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_camilar","name":"Camila R.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_stamaria","name":"Sta. María","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_leisewitz","name":"Leisewitz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_chuen","name":"Chuen","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_miranda","name":"Miranda","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_salazar","name":"Salazar","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_ricke","name":"Ricke","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_veliz","name":"Veliz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_astorga","name":"Astorga","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false}]}')
+  'andes': JSON.parse('{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago","welcome":"Servicio de Anestesiología","horarioEmbedURL":"https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc","staff":[{"id":"s_arriagada","name":"Arriagada","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_molina","name":"Molina","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_martinez","name":"Martinez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rodriguez","name":"Rodriguez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_guerrero","name":"Guerrero","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_vozmediano","name":"Vozmediano","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_fierro","name":"Fierro","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rojas","name":"Rojas","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_duran","name":"Duran","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_cardemil","name":"Cardemil","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_juliov","name":"Julio V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_gonzalez","name":"Gonzalez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larraguibel","name":"Larraguibel","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_barra","name":"Barra","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_biancardi","name":"Biancardi","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_coloma","name":"Coloma","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larosa","name":"La Rosa","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_silva","name":"Silva","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_jara","name":"Jara","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_gallardo","name":"Gallardo","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_hugov","name":"Hugo V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_camilar","name":"Camila R.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_stamaria","name":"Sta. María","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_leisewitz","name":"Leisewitz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_chuen","name":"Chuen","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_miranda","name":"Miranda","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_salazar","name":"Salazar","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_ricke","name":"Ricke","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_veliz","name":"Veliz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_astorga","name":"Astorga","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false}]}')
 };
 
 async function fetchJSON(url){
@@ -10903,6 +10913,9 @@ function renderMiPanel(){
     +'<input type="checkbox" '+(prefs.notifications?'checked':'')+' onchange="setPref(\'notifications\',this.checked)" style="width:20px;height:20px;accent-color:var(--primary)"></div>'
     +'<div class="mi-pref-row"><div><div class="mi-pref-label">Ocultar mi nombre en ofertas</div><div class="mi-pref-sub">Tu nombre aparece como "Anónimo" en ofertas abiertas.</div></div>'
     +'<input type="checkbox" '+(prefs.hideOthers?'checked':'')+' onchange="setPref(\'hideOthers\',this.checked)" style="width:20px;height:20px;accent-color:var(--primary)"></div>';
+
+  // Facturación (admin: administrar montos · staff: ver el propio)
+  try{ renderMiFacturacion(); }catch(e){}
 }
 
 function setPref(k,v){
@@ -10912,6 +10925,193 @@ function setPref(k,v){
   u.preferences[k] = v;
   save();
   toast && toast('Preferencia guardada');
+}
+
+// ============================================================
+// MÓDULO: FACTURACIÓN
+// ============================================================
+// Montos sensibles. NUNCA entran al estado compartido ni a localStorage:
+// viven SOLO en el backend (KV con expiración automática a 5 días).
+// - Admin: botón "Facturación" en Mi Panel (solo modo admin) → ingresa el
+//   listado de montos y publica (requiere el token del backend ya configurado).
+// - Staff: tarjeta "Monto a facturar" en su Mi Panel → confirma su PIN y la
+//   app consulta al servidor, que devuelve ÚNICAMENTE su monto.
+const BILLING_DAYS = 5;
+
+function _factFmt(n){ return '$' + (Number(n)||0).toLocaleString('es-CL'); }
+function _factFmtDate(iso){
+  try{ return new Date(iso).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso||''; }
+}
+
+// Deriva el "proof" (hash del PIN con la misma sal/iteraciones del pinHash
+// guardado). Es lo único que viaja al servidor: el PIN en texto plano jamás.
+async function _billingProof(pin, user){
+  const stored = user.pinHash || '';
+  if(stored.indexOf('pbkdf2$') === 0){
+    const p = stored.split('$');
+    return await _derivePIN(pin, user.id, _hexToBytes(p[2]), parseInt(p[1],10) || PIN_ITERATIONS);
+  }
+  return await hashPINLegacy(pin, user.id);
+}
+
+// --- Sección en Mi Panel (la llama renderMiPanel) ---
+function renderMiFacturacion(){
+  const title = document.getElementById('miFactTitle');
+  const box = document.getElementById('miFacturacion');
+  if(!title || !box) return;
+  const u = getCurrentUser();
+  const hasBackend = !!getBackendURL();
+  if(!u || !hasBackend){ title.style.display='none'; box.style.display='none'; return; }
+  title.style.display = '';
+  box.style.display = '';
+  if(state.isAdmin){
+    box.innerHTML = '<div class="mi-pref-row"><div><div class="mi-pref-label">Montos a facturar del servicio</div>'
+      +'<div class="mi-pref-sub">Publica el monto de cada persona. Visible solo para su titular (con PIN) durante '+BILLING_DAYS+' días; luego se borra del servidor automáticamente.</div></div>'
+      +'<button class="btn sm accent" onclick="openBillingAdmin()">Administrar</button></div>';
+  } else {
+    box.innerHTML = '<div class="mi-pref-row"><div><div class="mi-pref-label">Mi monto a facturar</div>'
+      +'<div class="mi-pref-sub">Información confidencial: se pide tu PIN y se consulta al servidor. Disponible '+BILLING_DAYS+' días desde su publicación.</div></div>'
+      +'<button class="btn sm secondary" onclick="billingViewMine()">Ver monto</button></div>';
+  }
+}
+
+// --- Vista del STAFF: confirmar PIN → consultar solo el monto propio ---
+function billingViewMine(){
+  const u = getCurrentUser();
+  if(!u || u.id === ADMIN_USER_ID) return;
+  if(!getBackendURL()){ toast('Sin conexión al backend'); return; }
+  openPinPad({
+    title:'💰 Monto a facturar',
+    sub:'Confirma tu PIN para ver tu monto',
+    maxLen:4,
+    onComplete: async(pin)=>{
+      try{
+        const ce = _pinCryptoUnavailableMsg();
+        if(ce){ pinError(ce); return; }
+        const r = await verifyPINHash(pin, u.id, u.pinHash);
+        if(!r.ok){ pinError('PIN incorrecto'); return; }
+        if(r.upgrade){ u.pinHash = r.upgrade; save(); _pushMyPinHash(u.id, u.pinHash).catch(()=>{}); }
+        const proof = await _billingProof(pin, u);
+        closePinPad();
+        modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:14px">Consultando…</div>');
+        const resp = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/mine', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ staffId: u.id, proof })
+        });
+        const data = await resp.json().catch(()=>({}));
+        if(!resp.ok){
+          modal('<h3>💰 Monto a facturar</h3><div class="alert warn" style="font-size:13px">'+(data.error||'No se pudo consultar')+'</div>'
+            +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+          return;
+        }
+        if(data.empty){
+          modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:18px"><span class="big" style="font-size:26px">📭</span>No hay ningún monto publicado para ti en este momento.</div>'
+            +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+          return;
+        }
+        modal('<h3>💰 Monto a facturar</h3>'
+          +'<div style="text-align:center;padding:16px 8px">'
+          +'<div style="font-size:32px;font-weight:800;color:var(--primary)">'+_factFmt(data.amount)+'</div>'
+          +(data.note?('<div style="font-size:13px;color:var(--muted);margin-top:6px">'+String(data.note).replace(/</g,'&lt;')+'</div>'):'')
+          +'<div style="font-size:12px;color:var(--muted);margin-top:10px">Publicado: '+_factFmtDate(data.publishedAt)+'<br>Disponible hasta: <b>'+_factFmtDate(data.expiresAt)+'</b> (luego se borra del servidor)</div>'
+          +'</div>'
+          +'<div class="alert info" style="font-size:12px">Este monto es visible únicamente para ti. No queda guardado en el dispositivo.</div>'
+          +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+      }catch(e){
+        pinError('Error: ' + (e && e.message ? e.message : e));
+      }
+    },
+    onCancel: ()=>{}
+  });
+}
+
+// --- Pantalla del ADMIN: listado de staff + monto por persona ---
+function openBillingAdmin(){
+  if(!state.isAdmin){ toast('Solo el administrador'); return; }
+  if(!getBackendURL() || !getBackendToken()){ toast('Configura el backend y su token primero'); return; }
+  const rows = (state.staff||[]).map(s=>
+    '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">'
+    +'<label style="flex:1;margin:0;font-size:13px">'+s.name+'</label>'
+    +'<input type="text" inputmode="numeric" class="fact-input" id="fact_'+s.id+'" data-staff="'+s.id+'" data-name="'+String(s.name).replace(/"/g,'&quot;')+'" placeholder="—" style="width:130px;text-align:right" />'
+    +'</div>'
+  ).join('');
+  modal('<h3>💰 Facturación</h3>'
+    +'<div class="alert info" style="font-size:12px">Ingresa el monto (CLP) de cada persona y publica. Cada uno verá <b>solo su monto</b> en su perfil, confirmando su PIN. Se borra del servidor automáticamente a los '+BILLING_DAYS+' días. Los que queden en blanco no se publican.</div>'
+    +'<div id="factStatus" style="font-size:12px;color:var(--muted);margin:6px 0">Consultando publicación vigente…</div>'
+    +'<div class="field"><label>Nota (opcional, la ven todos junto a su monto)</label><input type="text" id="fact_note" maxlength="300" placeholder="Ej: Facturación junio 2026" /></div>'
+    +'<div style="max-height:45vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:8px 0">'+rows+'</div>'
+    +'<div class="btn-row">'
+    +'<button class="btn accent" onclick="publishBilling()">Publicar ('+BILLING_DAYS+' días)</button>'
+    +'<button class="btn warn" onclick="clearBilling()">Borrar lo publicado</button>'
+    +'<button class="btn secondary" onclick="closeModal()">Cerrar</button>'
+    +'</div>');
+  _loadBillingStatus();
+}
+
+async function _loadBillingStatus(){
+  const el = document.getElementById('factStatus');
+  if(!el) return;
+  try{
+    const r = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/status', {
+      cache:'no-store', headers:{'Authorization':'Bearer ' + getBackendToken()}
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok){ el.textContent = 'No se pudo consultar lo publicado (' + (data.error||r.status) + ')'; return; }
+    if(data.empty || !data.items){ el.textContent = 'No hay montos publicados actualmente.'; return; }
+    const n = Object.keys(data.items).length;
+    el.innerHTML = '📌 Hay una publicación vigente: <b>'+n+'</b> persona'+(n===1?'':'s')+' · publicada '+_factFmtDate(data.publishedAt)+' · expira <b>'+_factFmtDate(data.expiresAt)+'</b>.';
+    // Pre-cargar los montos vigentes en los campos para poder corregir/republicar
+    Object.keys(data.items).forEach(id=>{
+      const inp = document.getElementById('fact_' + id);
+      if(inp && !inp.value) inp.value = (data.items[id].amount||'').toLocaleString('es-CL');
+    });
+    const note = document.getElementById('fact_note');
+    if(note && !note.value && data.note) note.value = data.note;
+  }catch(e){
+    el.textContent = 'Sin conexión para consultar lo publicado.';
+  }
+}
+
+async function publishBilling(){
+  if(!state.isAdmin) return;
+  const items = [];
+  document.querySelectorAll('.fact-input').forEach(inp=>{
+    const amount = parseInt(String(inp.value||'').replace(/[^\d]/g,''), 10);
+    if(amount > 0) items.push({ staffId: inp.dataset.staff, name: inp.dataset.name, amount });
+  });
+  if(items.length === 0){ toast('Ingresa al menos un monto'); return; }
+  const note = (document.getElementById('fact_note')||{}).value || '';
+  if(!confirm('Publicar montos de ' + items.length + ' persona(s)? Cada uno verá solo el suyo, durante ' + BILLING_DAYS + ' días.')) return;
+  try{
+    const r = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id), {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer ' + getBackendToken()},
+      body: JSON.stringify({ items, note })
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok){ toast('Error al publicar: ' + (data.error||r.status)); return; }
+    toast('✅ Publicado (' + data.count + '). Expira ' + _factFmtDate(data.expiresAt));
+    _loadBillingStatus();
+  }catch(e){
+    toast('Sin conexión: no se pudo publicar');
+  }
+}
+
+async function clearBilling(){
+  if(!state.isAdmin) return;
+  if(!confirm('¿Borrar AHORA todos los montos publicados del servidor?')) return;
+  try{
+    const r = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/clear', {
+      method:'POST',
+      headers:{'Authorization':'Bearer ' + getBackendToken()}
+    });
+    if(!r.ok){ const d = await r.json().catch(()=>({})); toast('Error: ' + (d.error||r.status)); return; }
+    toast('Montos borrados del servidor');
+    _loadBillingStatus();
+  }catch(e){
+    toast('Sin conexión: no se pudo borrar');
+  }
 }
 
 // ============================================================
