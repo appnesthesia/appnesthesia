@@ -10943,15 +10943,17 @@ function _factFmtDate(iso){
   try{ return new Date(iso).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return iso||''; }
 }
 
-// Deriva el "proof" (hash del PIN con la misma sal/iteraciones del pinHash
-// guardado). Es lo único que viaja al servidor: el PIN en texto plano jamás.
-async function _billingProof(pin, user){
-  const stored = user.pinHash || '';
+// "Proof" para el servidor: el hash del PIN que este dispositivo ya tiene
+// guardado tras el login del usuario. No hace falta re-pedir el PIN: entrar
+// al perfil ya lo exigió. El PIN en texto plano jamás viaja al servidor.
+function _billingProofFromStored(user){
+  const stored = user && user.pinHash;
+  if(!stored || typeof stored !== 'string') return null;
   if(stored.indexOf('pbkdf2$') === 0){
     const p = stored.split('$');
-    return await _derivePIN(pin, user.id, _hexToBytes(p[2]), parseInt(p[1],10) || PIN_ITERATIONS);
+    return p[3] || null;
   }
-  return await hashPINLegacy(pin, user.id);
+  return stored; // hash legado v1
 }
 
 // --- Sección en Mi Panel (la llama renderMiPanel) ---
@@ -10970,60 +10972,49 @@ function renderMiFacturacion(){
       +'<button class="btn sm accent" onclick="openBillingAdmin()">Administrar</button></div>';
   } else {
     box.innerHTML = '<div class="mi-pref-row"><div><div class="mi-pref-label">Mi monto a facturar</div>'
-      +'<div class="mi-pref-sub">Información confidencial: se pide tu PIN y se consulta al servidor. Disponible '+BILLING_DAYS+' días desde su publicación.</div></div>'
+      +'<div class="mi-pref-sub">Información confidencial: se consulta al servidor y solo tú puedes verla. Disponible '+BILLING_DAYS+' días desde su publicación.</div></div>'
       +'<button class="btn sm secondary" onclick="billingViewMine()">Ver monto</button></div>';
   }
 }
 
-// --- Vista del STAFF: confirmar PIN → consultar solo el monto propio ---
-function billingViewMine(){
+// --- Vista del STAFF: consultar solo el monto propio (sin re-pedir PIN;
+//     entrar al perfil ya exigió el PIN de la persona) ---
+async function billingViewMine(){
   const u = getCurrentUser();
   if(!u || u.id === ADMIN_USER_ID) return;
   if(!getBackendURL()){ toast('Sin conexión al backend'); return; }
-  openPinPad({
-    title:'💰 Monto a facturar',
-    sub:'Confirma tu PIN para ver tu monto',
-    maxLen:4,
-    onComplete: async(pin)=>{
-      try{
-        const ce = _pinCryptoUnavailableMsg();
-        if(ce){ pinError(ce); return; }
-        const r = await verifyPINHash(pin, u.id, u.pinHash);
-        if(!r.ok){ pinError('PIN incorrecto'); return; }
-        if(r.upgrade){ u.pinHash = r.upgrade; save(); _pushMyPinHash(u.id, u.pinHash).catch(()=>{}); }
-        const proof = await _billingProof(pin, u);
-        closePinPad();
-        modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:14px">Consultando…</div>');
-        const resp = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/mine', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ staffId: u.id, proof })
-        });
-        const data = await resp.json().catch(()=>({}));
-        if(!resp.ok){
-          modal('<h3>💰 Monto a facturar</h3><div class="alert warn" style="font-size:13px">'+(data.error||'No se pudo consultar')+'</div>'
-            +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
-          return;
-        }
-        if(data.empty){
-          modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:18px"><span class="big" style="font-size:26px">📭</span>No hay ningún monto publicado para ti en este momento.</div>'
-            +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
-          return;
-        }
-        modal('<h3>💰 Monto a facturar</h3>'
-          +'<div style="text-align:center;padding:16px 8px">'
-          +'<div style="font-size:32px;font-weight:800;color:var(--primary)">'+_factFmt(data.amount)+'</div>'
-          +(data.note?('<div style="font-size:13px;color:var(--muted);margin-top:6px">'+String(data.note).replace(/</g,'&lt;')+'</div>'):'')
-          +'<div style="font-size:12px;color:var(--muted);margin-top:10px">Publicado: '+_factFmtDate(data.publishedAt)+'<br>Disponible hasta: <b>'+_factFmtDate(data.expiresAt)+'</b> (luego se borra del servidor)</div>'
-          +'</div>'
-          +'<div class="alert info" style="font-size:12px">Este monto es visible únicamente para ti. No queda guardado en el dispositivo.</div>'
-          +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
-      }catch(e){
-        pinError('Error: ' + (e && e.message ? e.message : e));
-      }
-    },
-    onCancel: ()=>{}
-  });
+  const proof = _billingProofFromStored(u);
+  if(!proof){ toast('Tu PIN aún no está registrado en este dispositivo. Cierra sesión y vuelve a entrar.'); return; }
+  modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:14px">Consultando…</div>');
+  try{
+    const resp = await fetch(getBackendURL() + '/api/billing/' + encodeURIComponent(INSTITUTION.id) + '/mine', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ staffId: u.id, proof })
+    });
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok){
+      modal('<h3>💰 Monto a facturar</h3><div class="alert warn" style="font-size:13px">'+(data.error||'No se pudo consultar')+'</div>'
+        +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+      return;
+    }
+    if(data.empty){
+      modal('<h3>💰 Monto a facturar</h3><div class="empty" style="padding:18px"><span class="big" style="font-size:26px">📭</span>Aún no hay monto disponible.</div>'
+        +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+      return;
+    }
+    modal('<h3>💰 Monto a facturar</h3>'
+      +'<div style="text-align:center;padding:16px 8px">'
+      +'<div style="font-size:32px;font-weight:800;color:var(--primary)">'+_factFmt(data.amount)+'</div>'
+      +(data.note?('<div style="font-size:13px;color:var(--muted);margin-top:6px">'+String(data.note).replace(/</g,'&lt;')+'</div>'):'')
+      +'<div style="font-size:12px;color:var(--muted);margin-top:10px">Publicado: '+_factFmtDate(data.publishedAt)+'<br>Disponible hasta: <b>'+_factFmtDate(data.expiresAt)+'</b> (luego se borra del servidor)</div>'
+      +'</div>'
+      +'<div class="alert info" style="font-size:12px">Este monto es visible únicamente para ti. No queda guardado en el dispositivo.</div>'
+      +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+  }catch(e){
+    modal('<h3>💰 Monto a facturar</h3><div class="alert warn" style="font-size:13px">Sin conexión: no se pudo consultar.</div>'
+      +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+  }
 }
 
 // --- Pantalla del ADMIN: listado de staff + monto por persona ---
