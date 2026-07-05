@@ -538,6 +538,31 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .mod-card{background:var(--card);border-radius:22px;padding:30px 24px;max-width:460px;width:100%;box-shadow:0 18px 48px rgba(15,68,53,.18),0 4px 12px rgba(15,68,53,.08);border:1px solid var(--green-pale)}
 .mod-card-logo{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--green-deep),var(--green-forest));margin:0 auto 10px;box-shadow:0 8px 22px -2px rgba(14,125,117,.45),0 2px 6px rgba(14,125,117,.18);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:32px;font-family:'Manrope','Inter',sans-serif;overflow:hidden}
 .mod-card-logo img{width:100%;height:100%;object-fit:cover;display:block}
+/* ============================================================
+   Animación de entrada al selector de módulos (solo al elegir
+   institución — la clase .mod-enter la pone showModulesScreen()).
+   Secuencia: tarjeta asciende con fade → logo hace un "pop" con
+   micro-giro → destello de brillo cruza el logo → los botones
+   entran escalonados. Sobria, <1s total, sin loops.
+   ============================================================ */
+.mod-screen.mod-enter .mod-card{animation:modCardIn .5s cubic-bezier(.22,1,.36,1) both}
+.mod-screen.mod-enter .mod-card-logo{position:relative;animation:modLogoIn .65s cubic-bezier(.34,1.45,.64,1) .05s both;will-change:transform}
+.mod-screen.mod-enter .mod-card-logo::after{content:'';position:absolute;top:-25%;left:-80%;width:55%;height:150%;background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.5) 45%,rgba(255,255,255,.75) 50%,rgba(255,255,255,.5) 55%,rgba(255,255,255,0) 100%);transform:skewX(-18deg);animation:modLogoShine .75s cubic-bezier(.4,0,.2,1) .5s both;pointer-events:none}
+.mod-screen.mod-enter .mod-inst-name,
+.mod-screen.mod-enter .mod-card-title,
+.mod-screen.mod-enter .mod-card-sub{animation:modFadeUp .45s ease-out .15s both}
+.mod-screen.mod-enter .mod-item:nth-child(1){animation:modFadeUp .4s ease-out .22s both}
+.mod-screen.mod-enter .mod-item:nth-child(2){animation:modFadeUp .4s ease-out .3s both}
+.mod-screen.mod-enter .mod-item:nth-child(3){animation:modFadeUp .4s ease-out .38s both}
+@keyframes modCardIn{from{opacity:0;transform:translateY(16px) scale(.965)}to{opacity:1;transform:none}}
+@keyframes modLogoIn{0%{opacity:0;transform:scale(.55) rotate(-10deg)}55%{opacity:1}100%{opacity:1;transform:scale(1) rotate(0deg)}}
+@keyframes modLogoShine{from{left:-80%}to{left:130%}}
+@keyframes modFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .mod-screen.mod-enter .mod-card,.mod-screen.mod-enter .mod-card-logo,.mod-screen.mod-enter .mod-card-logo::after,
+  .mod-screen.mod-enter .mod-inst-name,.mod-screen.mod-enter .mod-card-title,.mod-screen.mod-enter .mod-card-sub,
+  .mod-screen.mod-enter .mod-item{animation:none}
+}
 .mod-inst-name{text-align:center;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:4px}
 .mod-card-title{font-family:'Manrope','Inter',sans-serif;font-size:21px;font-weight:800;color:var(--primary-dark);text-align:center;margin:0 0 4px;letter-spacing:.2px}
 .mod-card-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 18px}
@@ -2799,6 +2824,6 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=86"></script>
+<script src="app.js?v=87"></script>
 </body>
 </html>

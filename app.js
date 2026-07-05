@@ -5217,7 +5217,7 @@ async function selectInstitution(id){
         state.currentUserId = null;
       }
     }
-    showModulesScreen();
+    showModulesScreen({animate:true});
   }catch(e){
     console.error(e);
     alert('No se pudo cargar la configuración de la institución: '+e.message);
@@ -5267,7 +5267,7 @@ async function showInstitutionPicker(){
 }
 
 // Muestra la pantalla con los 3 botones (Staff / Agendamiento / Guías).
-function showModulesScreen(){
+function showModulesScreen(opts){
   // Ocultar otras pantallas de boot
   const ip = document.getElementById('institutionPicker');
   if(ip) ip.classList.add('hidden');
@@ -5280,7 +5280,18 @@ function showModulesScreen(){
   }
   // Mostrar
   const mods = document.getElementById('modulesScreen');
-  if(mods) mods.classList.remove('hidden');
+  if(mods){
+    mods.classList.remove('hidden');
+    // Animación de entrada (solo al llegar desde el selector de institución):
+    // tarjeta + logo con destello. Se retira la clase al terminar para que
+    // pueda re-dispararse en un próximo ingreso.
+    if(opts && opts.animate){
+      mods.classList.remove('mod-enter');
+      void mods.offsetWidth; // reflow: reinicia las animaciones CSS
+      mods.classList.add('mod-enter');
+      setTimeout(()=>{ try{ mods.classList.remove('mod-enter'); }catch(e){} }, 1600);
+    }
+  }
   // Refrescar el badge de Interconsultas (cuántas nuevas sin ver) con la nube.
   try{ updateIcBadges(); icSyncNow().then(()=>{ updateIcBadges(); }).catch(()=>{}); }catch(e){}
 }
