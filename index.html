@@ -1592,37 +1592,46 @@ html[data-theme="dark"] .agend-overview-tab:not(.active) .agend-overview-count{b
 html[data-theme="dark"] .pin-key.action:hover{background:var(--tint1)}
 html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 /* ===== Módulo Pabellón de Urgencia (bloques postergables) ===== */
+/* Usa SIEMPRE los tokens del sistema de diseño (:root / data-theme=dark). */
 .pu-monthbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
-.pu-monthbar h2{margin:0;font-size:19px;text-transform:capitalize}
-.pu-navbtn{border:1.5px solid #d0dcd6;background:#fff;border-radius:10px;min-width:40px;height:38px;font-size:18px;cursor:pointer;color:#1b7a5a;font-weight:700}
+.pu-monthbar h2{margin:0;font-size:19px;text-transform:capitalize;font-family:'Manrope','Inter',sans-serif;color:var(--primary-dark)}
+.pu-navbtn{border:1.5px solid var(--border);background:var(--card);border-radius:10px;min-width:40px;height:38px;font-size:18px;cursor:pointer;color:var(--primary);font-weight:700;box-shadow:var(--shadow)}
 .pu-navbtn:disabled{opacity:.3;cursor:default}
-.pu-intro{background:#eef6f2;border:1.5px solid #cfe5db;border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.45;margin-bottom:14px;color:#234}
-.pu-week{margin:0 0 16px}
-.pu-week-title{font-size:12.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#1b7a5a;margin:0 0 6px}
-.pu-day{background:#fff;border:1.5px solid #e2e8e5;border-radius:12px;padding:10px 12px;margin-bottom:8px}
-.pu-day.pu-today{border-color:#1b7a5a;box-shadow:0 0 0 2px rgba(27,122,90,.15)}
+.pu-intro{background:var(--tint1);border:1.5px solid var(--green-pale);border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.45;margin-bottom:14px;color:var(--text)}
+.pu-intro b{color:var(--primary-dark)}
+.pu-week{background:var(--card);border:1.5px solid var(--border);border-radius:14px;margin:0 0 10px;overflow:hidden;box-shadow:var(--shadow)}
+.pu-week-hd{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;cursor:pointer;padding:13px 14px;font-family:inherit;text-align:left;color:var(--primary-dark)}
+.pu-week-hd .t{flex:1;font-size:13px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+.pu-week-hd .n{font-size:11px;color:var(--muted);font-weight:600}
+.pu-week-hd .chev{font-size:15px;color:var(--muted);transition:transform .18s}
+.pu-week.open .pu-week-hd .chev{transform:rotate(90deg)}
+.pu-week-body{display:none;padding:0 10px 10px}
+.pu-week.open .pu-week-body{display:block}
+.pu-day{background:var(--tint1);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.pu-day.pu-today{border-color:var(--accent-dark);box-shadow:0 0 0 2px rgba(95,180,156,.22)}
 .pu-day-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
-.pu-day-name{font-weight:800;font-size:14px;text-transform:capitalize}
-.pu-day-date{font-size:12px;color:#678}
-.pu-today-tag{font-size:10px;background:#1b7a5a;color:#fff;border-radius:8px;padding:2px 7px;font-weight:700}
+.pu-day-name{font-weight:800;font-size:14px;text-transform:capitalize;color:var(--text)}
+.pu-today-tag{font-size:10px;background:var(--primary);color:#fff;border-radius:8px;padding:2px 7px;font-weight:700}
 .pu-fer{font-size:13px;color:#8a6d1a;background:#fff7e0;border-radius:8px;padding:6px 10px;font-weight:600}
-.pu-row{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed #e7ecea}
+html[data-theme="dark"] .pu-fer{background:#33300f;color:#e8c96a}
+.pu-row{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--border)}
 .pu-row:first-of-type{border-top:none}
-.pu-j{flex:0 0 34px;font-size:11px;font-weight:800;color:#fff;background:#1b7a5a;border-radius:8px;text-align:center;padding:3px 0;margin-top:2px}
+.pu-j{flex:0 0 34px;font-size:11px;font-weight:800;color:#fff;background:var(--green-forest);border-radius:8px;text-align:center;padding:3px 0;margin-top:2px}
 .pu-j.pm{background:#3b6ea8}
+html[data-theme="dark"] .pu-j{background:#2e8b6b}
+html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 .pu-cells{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:560px){.pu-cells{grid-template-columns:1fr}}
 .pu-cell{min-width:0}
-.pu-tag{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#b3541e}
-.pu-tag.resp{color:#678}
-.pu-eq{font-size:13px;font-weight:700;line-height:1.25}
-.pu-meta{font-size:11px;color:#789}
-.pu-crit{background:#fff;border:1.5px solid #e2e8e5;border-radius:12px;padding:12px 14px;margin:14px 0}
-.pu-crit h3{margin:0 0 8px;font-size:14px;color:#1b7a5a}
-.pu-crit ol{margin:0;padding-left:20px;font-size:13px;line-height:1.55}
+.pu-tag{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--warn)}
+.pu-tag.resp{color:var(--muted)}
+.pu-eq{font-size:13px;font-weight:700;line-height:1.25;color:var(--text)}
+.pu-meta{font-size:11px;color:var(--muted)}
+.pu-crit{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin:14px 0;box-shadow:var(--shadow)}
+.pu-crit h3{margin:0 0 8px;font-size:14px;color:var(--primary-dark)}
+.pu-crit ol{margin:0;padding-left:20px;font-size:13px;line-height:1.55;color:var(--text)}
 .pu-dl{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
-.pu-dl .btn-primary{background:#1b7a5a;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:700;font-size:13.5px;cursor:pointer}
-.pu-dl .btn{border-radius:10px}
+.pu-dl .btn-primary{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:var(--shadow)}
 </style>
 </head>
 <body>
@@ -1670,26 +1679,18 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
-      <button type="button" class="mod-item" onclick="openPabUrgModule()">
-        <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="25" height="25" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 3.6 18.4a1.4 1.4 0 0 0 1.2 2.1h14.4a1.4 1.4 0 0 0 1.2-2.1L12 3.2z"/><path d="M12 9.4v4.4"/><circle cx="12" cy="17" r=".4" fill="#fff"/></svg></div>
-        <div class="mod-item-body">
-          <div class="mod-item-name">Pabellón de Urgencia</div>
-          <div class="mod-item-desc">Bloques postergables ante urgencias quirúrgicas · rotación semanal equitativa</div>
-        </div>
-        <div class="mod-item-arrow">›</div>
-      </button>
-      <button type="button" class="mod-item" onclick="openGuiasModule()">
+      <button type="button" class="mod-item" onclick="openPortalChooser()">
         <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M6 4.2v3.6a4 4 0 0 0 8 0V4.2"/><path d="M10 11.8v2a6 6 0 0 0 6 6 3 3 0 0 0 3-3v-2"/><circle cx="19" cy="12.8" r="2"/><circle cx="6" cy="4" r="1"/><circle cx="14" cy="4" r="1"/></svg></div>
         <div class="mod-item-body">
-          <div class="mod-item-name">Portal Preanestésico</div>
-          <div class="mod-item-desc">Prepara a tu paciente: consulta, fármacos, ayuno, exámenes, riesgo CV</div>
+          <div class="mod-item-name">Portal Preanestésico y Pabellón de Urgencia</div>
+          <div class="mod-item-desc">Preparación del paciente · bloques postergables ante urgencias</div>
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
     </div>
     <button type="button" class="aria-pill ai-entry-btn" onclick="openAiChat()">
       <img src="logo-aria.png?v=49" alt="ARIA"/>
-      <span class="aria-pill-txt"><b>ARIA</b> · Asistente IA de Appnesthesia<span class="aria-pill-sub">Pregúntale a nuestra IA sobre ayuno, suspensión de fármacos, exámenes preoperatorios y más</span></span>
+      <span class="aria-pill-txt"><b>ARIA</b> · Asistente IA de Appnesthesia<span class="aria-pill-sub">Pregúntale sobre ayuno, suspensión de fármacos, exámenes preoperatorios, el Pabellón de Urgencia (bloques postergables) y más</span></span>
       <span class="aria-pill-arrow">›</span>
     </button>
     <div class="mod-actions">
@@ -1728,6 +1729,36 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
     </div>
     <div class="mod-actions">
       <button class="btn" onclick="closeSolicitudesChooser(true)">‹ Volver</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUB-SELECTOR: Portal Preanestésico / Pabellón de Urgencia -->
+<div id="portalChooser" class="mod-screen hidden">
+  <div class="mod-card">
+    <div class="mod-card-logo"><img src="icon-512.png?v=39" alt="A" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <h2 class="mod-card-title">¿A dónde quieres entrar?</h2>
+    <p class="mod-card-sub">Elige una sección</p>
+    <div class="mod-list">
+      <button type="button" class="mod-item" onclick="closePortalChooser();openGuiasModule()">
+        <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M6 4.2v3.6a4 4 0 0 0 8 0V4.2"/><path d="M10 11.8v2a6 6 0 0 0 6 6 3 3 0 0 0 3-3v-2"/><circle cx="19" cy="12.8" r="2"/><circle cx="6" cy="4" r="1"/><circle cx="14" cy="4" r="1"/></svg></div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Portal Preanestésico</div>
+          <div class="mod-item-desc">Prepara a tu paciente: consulta, fármacos, ayuno, exámenes, riesgo CV</div>
+        </div>
+        <div class="mod-item-arrow">›</div>
+      </button>
+      <button type="button" class="mod-item" onclick="closePortalChooser();openPabUrgModule()">
+        <div class="mod-item-ico"><svg viewBox="0 0 24 24" width="25" height="25" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 3.6 18.4a1.4 1.4 0 0 0 1.2 2.1h14.4a1.4 1.4 0 0 0 1.2-2.1L12 3.2z"/><path d="M12 9.4v4.4"/><circle cx="12" cy="17" r=".4" fill="#fff"/></svg></div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Pabellón de Urgencia</div>
+          <div class="mod-item-desc">Bloques postergables ante urgencias quirúrgicas · rotación semanal equitativa</div>
+        </div>
+        <div class="mod-item-arrow">›</div>
+      </button>
+    </div>
+    <div class="mod-actions">
+      <button class="btn" onclick="closePortalChooser(true)">‹ Volver</button>
     </div>
   </div>
 </div>
@@ -2768,6 +2799,6 @@ html[data-theme="dark"] .reg-block-tag{background:#1c3a30;color:#86e3c0}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=83"></script>
+<script src="app.js?v=86"></script>
 </body>
 </html>

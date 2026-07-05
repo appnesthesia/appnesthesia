@@ -4301,6 +4301,10 @@ function _aiBuildContext(question){
     scoredP.forEach(({p, texto})=> matches.unshift('[PROTOCOLO INSTITUCIONAL — ' + ((INSTITUTION&&INSTITUTION.shortName)||'Clínica Universidad de los Andes') + ' · ' + (p.titulo||p.title||p.id) + (p.fuente?' — '+p.fuente:'') + '] ' + texto));
   }catch(e){}
 
+  // 6) PABELLÓN DE URGENCIA (bloques postergables) — si la pregunta lo toca,
+  // se antepone el contexto con las designaciones vigentes (hoy + 2 semanas).
+  try{ const pu = _aiPabUrgContext(q); if(pu) matches.unshift(pu); }catch(e){}
+
   // 5) Si pregunta por riesgo/METs/RCRI, incluir referencia corta
   if(/riesgo|mets?|rcri|cardiolog|isquemia|esfuerzo|dobutamina/.test(q)){
     try{
@@ -4404,7 +4408,7 @@ function _aiRenderMessages(){
   if(!box) return;
   let html = `
     <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular, profilaxis ATB y TVP, y más. Respondo usando las tablas y guías de la app (AHA/ACC, ESC, ASRA, ASA…) y <b>cito siempre la fuente</b>.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
+      <div class="ai-msg-bubble">👋 Hola, soy <b>ARIA</b> — <b>A</b>sistente de <b>R</b>eferencia e <b>I</b>nformación <b>A</b>nestésica de Appnesthesia. Pregúntame sobre suspensión de anticoagulantes, exámenes preoperatorios, riesgo cardiovascular, profilaxis ATB y TVP, el <b>Pabellón de Urgencia</b> (¿qué bloque es postergable hoy?), y más. Respondo usando las tablas y guías de la app (AHA/ACC, ESC, ASRA, ASA…) y <b>cito siempre la fuente</b>.<br><span class="ai-disclaimer">⚠️ Apoyo clínico — la decisión final es siempre del anestesiólogo. No incluyas nombres ni RUT de pacientes.</span></div>
     </div>`;
   _aiMessages.forEach(m=>{
     const cls = m.role === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
@@ -5294,6 +5298,7 @@ function goToInicio(){
   try{ const ag = document.getElementById('agendScreen');  if(ag) ag.classList.add('hidden'); }catch(e){}
   try{ const pu = document.getElementById('pabUrgScreen'); if(pu) pu.classList.add('hidden'); }catch(e){}
   try{ const sc = document.getElementById('solChooser');   if(sc) sc.classList.add('hidden'); }catch(e){}
+  try{ const pc = document.getElementById('portalChooser'); if(pc) pc.classList.add('hidden'); }catch(e){}
   // Ir siempre al selector de módulos (el inicio).
   try{ showModulesScreen(); }catch(e){}
 }
@@ -12173,7 +12178,7 @@ const PU_CRITERIOS = [
   'Condición clínica que no admite reprogramación (riesgo de progresión, dolor intratable, urgencia diferida).',
   'Paciente hospitalizado con espera quirúrgica prolongada.'
 ];
-const PU_UI = { ym:'' };
+const PU_UI = { ym:'', openWeek:-1 };
 
 // Índice fecha -> {AM:{...}, PM:{...}} (se construye una sola vez)
 let _PU_IDX = null;
@@ -12199,8 +12204,10 @@ function _puClampYm(ym){ return ym < PU_MIN_MES ? PU_MIN_MES : (ym > PU_MAX_MES 
 function openPabUrgModule(){
   const mod = document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
   const sc  = document.getElementById('solChooser');    if(sc)  sc.classList.add('hidden');
+  const pc  = document.getElementById('portalChooser'); if(pc)  pc.classList.add('hidden');
   const s   = document.getElementById('pabUrgScreen');  if(s)   s.classList.remove('hidden');
   PU_UI.ym = _puClampYm(_puTodayStr().slice(0,7));
+  PU_UI.openWeek = -1;   // -1 = auto: se abre la semana de hoy (o la primera)
   renderPabUrg();
   try{ window.scrollTo(0,0); }catch(e){}
 }
@@ -12212,7 +12219,17 @@ function pabUrgNav(delta){
   const [y,m] = PU_UI.ym.split('-').map(Number);
   const d = new Date(y, m-1+delta, 1);
   PU_UI.ym = _puClampYm(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  PU_UI.openWeek = -1;
   renderPabUrg();
+}
+// Acordeón: abre/cierra una semana (solo una abierta a la vez)
+function puToggleWeek(i){
+  PU_UI.openWeek = (PU_UI.openWeek === i) ? -2 : i;   // -2 = todas cerradas
+  renderPabUrg();
+  try{
+    const el = document.getElementById('puWeek'+i);
+    if(el && PU_UI.openWeek === i) el.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }catch(e){}
 }
 
 function renderPabUrg(){
@@ -12247,9 +12264,29 @@ function renderPabUrg(){
        'Ante una urgencia quirúrgica que requiera pabellón, se posterga el bloque titular de esa jornada; si ese día cumple '+
        'algún criterio de exclusión, se posterga el respaldo. Los equipos con más horas de pabellón son designados más veces '+
        '(rotación <b>equitativa y proporcional</b>). Revisa tu semana antes de agendar cirugías complejas.</div>';
-  weeks.forEach(w=>{
+  // Fecha de referencia: hoy; si es fin de semana, el lunes siguiente (así el
+  // domingo ya se destaca y abre la semana entrante).
+  const refD = new Date(hoy+'T12:00:00');
+  while(refD.getDay()===0 || refD.getDay()===6) refD.setDate(refD.getDate()+1);
+  const ref = refD.getFullYear()+'-'+String(refD.getMonth()+1).padStart(2,'0')+'-'+String(refD.getDate()).padStart(2,'0');
+  // Semana abierta: la que contiene la fecha de referencia (si es este mes), si no la primera.
+  if(PU_UI.openWeek === -1 || PU_UI.openWeek === undefined){
+    let auto = 0;
+    weeks.forEach((w,i)=>{ if(w.days.some(d => d.ds === ref)) auto = i; });
+    PU_UI.openWeek = auto;
+  }
+  weeks.forEach((w,i)=>{
     const d0 = w.days[0], d1 = w.days[w.days.length-1];
-    h += '<div class="pu-week"><div class="pu-week-title">Semana del '+d0.d+' al '+d1.d+' de '+PU_MES_NOM[m-1]+'</div>';
+    const open = PU_UI.openWeek === i;
+    const nFer = w.days.filter(d => PU_FERIADOS[d.ds]).length;
+    const esHoy = w.days.some(d => d.ds === ref);
+    h += '<div class="pu-week'+(open?' open':'')+'" id="puWeek'+i+'">';
+    h += '<button type="button" class="pu-week-hd" onclick="puToggleWeek('+i+')">'+
+         '<span class="t">Semana del '+d0.d+' al '+d1.d+'</span>'+
+         (esHoy?'<span class="pu-today-tag">ESTA SEMANA</span>':'')+
+         (nFer?'<span class="n">'+nFer+' feriado'+(nFer>1?'s':'')+'</span>':'')+
+         '<span class="chev">›</span></button>';
+    h += '<div class="pu-week-body">';
     w.days.forEach(day=>{
       const fer = PU_FERIADOS[day.ds];
       const e = idx[day.ds];
@@ -12272,7 +12309,7 @@ function renderPabUrg(){
       }
       h += '</div>';
     });
-    h += '</div>';
+    h += '</div></div>';
   });
   h += '<div class="pu-crit"><h3>Criterios de exclusión (el bloque titular NO se posterga si aplica alguno)</h3><ol>';
   PU_CRITERIOS.forEach(c=>{ h += '<li>'+c+'</li>'; });
@@ -12310,6 +12347,55 @@ function pabUrgDownload(){
   setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} }, 800);
 }
 
+// ---- Contexto para ARIA: designaciones del Pabellón de Urgencia ----
+// Se activa cuando la pregunta (ya normalizada por _gpNorm) menciona
+// postergación/pabellón de urgencia. Devuelve UN solo string multilínea
+// (cuenta como 1 match en _aiBuildContext, que corta en 25).
+function _aiPabUrgContext(qnorm){
+  const q = String(qnorm||'');
+  const trigger = /posterga|pabellon de urgencia|bloque?s? postergable|rotacion de urgencia|respaldo/.test(q);
+  if(!trigger) return '';
+  const idx = _puIndex();
+  const hoyD = new Date(); hoyD.setHours(12,0,0,0);
+  const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const MESN = PU_MES_NOM;
+  // Fechas a incluir: hoy + próximos 14 días corridos (cubre "hoy", "mañana",
+  // "esta semana" y "la próxima semana")
+  const fechas = [];
+  for(let i=0;i<=14;i++){
+    const d = new Date(hoyD); d.setDate(d.getDate()+i); fechas.push(fmt(d));
+  }
+  // Fecha explícita: "14 de julio" / "3 de diciembre"
+  const mExp = q.match(/(\d{1,2}) de (julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+  if(mExp){
+    const mi = MESN.indexOf(mExp[2]);
+    if(mi>=0) fechas.push('2026-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(mExp[1],10)).padStart(2,'0'));
+  }
+  const lines = [];
+  lines.push('[PABELLON DE URGENCIA — rotación de bloques postergables, Clínica Universidad de los Andes, vigente 6-jul a 31-dic-2026] '+
+    'La clínica no tiene pabellón físico de urgencia. Cada día hábil hay un bloque quirúrgico TITULAR (postergable) y un RESPALDO (2ª opción) por jornada (AM y PM). '+
+    'Ante una urgencia quirúrgica se posterga el TITULAR de esa jornada; si el titular cumple un criterio de exclusión ese día, se posterga el RESPALDO. '+
+    'Rotación proporcional a las horas de bloque semanales de cada equipo. La calificación final la hace coordinación de pabellón + Anestesiología. '+
+    'Criterios de exclusión del titular: '+PU_CRITERIOS.join(' ')+
+    ' HOY es '+PU_DIA_NOM[hoyD.getDay()]+' '+hoyD.getDate()+' de '+MESN[hoyD.getMonth()]+' de '+hoyD.getFullYear()+'.');
+  const seen = {};
+  fechas.forEach(f=>{
+    if(seen[f]) return; seen[f]=1;
+    const d = new Date(f+'T12:00:00');
+    const et = PU_DIA_NOM[d.getDay()]+' '+d.getDate()+' de '+MESN[d.getMonth()];
+    if(d.getDay()===0 || d.getDay()===6){ return; }               // fin de semana: omitir
+    if(PU_FERIADOS[f]){ lines.push(et+': FERIADO ('+PU_FERIADOS[f]+') — sin designación.'); return; }
+    const e = idx[f];
+    if(!e){
+      if(f < '2026-07-06' || f > '2026-12-31') lines.push(et+': fuera de la vigencia de la rotación (6-jul a 31-dic-2026).');
+      return;
+    }
+    const j = x => x ? x.tEq+' (Pabellón '+x.tPab+(x.tNota?', '+x.tNota:'')+') / respaldo: '+x.rEq+' (Pabellón '+x.rPab+')' : '—';
+    lines.push(et+': AM titular: '+j(e.AM)+' · PM titular: '+j(e.PM));
+  });
+  return lines.join('\n');
+}
+
 // ============================================================
 // SUB-SELECTOR: Interconsultas / Agendamiento (botón combinado)
 // ============================================================
@@ -12320,6 +12406,18 @@ function openSolicitudesChooser(){
 }
 function closeSolicitudesChooser(goHome){
   const sc = document.getElementById('solChooser'); if(sc) sc.classList.add('hidden');
+  if(goHome === true){ showModulesScreen(); }
+}
+
+// ============================================================
+// SUB-SELECTOR: Portal Preanestésico / Pabellón de Urgencia
+// ============================================================
+function openPortalChooser(){
+  const mod = document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
+  const pc  = document.getElementById('portalChooser'); if(pc)  pc.classList.remove('hidden');
+}
+function closePortalChooser(goHome){
+  const pc = document.getElementById('portalChooser'); if(pc) pc.classList.add('hidden');
   if(goHome === true){ showModulesScreen(); }
 }
 
