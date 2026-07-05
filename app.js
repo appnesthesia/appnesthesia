@@ -4530,6 +4530,7 @@ const SEARCH_INDEX = [
   { ico:'🗓️', label:'Agendamiento de procedimientos', hint:'Solicitar / visar', kw:'agendamiento agenda procedimiento solicitud sala resonancia picc', go:()=>{ _searchCloseAll(); try{ showModulesScreen(); setTimeout(()=>{ try{ openAgendamientoModule(); }catch(e){} },60); }catch(e){} } },
   { ico:'🩺', label:'Portal Preanestésico', hint:'Preparación del paciente', kw:'portal preanestesico preanestesia preparacion', go:()=>_goPortal(null) },
   { ico:'✉️', label:'Interconsultas a Anestesiología', hint:'Módulo · Solicitar / Administrar', kw:'interconsulta interconsultas dolor evaluacion preanestesica procedimiento solicitud unidad pieza derivacion', go:()=>{ _searchCloseAll(); try{ openIcModule(); }catch(e){} } },
+  { ico:'🚨', label:'Pabellón de Urgencia', hint:'Bloques postergables · rotación 2026', kw:'pabellon urgencia urgencias bloques postergables postergable rotacion equitativa emergencia quirurgica', go:()=>{ _searchCloseAll(); try{ openPabUrgModule(); }catch(e){} } },
   { ico:'🍽️', label:'Ayuno Preoperatorio', hint:'Portal Preanestésico', kw:'ayuno preoperatorio glp ozempic', go:()=>_goPortal('gpAyuno') },
   { ico:'💊', label:'Fármacos a Suspender', hint:'Portal Preanestésico', kw:'farmacos suspender medicamentos preop', go:()=>_goPortal('gpSusp') },
   { ico:'🧪', label:'Exámenes Preoperatorios', hint:'Portal Preanestésico', kw:'examenes preoperatorios laboratorio asa', go:()=>_goPortal('gpExam') },
@@ -5291,6 +5292,8 @@ function goToInicio(){
   try{ const g  = document.getElementById('guiasScreen');  if(g)  g.classList.add('hidden'); }catch(e){}
   try{ const ic = document.getElementById('icScreen');     if(ic) ic.classList.add('hidden'); }catch(e){}
   try{ const ag = document.getElementById('agendScreen');  if(ag) ag.classList.add('hidden'); }catch(e){}
+  try{ const pu = document.getElementById('pabUrgScreen'); if(pu) pu.classList.add('hidden'); }catch(e){}
+  try{ const sc = document.getElementById('solChooser');   if(sc) sc.classList.add('hidden'); }catch(e){}
   // Ir siempre al selector de módulos (el inicio).
   try{ showModulesScreen(); }catch(e){}
 }
@@ -7672,6 +7675,7 @@ function updateAgendAdminNotice(){
       b.style.display = 'none';
     }
   }
+  try{ _updateSolBadge(); }catch(e){}
   // Piggyback: refresca también los badges de Interconsultas (mismo ciclo de vida).
   try{ updateIcBadges(); }catch(e){}
 }
@@ -11332,6 +11336,25 @@ function updateIcBadges(){
   const n = (state && state.isAdmin) ? _icPendientes().length : _icNewUnseen().length;
   if(n > 0){ b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'inline-block'; }
   else { b.style.display = 'none'; }
+  try{ _updateSolBadge(); }catch(e){}
+}
+
+// Badge combinado del botón "Interconsultas y Agendamiento" en la pantalla
+// principal: suma los badges individuales de ambos módulos (que viven dentro
+// del sub-selector solChooser).
+function _updateSolBadge(){
+  const s = document.getElementById('solModBadge');
+  if(!s) return;
+  let total = 0;
+  ['icModBadge','agendModBadge'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && el.style.display !== 'none'){
+      const v = parseInt(String(el.textContent).replace('+',''),10);
+      if(!isNaN(v)) total += v;
+    }
+  });
+  if(total > 0){ s.textContent = total > 99 ? '99+' : String(total); s.style.display = 'inline-block'; }
+  else { s.style.display = 'none'; }
 }
 
 // Chequeo periódico (solo admin): baja de la nube y avisa si hay nuevas.
@@ -11871,6 +11894,435 @@ async function boot(){
   renderInstitutionPicker(institutions);
   document.getElementById('institutionPicker').classList.remove('hidden');
 }
+
+
+// ============================================================
+// MÓDULO: PABELLÓN DE URGENCIA (bloques postergables)
+// ============================================================
+// La clínica no dispone de pabellón físico de urgencia. Cada día hábil se
+// designa 1 bloque TITULAR y 1 RESPALDO por jornada (AM/PM): ante una urgencia
+// quirúrgica se posterga el titular; si cumple criterios de exclusión, el
+// respaldo. La rotación jul–dic 2026 se generó proporcionalmente a las horas
+// de bloque semanales de cada equipo (titular=1 punto, respaldo=0.5), con
+// dispersión semanal/diaria. Fuente: planilla de bloques quirúrgicos (8
+// pabellones), julio 2026. Es información de planificación: la calificación
+// final de postergabilidad la hace coordinación de pabellón + Anestesiología.
+
+const PU_EQUIPOS=["NEUROCIRUGIA", "RODILLA (MATAS-CARRASCO-AMENABAR-HUN-VALENZUELA)", "CIRUGIA ROBOTICA", "EQUIPO DE MANO", "TOBILLO Y PIE", "EQUIPO DE HOMBRO", "COLOPROCTO (LOPEZ-WAINSTEIN)", "EQUIPO DE CADERA", "RODILLA (RADICE-ORIZOLA-FERRER)", "OTORRINO (KRAUSE)", "COLUMNA (LARRONDO-BEAULIEU)", "CABEZA Y CUELLO (DROPPELMANN)", "COLUMNA (POSTIGO-PANTOJA)", "CIR. PLASTICA (HASBUN)", "EQUIPO UROLOGIA", "COLOPROCTO (BARRERA-QUEZADA-ZUÑIGA)", "TRAUMATOLOGIA INFANTIL", "EQUIPO HOMBRO (EKDAHL)", "CIR. GENERAL (ESCALONA-LANZARINI)", "CIR. PLASTICA (SALISBURY)", "COLUMNA (GARRIDO)", "GINECOLOGIA", "OTORRINO (OIDO)", "OTORRINO (LANAS)", "COLUMNA (POSTIGO)", "CIR. PLASTICA (DAGNINO)", "CIR. DIGESTIVA (ESPINOZA-DEVAUD)", "OTORRINO (PACHECO)", "CIRUGIA INFANTIL", "OTORRINO (TAPIA)", "OTORRINO (CABEZON)", "OTORRINO (TOCORNAL)", "CIR. GENERAL (LEON)", "CIRUGIA INFANTIL (PINILLA)", "OTORRINO (GARCIA)", "OTORRINO (BELTRAN)", "OTORRINO (REBOLLEDO)", "CABEZA Y CUELLO (GAC)"];
+const PU_NOTAS=["comparte pabellón con Otorrino Tocornal", "continúa de AM", "comparte pabellón con Robótica", "opera c/14 días", "comparte pabellón con Hombro Ekdahl"];
+const PU_FERIADOS={"2026-07-16": "Virgen del Carmen", "2026-09-18": "Independencia Nacional", "2026-10-12": "Encuentro de Dos Mundos", "2026-12-08": "Inmaculada Concepción", "2026-12-25": "Navidad"};
+const PU_ROT=[
+["2026-07-06", 0, 0, 3, -1, 1, 4, -1],
+["2026-07-06", 1, 2, 5, 0, 3, 4, -1],
+["2026-07-07", 0, 4, 5, -1, 5, 2, -1],
+["2026-07-07", 1, 6, 3, 1, 7, 4, 1],
+["2026-07-08", 0, 8, 4, -1, 9, 3, -1],
+["2026-07-08", 1, 10, 1, -1, 11, 5, 1],
+["2026-07-09", 0, 12, 1, -1, 13, 7, -1],
+["2026-07-09", 1, 14, 2, -1, 15, 3, -1],
+["2026-07-10", 0, 16, 2, -1, 17, 5, 2],
+["2026-07-10", 1, 3, 3, -1, 8, 4, 1],
+["2026-07-13", 0, 18, 5, -1, 19, 7, -1],
+["2026-07-13", 1, 20, 1, -1, 21, 3, -1],
+["2026-07-14", 0, 22, 1, -1, 23, 7, -1],
+["2026-07-14", 1, 24, 1, -1, 5, 2, 1],
+["2026-07-15", 0, 25, 7, -1, 26, 2, -1],
+["2026-07-15", 1, 9, 3, 1, 11, 5, 1],
+["2026-07-17", 0, 27, 1, -1, 28, 3, -1],
+["2026-07-17", 1, 17, 5, -1, 8, 4, 1],
+["2026-07-20", 0, 29, 1, -1, 30, 2, -1],
+["2026-07-20", 1, 31, 5, 2, 19, 7, 1],
+["2026-07-21", 0, 32, 8, -1, 4, 5, -1],
+["2026-07-21", 1, 7, 4, 1, 1, 7, -1],
+["2026-07-22", 0, 33, 8, -1, 34, 6, 3],
+["2026-07-22", 1, 8, 4, 1, 9, 3, 1],
+["2026-07-23", 0, 35, 8, -1, 13, 7, -1],
+["2026-07-23", 1, 2, 5, 1, 4, 4, 1],
+["2026-07-24", 0, 36, 8, -1, 16, 2, -1],
+["2026-07-24", 1, 10, 1, -1, 3, 3, -1],
+["2026-07-27", 0, 37, 8, -1, 0, 3, -1],
+["2026-07-27", 1, 19, 7, 1, 21, 3, -1],
+["2026-07-28", 0, 5, 2, -1, 6, 3, -1],
+["2026-07-28", 1, 4, 5, 1, 1, 7, -1],
+["2026-07-29", 0, 18, 1, -1, 11, 5, -1],
+["2026-07-29", 1, 25, 7, 1, 9, 3, 1],
+["2026-07-30", 0, 6, 3, -1, 12, 1, -1],
+["2026-07-30", 1, 13, 7, 1, 15, 3, -1],
+["2026-07-31", 0, 28, 3, -1, 2, 5, 4],
+["2026-07-31", 1, 8, 4, 1, 16, 2, 1],
+["2026-08-03", 0, 30, 2, -1, 0, 3, -1],
+["2026-08-03", 1, 2, 5, 0, 3, 4, -1],
+["2026-08-04", 0, 23, 7, -1, 5, 2, -1],
+["2026-08-04", 1, 4, 5, 1, 7, 4, 1],
+["2026-08-05", 0, 26, 2, -1, 11, 5, -1],
+["2026-08-05", 1, 9, 3, 1, 8, 4, 1],
+["2026-08-06", 0, 12, 1, -1, 5, 2, -1],
+["2026-08-06", 1, 13, 7, 1, 14, 2, -1],
+["2026-08-07", 0, 16, 2, -1, 17, 5, 2],
+["2026-08-07", 1, 10, 1, -1, 8, 4, 1],
+["2026-08-10", 0, 1, 4, -1, 0, 3, -1],
+["2026-08-10", 1, 19, 7, 1, 20, 1, -1],
+["2026-08-11", 0, 6, 3, -1, 4, 5, -1],
+["2026-08-11", 1, 5, 2, 1, 7, 4, 1],
+["2026-08-12", 0, 18, 1, -1, 11, 5, -1],
+["2026-08-12", 1, 25, 7, 1, 9, 3, 1],
+["2026-08-13", 0, 35, 8, -1, 4, 4, -1],
+["2026-08-13", 1, 15, 3, -1, 2, 5, 1],
+["2026-08-14", 0, 27, 1, -1, 36, 8, -1],
+["2026-08-14", 1, 8, 4, 1, 3, 3, -1],
+["2026-08-17", 0, 29, 1, -1, 37, 8, -1],
+["2026-08-17", 1, 21, 3, -1, 2, 5, 0],
+["2026-08-18", 0, 22, 1, -1, 32, 8, -1],
+["2026-08-18", 1, 24, 1, -1, 6, 3, 1],
+["2026-08-19", 0, 33, 8, -1, 34, 6, 3],
+["2026-08-19", 1, 11, 5, 1, 9, 3, 1],
+["2026-08-20", 0, 4, 4, -1, 12, 1, -1],
+["2026-08-20", 1, 2, 5, 1, 13, 7, 1],
+["2026-08-21", 0, 17, 5, 2, 8, 4, -1],
+["2026-08-21", 1, 10, 1, -1, 16, 2, 1],
+["2026-08-24", 0, 0, 3, -1, 1, 4, -1],
+["2026-08-24", 1, 3, 4, -1, 19, 7, 1],
+["2026-08-25", 0, 7, 4, -1, 5, 2, -1],
+["2026-08-25", 1, 6, 3, 1, 4, 5, 1],
+["2026-08-26", 0, 9, 3, -1, 18, 1, -1],
+["2026-08-26", 1, 25, 7, 1, 8, 4, 1],
+["2026-08-27", 0, 5, 2, -1, 12, 1, -1],
+["2026-08-27", 1, 14, 2, -1, 4, 4, 1],
+["2026-08-28", 0, 28, 3, -1, 36, 8, -1],
+["2026-08-28", 1, 8, 4, 1, 16, 2, 1],
+["2026-08-31", 0, 1, 4, -1, 30, 2, -1],
+["2026-08-31", 1, 20, 1, -1, 19, 7, 1],
+["2026-09-01", 0, 23, 7, -1, 32, 8, -1],
+["2026-09-01", 1, 6, 3, 1, 4, 5, 1],
+["2026-09-02", 0, 26, 2, -1, 18, 1, -1],
+["2026-09-02", 1, 11, 5, 1, 9, 3, 1],
+["2026-09-03", 0, 12, 1, -1, 13, 7, -1],
+["2026-09-03", 1, 2, 5, 1, 4, 4, 1],
+["2026-09-04", 0, 8, 4, -1, 9, 7, -1],
+["2026-09-04", 1, 10, 1, -1, 16, 2, 1],
+["2026-09-07", 0, 37, 8, -1, 0, 3, -1],
+["2026-09-07", 1, 3, 4, -1, 19, 7, 1],
+["2026-09-08", 0, 7, 4, -1, 5, 2, -1],
+["2026-09-08", 1, 4, 5, 1, 6, 3, 1],
+["2026-09-09", 0, 18, 1, -1, 25, 7, -1],
+["2026-09-09", 1, 9, 3, 1, 8, 4, 1],
+["2026-09-10", 0, 5, 2, -1, 13, 7, -1],
+["2026-09-10", 1, 15, 3, -1, 2, 5, 1],
+["2026-09-11", 0, 17, 5, 2, 27, 1, -1],
+["2026-09-11", 1, 16, 2, 1, 8, 4, 1],
+["2026-09-14", 0, 0, 3, -1, 1, 4, -1],
+["2026-09-14", 1, 21, 3, -1, 31, 5, 2],
+["2026-09-15", 0, 22, 1, -1, 32, 8, -1],
+["2026-09-15", 1, 24, 1, -1, 6, 3, 1],
+["2026-09-16", 0, 33, 8, -1, 34, 6, 3],
+["2026-09-16", 1, 11, 5, 1, 25, 7, 1],
+["2026-09-17", 0, 35, 8, -1, 4, 4, -1],
+["2026-09-17", 1, 12, 1, 1, 13, 7, 1],
+["2026-09-21", 0, 29, 1, -1, 30, 2, -1],
+["2026-09-21", 1, 19, 7, 1, 2, 5, 0],
+["2026-09-22", 0, 7, 4, -1, 5, 2, -1],
+["2026-09-22", 1, 1, 7, -1, 6, 3, 1],
+["2026-09-23", 0, 8, 4, -1, 9, 3, -1],
+["2026-09-23", 1, 10, 1, -1, 25, 7, 1],
+["2026-09-24", 0, 4, 4, -1, 5, 2, -1],
+["2026-09-24", 1, 2, 5, 1, 13, 7, 1],
+["2026-09-25", 0, 36, 8, -1, 27, 1, -1],
+["2026-09-25", 1, 3, 3, -1, 17, 5, -1],
+["2026-09-28", 0, 0, 3, -1, 18, 5, -1],
+["2026-09-28", 1, 20, 1, -1, 19, 7, 1],
+["2026-09-29", 0, 6, 3, -1, 23, 7, -1],
+["2026-09-29", 1, 4, 5, 1, 5, 2, 1],
+["2026-09-30", 0, 26, 2, -1, 9, 3, -1],
+["2026-09-30", 1, 8, 4, 1, 11, 5, 1],
+["2026-10-01", 0, 12, 1, -1, 13, 7, -1],
+["2026-10-01", 1, 14, 2, -1, 2, 5, 1],
+["2026-10-02", 0, 28, 3, -1, 16, 2, -1],
+["2026-10-02", 1, 10, 1, -1, 3, 3, -1],
+["2026-10-05", 0, 30, 2, -1, 37, 8, -1],
+["2026-10-05", 1, 2, 5, 0, 19, 7, 1],
+["2026-10-06", 0, 32, 8, -1, 7, 4, -1],
+["2026-10-06", 1, 1, 7, -1, 5, 2, 1],
+["2026-10-07", 0, 18, 1, -1, 25, 7, -1],
+["2026-10-07", 1, 9, 3, 1, 8, 4, 1],
+["2026-10-08", 0, 6, 3, -1, 4, 4, -1],
+["2026-10-08", 1, 13, 7, 1, 15, 3, -1],
+["2026-10-09", 0, 16, 2, -1, 17, 5, 2],
+["2026-10-09", 1, 8, 4, 1, 3, 3, -1],
+["2026-10-13", 0, 4, 5, -1, 5, 2, -1],
+["2026-10-13", 1, 7, 4, 1, 24, 1, -1],
+["2026-10-14", 0, 11, 5, -1, 25, 7, -1],
+["2026-10-14", 1, 9, 3, 1, 8, 4, 1],
+["2026-10-15", 0, 35, 8, -1, 5, 2, -1],
+["2026-10-15", 1, 12, 1, 1, 2, 5, 1],
+["2026-10-16", 0, 27, 1, -1, 36, 8, -1],
+["2026-10-16", 1, 17, 5, -1, 8, 4, 1],
+["2026-10-19", 0, 0, 3, -1, 29, 1, -1],
+["2026-10-19", 1, 21, 3, -1, 31, 5, 2],
+["2026-10-20", 0, 22, 1, -1, 23, 7, -1],
+["2026-10-20", 1, 6, 3, 1, 4, 5, 1],
+["2026-10-21", 0, 33, 8, -1, 34, 6, 3],
+["2026-10-21", 1, 25, 7, 1, 9, 3, 1],
+["2026-10-22", 0, 5, 2, -1, 4, 4, -1],
+["2026-10-22", 1, 2, 5, 1, 13, 7, 1],
+["2026-10-23", 0, 16, 2, -1, 28, 3, -1],
+["2026-10-23", 1, 10, 1, -1, 3, 3, -1],
+["2026-10-26", 0, 37, 8, -1, 1, 4, -1],
+["2026-10-26", 1, 19, 7, 1, 20, 1, -1],
+["2026-10-27", 0, 4, 5, -1, 6, 3, -1],
+["2026-10-27", 1, 7, 4, 1, 1, 7, -1],
+["2026-10-28", 0, 18, 1, -1, 11, 5, -1],
+["2026-10-28", 1, 8, 4, 1, 9, 3, 1],
+["2026-10-29", 0, 5, 2, -1, 6, 3, -1],
+["2026-10-29", 1, 14, 2, -1, 15, 3, -1],
+["2026-10-30", 0, 36, 8, -1, 2, 5, 4],
+["2026-10-30", 1, 3, 3, -1, 10, 1, -1],
+["2026-11-02", 0, 0, 3, -1, 29, 1, -1],
+["2026-11-02", 1, 19, 7, 1, 2, 5, 0],
+["2026-11-03", 0, 23, 7, -1, 32, 8, -1],
+["2026-11-03", 1, 24, 1, -1, 4, 5, 1],
+["2026-11-04", 0, 26, 2, -1, 18, 1, -1],
+["2026-11-04", 1, 11, 5, 1, 25, 7, 1],
+["2026-11-05", 0, 12, 1, -1, 13, 7, -1],
+["2026-11-05", 1, 4, 4, 1, 15, 3, -1],
+["2026-11-06", 0, 9, 7, -1, 8, 4, -1],
+["2026-11-06", 1, 16, 2, 1, 17, 5, -1],
+["2026-11-09", 0, 30, 2, -1, 1, 4, -1],
+["2026-11-09", 1, 20, 1, -1, 21, 3, -1],
+["2026-11-10", 0, 6, 3, -1, 5, 2, -1],
+["2026-11-10", 1, 7, 4, 1, 1, 7, -1],
+["2026-11-11", 0, 8, 4, -1, 18, 1, -1],
+["2026-11-11", 1, 25, 7, 1, 9, 3, 1],
+["2026-11-12", 0, 13, 7, -1, 35, 8, -1],
+["2026-11-12", 1, 4, 4, 1, 2, 5, 1],
+["2026-11-13", 0, 27, 1, -1, 28, 3, -1],
+["2026-11-13", 1, 10, 1, -1, 3, 3, -1],
+["2026-11-16", 0, 0, 3, -1, 29, 1, -1],
+["2026-11-16", 1, 31, 5, 2, 19, 7, 1],
+["2026-11-17", 0, 22, 1, -1, 32, 8, -1],
+["2026-11-17", 1, 5, 2, 1, 6, 3, 1],
+["2026-11-18", 0, 33, 8, -1, 34, 6, 3],
+["2026-11-18", 1, 8, 4, 1, 11, 5, 1],
+["2026-11-19", 0, 12, 1, -1, 6, 3, -1],
+["2026-11-19", 1, 2, 5, 1, 4, 4, 1],
+["2026-11-20", 0, 9, 7, -1, 17, 5, 2],
+["2026-11-20", 1, 16, 2, 1, 3, 3, -1],
+["2026-11-23", 0, 37, 8, -1, 1, 4, -1],
+["2026-11-23", 1, 19, 7, 1, 21, 3, -1],
+["2026-11-24", 0, 4, 5, -1, 5, 2, -1],
+["2026-11-24", 1, 6, 3, 1, 7, 4, 1],
+["2026-11-25", 0, 18, 1, -1, 8, 4, -1],
+["2026-11-25", 1, 11, 5, 1, 25, 7, 1],
+["2026-11-26", 0, 13, 7, -1, 35, 8, -1],
+["2026-11-26", 1, 14, 2, -1, 15, 3, -1],
+["2026-11-27", 0, 28, 3, -1, 36, 8, -1],
+["2026-11-27", 1, 8, 4, 1, 17, 5, -1],
+["2026-11-30", 0, 0, 3, -1, 1, 4, -1],
+["2026-11-30", 1, 2, 5, 0, 3, 4, -1],
+["2026-12-01", 0, 23, 7, -1, 32, 8, -1],
+["2026-12-01", 1, 24, 1, -1, 5, 2, 1],
+["2026-12-02", 0, 26, 2, -1, 9, 3, -1],
+["2026-12-02", 1, 10, 1, -1, 25, 7, 1],
+["2026-12-03", 0, 4, 4, -1, 12, 1, -1],
+["2026-12-03", 1, 13, 7, 1, 15, 3, -1],
+["2026-12-04", 0, 9, 7, -1, 8, 4, -1],
+["2026-12-04", 1, 16, 2, 1, 3, 3, -1],
+["2026-12-07", 0, 29, 1, -1, 30, 2, -1],
+["2026-12-07", 1, 2, 5, 0, 19, 7, 1],
+["2026-12-09", 0, 18, 1, -1, 8, 4, -1],
+["2026-12-09", 1, 11, 5, 1, 25, 7, 1],
+["2026-12-10", 0, 5, 2, -1, 6, 3, -1],
+["2026-12-10", 1, 4, 4, 1, 12, 1, 1],
+["2026-12-11", 0, 17, 5, 2, 27, 1, -1],
+["2026-12-11", 1, 8, 4, 1, 10, 1, -1],
+["2026-12-14", 0, 1, 4, -1, 0, 3, -1],
+["2026-12-14", 1, 20, 1, -1, 21, 3, -1],
+["2026-12-15", 0, 7, 4, -1, 6, 3, -1],
+["2026-12-15", 1, 5, 2, 1, 4, 5, 1],
+["2026-12-16", 0, 33, 8, -1, 34, 6, 3],
+["2026-12-16", 1, 9, 3, 1, 25, 7, 1],
+["2026-12-17", 0, 35, 8, -1, 6, 3, -1],
+["2026-12-17", 1, 12, 1, 1, 2, 5, 1],
+["2026-12-18", 0, 36, 8, -1, 8, 4, -1],
+["2026-12-18", 1, 3, 3, -1, 10, 1, -1],
+["2026-12-21", 0, 30, 2, -1, 37, 8, -1],
+["2026-12-21", 1, 19, 7, 1, 2, 5, 0],
+["2026-12-22", 0, 22, 1, -1, 32, 8, -1],
+["2026-12-22", 1, 7, 4, 1, 1, 7, -1],
+["2026-12-23", 0, 18, 1, -1, 8, 4, -1],
+["2026-12-23", 1, 9, 3, 1, 11, 5, 1],
+["2026-12-24", 0, 6, 3, -1, 4, 4, -1],
+["2026-12-24", 1, 13, 7, 1, 14, 2, -1],
+["2026-12-28", 0, 0, 3, -1, 1, 4, -1],
+["2026-12-28", 1, 21, 3, -1, 2, 5, 0],
+["2026-12-29", 0, 4, 5, -1, 5, 2, -1],
+["2026-12-29", 1, 24, 1, -1, 6, 3, 1],
+["2026-12-30", 0, 25, 7, -1, 26, 2, -1],
+["2026-12-30", 1, 8, 4, 1, 10, 1, -1],
+["2026-12-31", 0, 5, 2, -1, 12, 1, -1],
+["2026-12-31", 1, 15, 3, -1, 2, 5, 1]
+];
+
+const PU_MES_NOM = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const PU_DIA_NOM = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const PU_MIN_MES = '2026-07', PU_MAX_MES = '2026-12';
+const PU_CRITERIOS = [
+  'Paciente oncológico con plazo biológico de resolución.',
+  'Lactante menor de 1 año.',
+  'Paciente previamente suspendido o postergado (no se posterga dos veces).',
+  'Trasplante, procuramiento de órganos o injerto/insumo crítico ya activado.',
+  'Condición clínica que no admite reprogramación (riesgo de progresión, dolor intratable, urgencia diferida).',
+  'Paciente hospitalizado con espera quirúrgica prolongada.'
+];
+const PU_UI = { ym:'' };
+
+// Índice fecha -> {AM:{...}, PM:{...}} (se construye una sola vez)
+let _PU_IDX = null;
+function _puIndex(){
+  if(_PU_IDX) return _PU_IDX;
+  _PU_IDX = {};
+  PU_ROT.forEach(r=>{
+    const [f,j,ti,tp,tn,ri,rp,rn] = r;
+    if(!_PU_IDX[f]) _PU_IDX[f] = {};
+    _PU_IDX[f][j===0?'AM':'PM'] = {
+      tEq:PU_EQUIPOS[ti], tPab:tp, tNota:tn>=0?PU_NOTAS[tn]:'',
+      rEq:PU_EQUIPOS[ri], rPab:rp, rNota:rn>=0?PU_NOTAS[rn]:''
+    };
+  });
+  return _PU_IDX;
+}
+function _puTodayStr(){
+  const t = new Date();
+  return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+}
+function _puClampYm(ym){ return ym < PU_MIN_MES ? PU_MIN_MES : (ym > PU_MAX_MES ? PU_MAX_MES : ym); }
+
+function openPabUrgModule(){
+  const mod = document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
+  const sc  = document.getElementById('solChooser');    if(sc)  sc.classList.add('hidden');
+  const s   = document.getElementById('pabUrgScreen');  if(s)   s.classList.remove('hidden');
+  PU_UI.ym = _puClampYm(_puTodayStr().slice(0,7));
+  renderPabUrg();
+  try{ window.scrollTo(0,0); }catch(e){}
+}
+function pabUrgBack(){
+  const s = document.getElementById('pabUrgScreen'); if(s) s.classList.add('hidden');
+  showModulesScreen();
+}
+function pabUrgNav(delta){
+  const [y,m] = PU_UI.ym.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  PU_UI.ym = _puClampYm(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  renderPabUrg();
+}
+
+function renderPabUrg(){
+  const body = document.getElementById('pabUrgBody');
+  if(!body) return;
+  const idx = _puIndex();
+  const [y,m] = PU_UI.ym.split('-').map(Number);
+  const hoy = _puTodayStr();
+  // Agrupar los días hábiles del mes por semana (lunes como inicio)
+  const weeks = [];
+  let cur = null;
+  const last = new Date(y, m, 0).getDate();
+  for(let d=1; d<=last; d++){
+    const dt = new Date(y, m-1, d);
+    const wd = dt.getDay();
+    if(wd===0 || wd===6) continue;
+    const ds = PU_UI.ym+'-'+String(d).padStart(2,'0');
+    if(wd===1 || !cur){ cur = {days:[]}; weeks.push(cur); }
+    cur.days.push({ds, wd, d});
+  }
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const cell = (tag, cls, eq, pab, nota) =>
+    '<div class="pu-cell"><div class="pu-tag'+cls+'">'+tag+'</div>'+
+    '<div class="pu-eq">'+esc(eq)+'</div>'+
+    '<div class="pu-meta">Pabellón '+pab+(nota?' · '+esc(nota):'')+'</div></div>';
+  let h = '';
+  h += '<div class="pu-monthbar">'+
+       '<button type="button" class="pu-navbtn" onclick="pabUrgNav(-1)"'+(PU_UI.ym<=PU_MIN_MES?' disabled':'')+'>‹</button>'+
+       '<h2>'+PU_MES_NOM[m-1]+' '+y+'</h2>'+
+       '<button type="button" class="pu-navbtn" onclick="pabUrgNav(1)"'+(PU_UI.ym>=PU_MAX_MES?' disabled':'')+'>›</button></div>';
+  h += '<div class="pu-intro"><b>¿Cómo funciona?</b> Cada día hábil hay un bloque <b>titular</b> y un <b>respaldo</b> por jornada. '+
+       'Ante una urgencia quirúrgica que requiera pabellón, se posterga el bloque titular de esa jornada; si ese día cumple '+
+       'algún criterio de exclusión, se posterga el respaldo. Los equipos con más horas de pabellón son designados más veces '+
+       '(rotación <b>equitativa y proporcional</b>). Revisa tu semana antes de agendar cirugías complejas.</div>';
+  weeks.forEach(w=>{
+    const d0 = w.days[0], d1 = w.days[w.days.length-1];
+    h += '<div class="pu-week"><div class="pu-week-title">Semana del '+d0.d+' al '+d1.d+' de '+PU_MES_NOM[m-1]+'</div>';
+    w.days.forEach(day=>{
+      const fer = PU_FERIADOS[day.ds];
+      const e = idx[day.ds];
+      const isToday = day.ds === hoy;
+      h += '<div class="pu-day'+(isToday?' pu-today':'')+'"><div class="pu-day-head">'+
+           '<span class="pu-day-name">'+PU_DIA_NOM[day.wd]+' '+day.d+'</span>'+
+           (isToday?'<span class="pu-today-tag">HOY</span>':'')+'</div>';
+      if(fer){
+        h += '<div class="pu-fer">🎌 Feriado — '+esc(fer)+' · sin designación</div>';
+      } else if(e){
+        ['AM','PM'].forEach(j=>{
+          const x = e[j]; if(!x) return;
+          h += '<div class="pu-row"><div class="pu-j'+(j==='PM'?' pm':'')+'">'+j+'</div><div class="pu-cells">'+
+               cell('Postergable (titular)','',x.tEq,x.tPab,x.tNota)+
+               cell('Respaldo (2ª opción)',' resp',x.rEq,x.rPab,x.rNota)+
+               '</div></div>';
+        });
+      } else {
+        h += '<div class="pu-meta">Sin designación registrada.</div>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  h += '<div class="pu-crit"><h3>Criterios de exclusión (el bloque titular NO se posterga si aplica alguno)</h3><ol>';
+  PU_CRITERIOS.forEach(c=>{ h += '<li>'+c+'</li>'; });
+  h += '</ol><div class="pu-meta" style="margin-top:8px">Si el titular no es postergable, se posterga el bloque respaldo. '+
+       'La calificación final la realiza la coordinación de pabellón junto a Anestesiología el día correspondiente.</div></div>';
+  h += '<div class="pu-dl"><button type="button" class="btn-primary" onclick="pabUrgDownload()">⬇ Descargar rotación anual completa (Excel/CSV)</button></div>';
+  h += '<div class="pu-meta" style="margin:6px 2px 20px">Rotación vigente: 6 de julio – 31 de diciembre de 2026 · 248 jornadas designadas · proporcional a horas de bloque semanales. Generada julio 2026.</div>';
+  body.innerHTML = h;
+}
+
+// Descarga la rotación anual completa como CSV (compatible con Excel es-CL).
+function pabUrgDownload(){
+  const idx = _puIndex();
+  const fechas = Object.keys(idx).concat(Object.keys(PU_FERIADOS));
+  const uniq = Array.from(new Set(fechas)).sort();
+  const rows = [['Fecha','Día','Jornada','Bloque Titular (postergable)','Pabellón','Nota','Bloque Respaldo (2ª opción)','Pabellón','Nota']];
+  uniq.forEach(f=>{
+    const dt = new Date(f+'T12:00:00');
+    const dia = PU_DIA_NOM[dt.getDay()];
+    if(PU_FERIADOS[f]){
+      rows.push([f, dia, 'FERIADO — '+PU_FERIADOS[f], '', '', '', '', '', '']);
+      return;
+    }
+    ['AM','PM'].forEach(j=>{
+      const x = idx[f] && idx[f][j]; if(!x) return;
+      rows.push([f, dia, j, x.tEq, x.tPab, x.tNota, x.rEq, x.rPab, x.rNota]);
+    });
+  });
+  const csv = '﻿' + rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Rotacion_Pabellon_Urgencia_2026.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} }, 800);
+}
+
+// ============================================================
+// SUB-SELECTOR: Interconsultas / Agendamiento (botón combinado)
+// ============================================================
+function openSolicitudesChooser(){
+  const mod = document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
+  const sc  = document.getElementById('solChooser');    if(sc)  sc.classList.remove('hidden');
+  try{ updateIcBadges(); }catch(e){}
+}
+function closeSolicitudesChooser(goHome){
+  const sc = document.getElementById('solChooser'); if(sc) sc.classList.add('hidden');
+  if(goHome === true){ showModulesScreen(); }
+}
+
 
 // INIT — boot async (selecciona institución y carga su config)
 boot();
