@@ -361,7 +361,11 @@ async function fetchRemoteState(){
   if(!base || !INSTITUTION){ _setSyncStatus('disabled'); return null; }
   try{
     _setSyncStatus('syncing');
-    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
+    // Timeout de 8 s: si el Worker está lento, la app sigue con lo local en
+    // vez de quedarse colgada esperando (el sync periódico reintenta después).
+    const opts = _stateGetOpts();
+    try{ if(typeof AbortSignal!=='undefined' && AbortSignal.timeout) opts.signal = AbortSignal.timeout(8000); }catch(e){}
+    const r = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), opts);
     if(!r.ok){ _setSyncStatus('error'); return null; }
     const data = await r.json();
     _updateRemotePinCache(data);
@@ -5168,7 +5172,7 @@ function renderInstitutionPicker(institutions){
   list.innerHTML = institutions.map(i=>{
     const initials = (i.shortName||i.name).split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const loc = [i.city,i.country].filter(Boolean).join(', ');
-    return `<button class="inst-item" onclick="selectInstitution('${i.id}')">
+    return `<button class="inst-item" data-inst-id="${i.id}" onclick="selectInstitution('${i.id}')">
       <div class="inst-item-flag">${initials}</div>
       <div class="inst-item-info">
         <div class="inst-item-name">${i.name}</div>
@@ -5180,6 +5184,26 @@ function renderInstitutionPicker(institutions){
 }
 
 async function selectInstitution(id){
+  // Feedback INMEDIATO al clic: lo que sigue son 2 viajes de red (config de
+  // la institución + estado compartido en Cloudflare, que puede tener "cold
+  // start") y en un teléfono puede tomar 1-3 s. Sin este spinner, el selector
+  // parecía "pegado". La animación de entrada NO es la causa: es CSS puro y
+  // recién corre cuando todo ya cargó.
+  try{
+    const list = document.getElementById('institutionList');
+    if(list){
+      list.querySelectorAll('.inst-item').forEach(b=>{
+        b.disabled = true;
+        if(b.getAttribute('data-inst-id') === id){
+          b.classList.add('inst-item-loading');
+          const arr = b.querySelector('.inst-item-arrow'); if(arr) arr.innerHTML = '<span class="inst-spinner"></span>';
+          const loc = b.querySelector('.inst-item-loc'); if(loc) loc.textContent = 'Conectando…';
+        } else {
+          b.style.opacity = '.4';
+        }
+      });
+    }
+  }catch(e){}
   try{
     const cfg = await loadInstitutionConfig(id);
     localStorage.setItem(INSTITUTION_LS_KEY, id);
@@ -5221,6 +5245,8 @@ async function selectInstitution(id){
   }catch(e){
     console.error(e);
     alert('No se pudo cargar la configuración de la institución: '+e.message);
+    // Restaurar el selector para poder reintentar
+    try{ renderInstitutionPicker(INSTITUTIONS_CACHE||[]); }catch(_){}
   }
 }
 
@@ -10458,6 +10484,10 @@ function pinKey(k){
   renderPinDisplay();
   if(_pinBuffer.length === _pinMaxLen){
     const pin = _pinBuffer;
+    // La verificación usa PBKDF2 con 200.000 iteraciones (lento A PROPÓSITO,
+    // por seguridad) y puede tomar ~0.5-1.5 s en un teléfono. Avisar que se
+    // está trabajando para que no parezca que la app quedó pegada.
+    try{ const m = document.getElementById('pinMsg'); if(m) m.textContent = 'Verificando…'; }catch(e){}
     setTimeout(()=>{ if(_pinOnComplete) _pinOnComplete(pin); }, 80);
   }
 }
@@ -12364,7 +12394,16 @@ function pabUrgDownload(){
 // (cuenta como 1 match en _aiBuildContext, que corta en 25).
 function _aiPabUrgContext(qnorm){
   const q = String(qnorm||'');
-  const trigger = /posterga|pabellon de urgencia|bloque?s? postergable|rotacion de urgencia|respaldo/.test(q);
+  // Disparadores AMPLIOS (jul 2026): antes solo reaccionaba a frases muy
+  // exactas ("pabellon de urgencia", "bloque postergable"). Ahora también a
+  // pabellón+urgencia en cualquier orden/plural ("pabellón de urgencias",
+  // "pabellón urgencia"), titular/respaldo, rotación y "urgencia quirúrgica".
+  const trigger = /posterga/.test(q)                                  // posterga, postergable(s), postergación
+    || /respaldo|titular/.test(q)
+    || (/pabellon/.test(q) && /urgencia/.test(q))
+    || /rotacion (de )?(urgencia|pabellon|bloque)/.test(q)
+    || /urgencia quirurgica/.test(q)
+    || /bloque?s? postergable/.test(q);
   if(!trigger) return '';
   const idx = _puIndex();
   const hoyD = new Date(); hoyD.setHours(12,0,0,0);
@@ -12394,7 +12433,7 @@ function _aiPabUrgContext(qnorm){
     if(seen[f]) return; seen[f]=1;
     const d = new Date(f+'T12:00:00');
     const et = PU_DIA_NOM[d.getDay()]+' '+d.getDate()+' de '+MESN[d.getMonth()];
-    if(d.getDay()===0 || d.getDay()===6){ return; }               // fin de semana: omitir
+    if(d.getDay()===0 || d.getDay()===6){ lines.push(et+': fin de semana — sin designación (la rotación cubre solo días hábiles).'); return; }
     if(PU_FERIADOS[f]){ lines.push(et+': FERIADO ('+PU_FERIADOS[f]+') — sin designación.'); return; }
     const e = idx[f];
     if(!e){

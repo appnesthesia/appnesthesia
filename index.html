@@ -530,6 +530,11 @@ html:has(#modulesScreen:not(.hidden)){overflow:hidden}
 .inst-mail-btn:active{transform:translateY(0)}
 .inst-mail-btn .mail-icon{font-size:14px;line-height:1}
 .inst-loading{text-align:center;color:var(--muted);font-size:13px;padding:20px}
+/* Estado "Conectando…" tras el clic en una institución (feedback inmediato) */
+.inst-item[disabled]{pointer-events:none}
+.inst-item-loading{border-color:var(--green-forest)!important;box-shadow:0 6px 14px -3px rgba(15,68,53,.18)}
+.inst-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--green-pale);border-top-color:var(--green-forest);border-radius:50%;animation:instSpin .7s linear infinite;vertical-align:middle}
+@keyframes instSpin{to{transform:rotate(360deg)}}
 
 /* ============ SELECTOR DE MÓDULO (Staff / Agendamiento / Guías) ============ */
 .mod-screen{position:fixed;inset:0;background:linear-gradient(180deg,var(--tint1) 0%,var(--tint1) 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',-apple-system,system-ui,sans-serif;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
@@ -2824,6 +2829,6 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=87"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>
