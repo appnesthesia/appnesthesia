@@ -11497,7 +11497,7 @@ function icDeleteRequest(id){
 // admin = true solo tras desbloquear con el PIN de administrador (o si la
 // sesión principal ya es el usuario Administrador). Las acciones de gestión
 // (Realizada / Reabrir / Borrar) dependen de ESTE flag, no del estado global.
-const IC_UI = { view:'landing', tab:'pendiente', admin:false, calYear:0, calMonth:0, selectedDate:null, detailId:null };
+const IC_UI = { view:'landing', tab:'pendiente', admin:false, calYear:0, calMonth:0, selectedDate:null, detailId:null, detailReturn:'home' };
 
 // Abre el módulo Interconsultas (overlay fullscreen, desde el selector de módulos).
 function openIcModule(){
@@ -11530,9 +11530,10 @@ function closeIcModule(){
 
 // Botón "‹ Volver" del header: navegación contextual.
 function icBack(){
-  if(IC_UI.view === 'cal' || IC_UI.view === 'detail'){ IC_UI.view = 'home'; renderIcModule(); return; }
+  if(IC_UI.view === 'cal'){ IC_UI.view = 'home'; renderIcModule(); return; }
+  if(IC_UI.view === 'detail'){ IC_UI.view = IC_UI.detailReturn || 'home'; renderIcModule(); return; }
   if(IC_UI.view === 'form'){ IC_UI.view = 'cal'; renderIcModule(); return; }
-  if(IC_UI.view === 'home'){ icOpenLanding(); return; }
+  if(IC_UI.view === 'home' || IC_UI.view === 'seguimiento'){ icOpenLanding(); return; }
   closeIcModule();
 }
 
@@ -11587,7 +11588,18 @@ function _icUpdateHeadSub(){
   const el = document.getElementById('icHeadSub');
   if(!el) return;
   if(IC_UI.view === 'landing') el.textContent = 'Servicio de Anestesiología';
+  else if(IC_UI.view === 'seguimiento') el.textContent = '🔎 Seguimiento';
   else el.textContent = IC_UI.admin ? '🔒 Administrador · gestión' : '✉️ Solicitar interconsulta';
+}
+
+// Vía seguimiento: lista de solo lectura del estado de las interconsultas.
+function icEnterSeguimiento(){
+  IC_UI.admin = false;
+  IC_UI.view = 'seguimiento';
+  _icUpdateHeadSub();
+  renderIcModule();
+  icMarkSeen();
+  icSyncNow().then(()=>{ if(IC_UI.view === 'seguimiento') renderIcModule(); updateIcBadges(); }).catch(()=>{});
 }
 
 function renderIcModule(){
@@ -11595,6 +11607,7 @@ function renderIcModule(){
   if(!body) return;
   let html;
   if(IC_UI.view === 'landing') html = _icRenderLanding();
+  else if(IC_UI.view === 'seguimiento') html = _icRenderSeguimiento();
   else if(IC_UI.view === 'cal') html = _icRenderCal();
   else if(IC_UI.view === 'form') html = _icRenderForm();
   else if(IC_UI.view === 'detail') html = _icRenderDetail();
@@ -11616,11 +11629,61 @@ function _icRenderLanding(){
         <div class="ic-land-tx"><b>Solicitar interconsulta</b><span>Para unidades que piden evaluación · por día, datos anonimizados</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
+      <button type="button" class="ic-land-btn seg" onclick="icEnterSeguimiento()">
+        <div class="ic-land-ico">🔎</div>
+        <div class="ic-land-tx"><b>Seguimiento</b><span>Estado de las interconsultas: 🎫 recibidas y ✅ realizadas</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
       <button type="button" class="ic-land-btn admin" onclick="icEnterAdmin()">
         <div class="ic-land-ico">🔒</div>
         <div class="ic-land-tx"><b>Administrador</b><span>${_icEsc(adminSub)}</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
+    </div>`;
+}
+
+// --- Vista SEGUIMIENTO: listado compacto de solo lectura con tickets de estado.
+//     🎫 amarillo = Recibida (en espera) · ✅ verde = Realizada (resuelta).
+function _icRenderSeguimiento(){
+  const recibidas = _icPendientes().slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const realizadas = _icRealizadas(); // ya vienen ordenadas por realizadaAt desc
+  const total = recibidas.length + realizadas.length;
+  const head = `
+    <div class="ic-modehead">
+      <button type="button" class="ic-back" onclick="icOpenLanding()">‹ Inicio</button>
+      <span class="ic-mode-pill">🔎 Seguimiento</span>
+    </div>
+    <div class="ic-intro">Estado de las interconsultas enviadas. <b>🎫 Recibida</b> = en espera · <b>✅ Realizada</b> = resuelta. Toca una para ver el detalle.</div>`;
+  if(total === 0){
+    return `<div class="ic-wrap">${head}<div class="ic-empty"><span>📭</span>Aún no hay interconsultas para seguir.</div></div>`;
+  }
+  const counts = `
+    <div class="ic-track-counts">
+      <span class="ic-track-tk recibida">🎫 Recibidas · ${recibidas.length}</span>
+      <span class="ic-track-tk realizada">✅ Realizadas · ${realizadas.length}</span>
+    </div>`;
+  const rows = [
+    ...recibidas.map(r => _icTrackRow(r, 'recibida')),
+    ...realizadas.map(r => _icTrackRow(r, 'realizada'))
+  ].join('');
+  return `<div class="ic-wrap">${head}${counts}<div class="ic-track-list">${rows}</div></div>`;
+}
+function _icTrackRow(r, st){
+  const tm = _icTipoMeta(r.tipo);
+  const tipoLabel = r.tipo === 'otro' ? (r.tipoOtro || 'Otra') : tm.label;
+  const lugar = [r.pieza, r.unidad].filter(Boolean).map(_icEsc).join(' · ') || '—';
+  const quien = r.solicitante ? `${r.solicitanteRol === 'enfermera' ? 'Enf.' : 'Dr(a).'} ${_icEsc(r.solicitante)}` : '';
+  const pill = st === 'realizada'
+    ? '<span class="ic-track-tk realizada">✅ Realizada</span>'
+    : '<span class="ic-track-tk recibida">🎫 Recibida</span>';
+  const sub = [quien, `${tm.ico} ${_icEsc(tipoLabel)}`].filter(Boolean).join(' · ');
+  return `
+    <div class="ic-track-row st-${st}" onclick="icOpenDetail('${r.id}')">
+      <div class="ic-track-info">
+        <div class="ic-track-main">🛏 ${lugar}</div>
+        <div class="ic-track-sub">${sub}</div>
+      </div>
+      ${pill}
     </div>`;
 }
 
@@ -11784,7 +11847,7 @@ function _icRenderForm(){
 
 function _icRenderDetail(){
   const r = icLoadData().find(x => x && x.id === IC_UI.detailId);
-  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button><div class="ic-empty"><span>❓</span>Interconsulta no encontrada.</div></div>`; }
+  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="icDetailBack()">‹ Volver</button><div class="ic-empty"><span>❓</span>Interconsulta no encontrada.</div></div>`; }
   const isAdmin = !!IC_UI.admin;
   const tm = _icTipoMeta(r.tipo);
   const tipoLabel = r.tipo === 'otro' ? (r.tipoOtro || 'Otra') : tm.label;
@@ -11801,7 +11864,7 @@ function _icRenderDetail(){
     </div>` : '';
   return `
     <div class="ic-wrap">
-      <button type="button" class="ic-back" onclick="icGoHome()">‹ Volver</button>
+      <button type="button" class="ic-back" onclick="icDetailBack()">‹ Volver</button>
       <div class="ic-d-head">
         <div class="ic-d-tipo">${tm.ico} ${_icEsc(tipoLabel)}</div>
         ${realizada ? '<span class="ic-chip done">✓ Realizada</span>' : _icPrioChip(r.prioridad)}
@@ -11829,6 +11892,8 @@ function _icRenderDetail(){
 
 // --- Acciones de navegación ---
 function icGoHome(){ IC_UI.view='home'; renderIcModule(); }
+// Volver del detalle a donde se venía (seguimiento o home).
+function icDetailBack(){ IC_UI.view = IC_UI.detailReturn || 'home'; renderIcModule(); }
 function icGoNew(){
   const t = new Date();
   if(!IC_UI.calYear){ IC_UI.calYear = t.getFullYear(); IC_UI.calMonth = t.getMonth(); }
@@ -11841,7 +11906,7 @@ function icCalMove(delta){
   IC_UI.calYear = y; IC_UI.calMonth = m; renderIcModule();
 }
 function icPickDay(ds){ IC_UI.selectedDate = ds; IC_UI.view='form'; renderIcModule(); setTimeout(()=>{ const e=document.getElementById('icfIniciales'); if(e) e.focus(); },60); }
-function icOpenDetail(id){ IC_UI.detailId = id; IC_UI.view='detail'; renderIcModule(); }
+function icOpenDetail(id){ IC_UI.detailReturn = (IC_UI.view === 'seguimiento') ? 'seguimiento' : 'home'; IC_UI.detailId = id; IC_UI.view='detail'; renderIcModule(); }
 function icOnTipoChange(){
   const sel = document.getElementById('icfTipo');
   const w = document.getElementById('icfOtroWrap');
