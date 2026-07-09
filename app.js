@@ -4206,7 +4206,14 @@ async function testPushFromBtn(){
     const d = await r.json().catch(()=>null);
     if(r.status === 401){ alert('❌ El worker de push rechazó el token (401).\n\nRevisa que el secret APP_TOKEN del worker de push sea igual al token de la app.'); return; }
     if(r.ok && d && d.ok){
-      alert('✅ Resultado de la prueba:\n\n• Enviadas: '+(d.enviadas??'?')+'\n• Expiradas/eliminadas: '+(d.eliminadas??'?')+'\n• Suscritos en total: '+(d.total??'?')+'\n\nSi "Enviadas" es 0 pero hay suscritos, las llaves VAPID del worker no coinciden con las de la app.');
+      alert('✅ Resultado de la prueba:\n\n'
+        + '• Enviadas: '+(d.enviadas??'?')+'\n'
+        + '• Con payload (deep-link): '+(d.conPayload??'?')+'\n'
+        + '• Sin payload (genérico): '+(d.sinPayload??'?')+'\n'
+        + '• Expiradas/eliminadas: '+(d.eliminadas??'?')+'\n'
+        + '• Suscritos en total: '+(d.total??'?')+'\n'
+        + '• Versión worker: '+(d.v||'—')+'\n\n'
+        + 'Si "Con payload" es 0, las suscripciones no traen claves o el worker no es la versión nueva.');
       return;
     }
     alert('No se pudo enviar la prueba: ' + ((d&&d.error) || ('HTTP '+r.status)));
