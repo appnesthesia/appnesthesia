@@ -10,7 +10,7 @@
 // ⚠️ SUBIR ESTE NÚMERO EN CADA DEPLOY (v72 → v73 → …). Es lo que hace que el
 // navegador detecte un service worker nuevo y muestre el aviso "Nueva versión
 // disponible". Si no cambia, la app NO se entera de que hay una actualización.
-const CACHE = 'anestesia-v116';
+const CACHE = 'anestesia-v117';
 const ASSETS = [
   './',
   './index.html',
@@ -118,22 +118,28 @@ self.addEventListener('message', e => {
 self.addEventListener('push', e => {
   let titulo = '📋 Appnesthesia';
   let cuerpo = 'Tienes una nueva solicitud por revisar. Toca para abrir.';
-  // Si en el futuro se envía payload, se usa; si no, queda el genérico.
+  let targetUrl = './';
+  // El payload (cifrado por el worker de push) trae {title, body, url}. Si no
+  // hay payload (suscripción antigua), queda el aviso genérico al inicio.
   try {
     if (e.data) {
       const d = e.data.json();
       if (d && d.title) titulo = d.title;
       if (d && d.body) cuerpo = d.body;
+      if (d && d.url) targetUrl = d.url;
     }
   } catch (err) { /* sin payload → genérico */ }
+  // tag basado en la URL: así solicitudes distintas se muestran por separado
+  // (no se reemplazan entre sí) y cada una abre su propio detalle.
+  const tag = 'appx:' + targetUrl;
   e.waitUntil(
     self.registration.showNotification(titulo, {
       body: cuerpo,
       icon: './icon-192.png',
       badge: './icon-192.png',
-      tag: 'agend-nueva',
+      tag: tag,
       renotify: true,
-      data: { url: './' }
+      data: { url: targetUrl }
     })
   );
 });
@@ -141,12 +147,18 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const target = (e.notification.data && e.notification.data.url) || './';
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cl => {
-      for (const c of cl) {
-        if ('focus' in c) { c.focus(); return; }
+  e.waitUntil((async () => {
+    const cl = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of cl) {
+      if ('focus' in c) {
+        try { await c.focus(); } catch (_) {}
+        // La ventana ya está cargada: no cambia de URL, así que le avisamos por
+        // mensaje para que navegue al detalle exacto dentro de la app.
+        try { c.postMessage({ type: 'appx-open', url: target }); } catch (_) {}
+        return;
       }
-      if (self.clients.openWindow) return self.clients.openWindow(target);
-    })
-  );
+    }
+    // No hay ventana abierta → abrir una nueva con la URL (la app la lee al cargar).
+    if (self.clients.openWindow) return self.clients.openWindow(target);
+  })());
 });

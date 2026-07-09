@@ -4103,17 +4103,80 @@ async function disablePushNotifications(){
 // Envía una notificación push a los dispositivos suscritos (admin).
 // El mensaje es genérico (no viaja info sensible); sirve para agendamiento,
 // vacaciones y permisos por igual. El admin abre la app y ve qué hay pendiente.
-function notifyAdminsPush(tipo){
+function notifyAdminsPush(tipo, id){
   const base = getPushURL();
   if(!base) return;
   const headers = {'Content-Type':'application/json'};
   try{ const t = getBackendToken(); if(t) headers['Authorization'] = 'Bearer ' + t; }catch(e){}
   try{
-    fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo: tipo || 'solicitud' }) }).catch(()=>{});
+    // Solo viaja tipo + id (NO datos de paciente). El id permite el deep-link.
+    fetch(base + '/api/notify', { method:'POST', headers, body: JSON.stringify({ tipo: tipo || 'solicitud', id: id || '' }) }).catch(()=>{});
   }catch(e){}
 }
 // Alias para el agendamiento (mantiene compatibilidad).
-function notifyAdminsOfNewRequest(){ notifyAdminsPush('agendamiento'); }
+function notifyAdminsOfNewRequest(reqId){ notifyAdminsPush('agendamiento', reqId); }
+
+// ============================================================
+// DEEP-LINK desde notificaciones push (?ic=<id> / ?agend=<id>)
+// La notificación abre la solicitud EXACTA: si la app ya está abierta, el
+// service worker manda un mensaje; si arranca en frío, se lee de la URL y se
+// aplica al entrar a la institución (INSTITUTION disponible).
+// ============================================================
+let _appxPendingDeepLink = null;
+function _appxParseDeepLink(urlStr){
+  try{
+    const qi = String(urlStr||'').indexOf('?');
+    if(qi < 0) return null;
+    const p = new URLSearchParams(String(urlStr).slice(qi+1));
+    if(p.get('ic')) return { kind:'ic', id:p.get('ic') };
+    if(p.get('agend')) return { kind:'agend', id:p.get('agend') };
+  }catch(e){}
+  return null;
+}
+function _appxHandleDeepLink(urlStr){
+  const dl = _appxParseDeepLink(urlStr);
+  if(!dl) return;
+  if(typeof INSTITUTION === 'undefined' || !INSTITUTION){ _appxPendingDeepLink = dl; return; }
+  _appxApplyDeepLink(dl);
+}
+function _appxFlushPendingDeepLink(){
+  if(_appxPendingDeepLink && typeof INSTITUTION !== 'undefined' && INSTITUTION){
+    const dl = _appxPendingDeepLink; _appxPendingDeepLink = null;
+    setTimeout(()=>{ try{ _appxApplyDeepLink(dl); }catch(e){} }, 150);
+  }
+}
+function _appxApplyDeepLink(dl){
+  if(!dl) return;
+  if(dl.kind === 'ic'){ try{ icOpenRequestById(dl.id); }catch(e){} }
+  else if(dl.kind === 'agend'){ try{ agendOpenRequestById(dl.id); }catch(e){} }
+}
+// Abre el módulo Interconsultas directo en el detalle de la solicitud dada.
+function icOpenRequestById(id){
+  const mod=document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
+  const g=document.getElementById('guiasScreen'); if(g) g.classList.add('hidden');
+  const s=document.getElementById('icScreen'); if(s) s.classList.remove('hidden');
+  IC_UI.admin=false; IC_UI.view='seguimiento'; IC_UI.detailReturn='seguimiento';
+  const t=new Date(); IC_UI.calYear=t.getFullYear(); IC_UI.calMonth=t.getMonth(); IC_UI.selectedDate=null;
+  renderIcModule();
+  const show=()=>{
+    const scr=document.getElementById('icScreen'); if(!scr || scr.classList.contains('hidden')) return;
+    const r=icLoadData().find(x=>x&&x.id===id && !x.deleted);
+    if(r){ IC_UI.detailReturn='seguimiento'; IC_UI.detailId=id; IC_UI.view='detail'; }
+    else { IC_UI.view='seguimiento'; }
+    renderIcModule(); try{ updateIcBadges(); }catch(e){}
+  };
+  try{ icMarkSeen(); }catch(e){}
+  try{ icSyncNow().then(show).catch(show); }catch(e){ show(); }
+}
+// Abre el módulo Agendamiento directo en el detalle de la solicitud dada.
+function agendOpenRequestById(id){
+  try{ openAgendamientoModule(); }catch(e){}
+  const show=()=>{
+    const scr=document.getElementById('agendScreen'); if(!scr || scr.classList.contains('hidden')) return;
+    try{ if(_agendFindRequest(id)) agendOpenDetalle(id); }catch(e){}
+  };
+  try{ agendSyncNow().then(show).catch(show); }catch(e){ show(); }
+}
 // Muestra/actualiza el botón de activar avisos (solo admin)
 function updatePushBtn(){
   const btn = document.getElementById('pushToggleBtn');
@@ -5236,12 +5299,14 @@ async function selectInstitution(id){
           try{ checkAgendNewForAdmin(); startAgendAdminPolling(); }catch(e){}
           try{ icCheckNewForAdmin(); startIcAdminPolling(); }catch(e){}
         }
+        try{ _appxFlushPendingDeepLink(); }catch(e){}
         return;
       } else {
         state.currentUserId = null;
       }
     }
     showModulesScreen({animate:true});
+    try{ _appxFlushPendingDeepLink(); }catch(e){}
   }catch(e){
     console.error(e);
     alert('No se pudo cargar la configuración de la institución: '+e.message);
@@ -9152,7 +9217,7 @@ async function agendSubmitSolicitud(ev){
   // Empuja Y verifica que la solicitud quedó en la nube (reintenta ante colisión).
   try{ _ok = await _agendSyncVerified(salaId, dateStr, req.id); }catch(e){ _ok = false; }
   if(_ok){
-    try{ notifyAdminsOfNewRequest(); }catch(e){}
+    try{ notifyAdminsOfNewRequest(req.id); }catch(e){}
     alert(isExtra
       ? '✅ Solicitud EXTRA enviada y registrada en la nube. Requiere visado del administrador.'
       : '✅ Solicitud enviada y registrada en la nube. El Servicio de Anestesia será notificado.');
@@ -12017,7 +12082,7 @@ async function icSubmitForm(ev){
   let ok = false;
   try{ ok = await _icSyncVerified(req.id, r => !!r && !r.deleted); }catch(e){ ok = false; }
   if(ok){
-    try{ notifyAdminsPush('interconsulta'); }catch(e){}
+    try{ notifyAdminsPush('interconsulta', req.id); }catch(e){}
     alert('✅ Interconsulta enviada y registrada en la nube. El Servicio de Anestesia será notificado.');
   } else {
     alert('⚠️ La interconsulta quedó guardada en este dispositivo, pero NO se pudo registrar en la nube (revisa tu conexión).\n\nSe reintentará al reabrir. Si es urgente, avisa directamente al Servicio de Anestesia.');
@@ -12055,6 +12120,19 @@ async function icDoDelete(id){
 }
 
 async function boot(){
+  // 0) Deep-link desde una notificación: si la app arranca con ?ic=/?agend= se
+  //    guarda para aplicarlo al entrar a la institución. Y si ya está abierta,
+  //    el service worker nos avisa por mensaje para abrir el detalle exacto.
+  try{ _appxHandleDeepLink(location.search || ''); }catch(e){}
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.addEventListener('message', ev=>{
+        const d = ev && ev.data;
+        if(d && d.type === 'appx-open' && d.url){ try{ _appxHandleDeepLink(d.url); }catch(e){} }
+      });
+    }
+  }catch(e){}
+
   // 1) Cargar el índice de instituciones (cacheado por SW)
   const idx = await loadInstitutionsIndex();
   const institutions = idx.institutions||[];
