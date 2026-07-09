@@ -736,12 +736,14 @@ html[data-theme="dark"] .mod-item-ico{background:linear-gradient(135deg,#268063,
 .ic-track-counts{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0}
 .ic-track-tk{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0}
 .ic-track-tk.recibida{background:#fef9c3;color:#854d0e}
+.ic-track-tk.aceptada{background:#e0f2fe;color:#075985}
 .ic-track-tk.realizada{background:#dcfce7;color:#166534}
 .ic-track-list{display:flex;flex-direction:column;gap:9px}
 .ic-track-row{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--border);border-left-width:5px;border-radius:12px;padding:11px 13px;cursor:pointer;transition:box-shadow .2s,transform .12s}
 .ic-track-row:hover{box-shadow:0 4px 14px rgba(15,68,53,.1)}
 .ic-track-row:active{transform:scale(.99)}
 .ic-track-row.st-recibida{border-left-color:#eab308}
+.ic-track-row.st-aceptada{border-left-color:#0ea5e9}
 .ic-track-row.st-realizada{border-left-color:#16a34a}
 .ic-track-info{flex:1;min-width:0}
 .ic-track-main{font-size:13.5px;font-weight:800;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -775,8 +777,17 @@ html[data-theme="dark"] .mod-item-ico{background:linear-gradient(135deg,#268063,
 .ic-mini-btn{flex:1;min-width:104px;background:var(--card);border:1.5px solid var(--border);border-radius:9px;padding:8px 6px;font-family:inherit;font-weight:700;font-size:12.5px;color:var(--primary-dark);cursor:pointer;transition:background .15s,border-color .15s}
 .ic-mini-btn.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
 .ic-mini-btn.ok:hover{background:#d1fae5}
+.ic-mini-btn.acc{background:#e0f2fe;border-color:#7dd3fc;color:#075985}
+.ic-mini-btn.acc:hover{background:#bae6fd}
 .ic-mini-btn.danger{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
 .ic-mini-btn.danger:hover{background:#fee2e2}
+/* Estado (chip) en tarjeta/detalle: Recibida (amarillo) · Aceptada (celeste) · Realizada (verde) */
+.ic-status{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ic-status.recibida{background:#fef9c3;color:#854d0e}
+.ic-status.aceptada{background:#e0f2fe;color:#075985}
+.ic-status.realizada{background:#dcfce7;color:#166534}
+/* Botón "Aceptar" en el detalle */
+.ic-btn-acc{flex:1;background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border:none;border-radius:12px;padding:14px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer}
 .ic-back{align-self:flex-start;background:var(--card);border:1.5px solid var(--border);color:var(--primary-dark);font-family:inherit;font-weight:700;font-size:13px;padding:8px 13px;border-radius:10px;cursor:pointer}
 .ic-back:hover{background:var(--tint1)}
 /* Calendario */
@@ -1385,6 +1396,17 @@ button.ic-cal-cell:hover{background:var(--tint1);border-color:var(--green-light)
 .agend-slot-status.aprobada{background:#dcfce7;color:#166534}
 .agend-slot-status.rechazada{background:#fee2e2;color:#991b1b}
 .agend-slot-status.propuesta{background:#e0e7ff;color:#3730a3}
+/* MODO OSCURO: los fondos de estado eran claros fijos y el texto (--primary-dark)
+   pasa a verde claro → texto claro sobre fondo claro = ilegible. Se reemplazan
+   por tintes oscuros del mismo color, manteniendo el borde izquierdo de color. */
+html[data-theme="dark"] .agend-slot.pendiente{background:linear-gradient(90deg,#3a2e0c 0%,var(--card) 62%);border-color:#6b530f;border-left-color:#f59e0b}
+html[data-theme="dark"] .agend-slot.aprobada{background:linear-gradient(90deg,#0f2c1e 0%,var(--card) 62%);border-color:#1c6b45;border-left-color:#22c55e}
+html[data-theme="dark"] .agend-slot.rechazada{background:#2a1414;border-color:#5f2626;border-left-color:#ef4444}
+html[data-theme="dark"] .agend-slot.propuesta{background:linear-gradient(90deg,#191d3a 0%,var(--card) 62%);border-color:#39407a;border-left-color:#818cf8}
+/* Los badges de estado (fondo claro + texto oscuro) sí se leen bien; se dejan.
+   Ídem la CTA "Extra" y "crossblock": se les da un tinte oscuro por prolijidad. */
+html[data-theme="dark"] .agend-slot.extra-cta{background:linear-gradient(135deg,#3a2a10 0%,#4a3410 100%);border-color:#a3671f;color:#f7c98a}
+html[data-theme="dark"] .agend-slot.crossblock{background:var(--tint1);border-color:#3a4658;color:#9fb0c4}
 .agend-propuesta-box{background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:12px 14px;margin:10px 0}
 .agend-propuesta-title{font-weight:800;color:#3730a3;font-size:13px;margin-bottom:6px}
 .agend-propuesta-line{color:var(--primary-dark);font-size:14px;font-weight:600}
@@ -2149,6 +2171,17 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
             <input type="number" id="afPeso" min="0" max="350" step="0.1" placeholder="Ej: 18,5" />
           </div>
         </div>
+        <div class="row2">
+          <div>
+            <label>Pieza / Ubicación</label>
+            <input type="text" id="afPieza" autocomplete="off" maxlength="24" placeholder="Ej: MQ 303, UPC 478" />
+          </div>
+          <div>
+            <label>Unidad de hospitalización</label>
+            <input type="text" id="afUnidadHosp" autocomplete="off" maxlength="40" placeholder="Ej: Medicina, UPC, Cirugía" />
+          </div>
+        </div>
+        <div class="hint">Completa pieza y unidad solo si el paciente está hospitalizado.</div>
         <input type="hidden" id="afRut" value="" />
         <!-- Procedimiento: input libre (default) -->
         <div id="afProcLibreBlock">

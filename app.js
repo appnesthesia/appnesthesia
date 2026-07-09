@@ -8786,6 +8786,7 @@ function agendOpenFormForRange(startHHMM, endHHMM){
   document.getElementById('afEdad').value = '';
   document.getElementById('afRut').value = '';
   document.getElementById('afNotas').value = '';
+  { const _p=document.getElementById('afPieza'); if(_p) _p.value=''; const _u=document.getElementById('afUnidadHosp'); if(_u) _u.value=''; }
   document.getElementById('afPrioridad').value = 'electiva';
   _agendResetTriageFields();
   // Toggle modo horario y procedimiento según la sala
@@ -8993,6 +8994,10 @@ async function agendSubmitSolicitud(ev){
   const paciente = _agendIniciales(document.getElementById('afPaciente').value.trim());
   const edad = document.getElementById('afEdad').value.trim();
   const rut = '';
+  const piezaEl = document.getElementById('afPieza');
+  const unidadHospEl = document.getElementById('afUnidadHosp');
+  const pieza = piezaEl ? piezaEl.value.trim() : '';
+  const unidadHosp = unidadHospEl ? unidadHospEl.value.trim() : '';
   const notas = document.getElementById('afNotas').value.trim();
   const prio = document.getElementById('afPrioridad').value;
   // Triage clínico (todos opcionales)
@@ -9108,7 +9113,7 @@ async function agendSubmitSolicitud(ev){
   }
   const req = {
     id: _agendGenId(),
-    paciente, edad, rut, procedimiento: proc, notas, prioridad: prio,
+    paciente, edad, rut, pieza, unidadHosp, procedimiento: proc, notas, prioridad: prio,
     peso: triage.peso, asa: triage.asa, ayuno: triage.ayuno,
     tipoAnestesia: triage.tipoAnestesia, alergias: triage.alergias, anticoag: triage.anticoag,
     startMin, endMin,
@@ -9199,6 +9204,7 @@ function agendOpenFormExtra(dateStr){
   document.getElementById('afRut').value = '';
   const procInp = document.getElementById('afProc'); if(procInp) procInp.value = '';
   document.getElementById('afNotas').value = '';
+  { const _p=document.getElementById('afPieza'); if(_p) _p.value=''; const _u=document.getElementById('afUnidadHosp'); if(_u) _u.value=''; }
   document.getElementById('afPrioridad').value = 'electiva';
   _agendResetTriageFields();
   // Aplica modo de form (catálogo/AM-PM si corresponde — defensivo, las salas con Extra son horario libre)
@@ -9321,6 +9327,7 @@ function agendOpenDetalle(reqId){
       ${propuestaRow}
       ${horarioRow}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Paciente</div><div class="agend-detalle-v">${_gpEsc(req.paciente)}${req.edad?` · ${_gpEsc(String(req.edad))} años`:''}${req.rut?` · ${_gpEsc(req.rut)}`:''}</div></div>
+      ${(req.pieza||req.unidadHosp)?`<div class="agend-detalle-row"><div class="agend-detalle-k">Ubicación</div><div class="agend-detalle-v">${[req.pieza?('🛏 '+_gpEsc(req.pieza)):'', req.unidadHosp?_gpEsc(req.unidadHosp):''].filter(Boolean).join(' · ')}</div></div>`:''}
       <div class="agend-detalle-row"><div class="agend-detalle-k">Procedimiento</div><div class="agend-detalle-v">${_gpEsc(req.procedimiento)}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Prioridad</div><div class="agend-detalle-v">${_gpEsc(req.prioridad||'electiva')}</div></div>
       ${triageRows}
@@ -11366,6 +11373,22 @@ function _icPendientes(){
 function _icRealizadas(){
   return _icAll().filter(r => r.estado === 'realizada').sort((a,b)=>(b.realizadaAt||0)-(a.realizadaAt||0));
 }
+// Estados de una interconsulta: pendiente (Recibida) → aceptada (Aceptada) → realizada.
+function _icRecibidas(){
+  return _icAll().filter(r => r.estado !== 'aceptada' && r.estado !== 'realizada')
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+}
+function _icAceptadas(){
+  return _icAll().filter(r => r.estado === 'aceptada')
+    .sort((a,b)=>(b.aceptadaAt||0)-(a.aceptadaAt||0));
+}
+// Metadatos visuales por estado (etiqueta, clave de estilo, ícono).
+function _icStatusMeta(estado){
+  if(estado === 'realizada') return { label:'Realizada', key:'realizada', ico:'✅' };
+  if(estado === 'aceptada')  return { label:'Aceptada',  key:'aceptada',  ico:'🔵' };
+  return { label:'Recibida', key:'recibida', ico:'🎫' };
+}
+function _icStatusChip(estado){ const m = _icStatusMeta(estado); return `<span class="ic-status ${m.key}">${m.ico} ${m.label}</span>`; }
 function _icSeenTs(){ try{ return parseInt(localStorage.getItem(IC_SEEN_LS_KEY)||'0',10) || 0; }catch(e){ return 0; } }
 function icMarkSeen(){ try{ localStorage.setItem(IC_SEEN_LS_KEY, String(Date.now())); }catch(e){} try{ updateIcBadges(); }catch(e){} }
 function _icNewUnseen(){ const seen = _icSeenTs(); return _icPendientes().filter(r => (r.createdAt||0) > seen); }
@@ -11460,10 +11483,23 @@ function icCreateRequest(f){
   icSaveData(arr);
   return req;
 }
+function icMarkAceptada(id){
+  const arr = icLoadData();
+  const r = arr.find(x => x && x.id === id);
+  if(!r) return null;
+  r.estado = 'aceptada';
+  r.aceptadaAt = Date.now();
+  r.aceptadaBy = _icCurrentUserName();
+  r.updatedAt = Date.now();
+  icSaveData(arr);
+  return r;
+}
 function icMarkRealizada(id, nota){
   const arr = icLoadData();
   const r = arr.find(x => x && x.id === id);
   if(!r) return null;
+  // Si venía sin aceptar, registra la aceptación implícita en el mismo momento.
+  if(!r.aceptadaAt){ r.aceptadaAt = Date.now(); r.aceptadaBy = _icCurrentUserName(); }
   r.estado = 'realizada';
   r.realizadaAt = Date.now();
   r.realizadaBy = _icCurrentUserName();
@@ -11478,6 +11514,7 @@ function icReabrir(id){
   if(!r) return null;
   r.estado = 'pendiente';
   r.realizadaAt = null; r.realizadaBy = null;
+  r.aceptadaAt = null; r.aceptadaBy = null;
   r.updatedAt = Date.now();
   icSaveData(arr);
   return r;
@@ -11645,25 +11682,28 @@ function _icRenderLanding(){
 // --- Vista SEGUIMIENTO: listado compacto de solo lectura con tickets de estado.
 //     🎫 amarillo = Recibida (en espera) · ✅ verde = Realizada (resuelta).
 function _icRenderSeguimiento(){
-  const recibidas = _icPendientes().slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const recibidas = _icRecibidas();
+  const aceptadas = _icAceptadas();
   const realizadas = _icRealizadas(); // ya vienen ordenadas por realizadaAt desc
-  const total = recibidas.length + realizadas.length;
+  const total = recibidas.length + aceptadas.length + realizadas.length;
   const head = `
     <div class="ic-modehead">
       <button type="button" class="ic-back" onclick="icOpenLanding()">‹ Inicio</button>
       <span class="ic-mode-pill">🔎 Seguimiento</span>
     </div>
-    <div class="ic-intro">Estado de las interconsultas enviadas. <b>🎫 Recibida</b> = en espera · <b>✅ Realizada</b> = resuelta. Toca una para ver el detalle.</div>`;
+    <div class="ic-intro">Estado de cada interconsulta: <b>🎫 Recibida</b> (en espera) → <b>🔵 Aceptada</b> (la tomó Anestesia) → <b>✅ Realizada</b> (resuelta). Toca una para ver el detalle.</div>`;
   if(total === 0){
     return `<div class="ic-wrap">${head}<div class="ic-empty"><span>📭</span>Aún no hay interconsultas para seguir.</div></div>`;
   }
   const counts = `
     <div class="ic-track-counts">
       <span class="ic-track-tk recibida">🎫 Recibidas · ${recibidas.length}</span>
+      <span class="ic-track-tk aceptada">🔵 Aceptadas · ${aceptadas.length}</span>
       <span class="ic-track-tk realizada">✅ Realizadas · ${realizadas.length}</span>
     </div>`;
   const rows = [
     ...recibidas.map(r => _icTrackRow(r, 'recibida')),
+    ...aceptadas.map(r => _icTrackRow(r, 'aceptada')),
     ...realizadas.map(r => _icTrackRow(r, 'realizada'))
   ].join('');
   return `<div class="ic-wrap">${head}${counts}<div class="ic-track-list">${rows}</div></div>`;
@@ -11675,7 +11715,9 @@ function _icTrackRow(r, st){
   const quien = r.solicitante ? `${r.solicitanteRol === 'enfermera' ? 'Enf.' : 'Dr(a).'} ${_icEsc(r.solicitante)}` : '';
   const pill = st === 'realizada'
     ? '<span class="ic-track-tk realizada">✅ Realizada</span>'
-    : '<span class="ic-track-tk recibida">🎫 Recibida</span>';
+    : (st === 'aceptada'
+      ? '<span class="ic-track-tk aceptada">🔵 Aceptada</span>'
+      : '<span class="ic-track-tk recibida">🎫 Recibida</span>');
   const sub = [quien, `${tm.ico} ${_icEsc(tipoLabel)}`].filter(Boolean).join(' · ');
   return `
     <div class="ic-track-row st-${st}" onclick="icOpenDetail('${r.id}')">
@@ -11747,21 +11789,28 @@ function _icRenderCard(r, isAdmin){
   if(r.unidad) lineas.push(`🏥 ${_icEsc(r.unidad)}${r.anexo?` · ☎ ${_icEsc(r.anexo)}`:''}`);
   if(r.solicitante) lineas.push(`${r.solicitanteRol==='enfermera'?'👩‍⚕️ Enf.':'🩺 Dr(a).'} ${_icEsc(r.solicitante)}`);
   const meta = lineas.map(l=>`<div class="ic-card-line">${l}</div>`).join('');
+  let actBtns;
+  if(r.estado === 'realizada'){
+    actBtns = `<button type="button" class="ic-mini-btn" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`;
+  } else if(r.estado === 'aceptada'){
+    actBtns = `<button type="button" class="ic-mini-btn ok" onclick="icDoRealizada('${r.id}')">✅ Realizada</button>`;
+  } else {
+    actBtns = `<button type="button" class="ic-mini-btn acc" onclick="icDoAceptar('${r.id}')">🔵 Aceptar</button>`
+            + `<button type="button" class="ic-mini-btn ok" onclick="icDoRealizada('${r.id}')">✅ Realizada</button>`;
+  }
   const acts = isAdmin ? `
     <div class="ic-card-acts" onclick="event.stopPropagation()">
-      ${realizada
-        ? `<button type="button" class="ic-mini-btn" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`
-        : `<button type="button" class="ic-mini-btn ok" onclick="icDoRealizada('${r.id}')">✓ Realizada</button>`}
+      ${actBtns}
       <button type="button" class="ic-mini-btn danger" onclick="icDoDelete('${r.id}')">🗑 Borrar</button>
     </div>` : '';
   return `
     <div class="ic-card ${realizada?'done':''} prio-${r.prioridad}" onclick="icOpenDetail('${r.id}')">
       <div class="ic-card-top">
         <div class="ic-card-tipo">${tm.ico} ${_icEsc(tipoLabel)}</div>
-        ${realizada ? '<span class="ic-chip done">✓ Realizada</span>' : _icPrioChip(r.prioridad)}
+        ${_icStatusChip(r.estado)}
       </div>
       <div class="ic-card-body">${meta}</div>
-      <div class="ic-card-foot">📅 Día preferido: <b>${_icFmtFechaLarga(r.fecha)}</b></div>
+      <div class="ic-card-foot">${_icPrioChip(r.prioridad)} · 📅 <b>${_icFmtFechaLarga(r.fecha)}</b></div>
       ${acts}
     </div>`;
 }
@@ -11855,11 +11904,19 @@ function _icRenderDetail(){
   const row = (lbl, val) => val ? `<div class="ic-d-row"><div class="ic-d-lbl">${lbl}</div><div class="ic-d-val">${_icEsc(String(val))}</div></div>` : '';
   const created = r.createdAt ? new Date(r.createdAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
   const realAt = r.realizadaAt ? new Date(r.realizadaAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const acepAt = r.aceptadaAt ? new Date(r.aceptadaAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  let actBtns;
+  if(r.estado === 'realizada'){
+    actBtns = `<button type="button" class="ic-btn-sec" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`;
+  } else if(r.estado === 'aceptada'){
+    actBtns = `<button type="button" class="ic-btn-pri" onclick="icDoRealizada('${r.id}')">✅ Marcar realizada</button>`;
+  } else {
+    actBtns = `<button type="button" class="ic-btn-acc" onclick="icDoAceptar('${r.id}')">🔵 Aceptar</button>`
+            + `<button type="button" class="ic-btn-pri" onclick="icDoRealizada('${r.id}')">✅ Realizada</button>`;
+  }
   const acts = isAdmin ? `
     <div class="ic-d-actions">
-      ${realizada
-        ? `<button type="button" class="ic-btn-sec" onclick="icDoReabrir('${r.id}')">↩ Reabrir</button>`
-        : `<button type="button" class="ic-btn-pri" onclick="icDoRealizada('${r.id}')">✓ Marcar realizada</button>`}
+      ${actBtns}
       <button type="button" class="ic-btn-danger" onclick="icDoDelete('${r.id}')">🗑 Borrar</button>
     </div>` : '';
   return `
@@ -11867,9 +11924,10 @@ function _icRenderDetail(){
       <button type="button" class="ic-back" onclick="icDetailBack()">‹ Volver</button>
       <div class="ic-d-head">
         <div class="ic-d-tipo">${tm.ico} ${_icEsc(tipoLabel)}</div>
-        ${realizada ? '<span class="ic-chip done">✓ Realizada</span>' : _icPrioChip(r.prioridad)}
+        ${_icStatusChip(r.estado)}
       </div>
       <div class="ic-d-card">
+        ${row('Prioridad', _icPrioMeta(r.prioridad).label)}
         ${row('Día preferido', _icFmtFechaLarga(r.fecha))}
         ${row('Iniciales', r.iniciales)}
         ${row('Edad', r.edad ? r.edad+' años' : '')}
@@ -11883,6 +11941,7 @@ function _icRenderDetail(){
         ${row('Exámenes', r.examenes)}
         ${row('Medicamentos', r.medicamentos)}
         ${row('Enviada', created)}
+        ${(r.aceptadaAt && !realizada) ? row('Aceptada', acepAt + (r.aceptadaBy?(' · '+r.aceptadaBy):'')) : ''}
         ${realizada ? row('Realizada', realAt + (r.realizadaBy?(' · '+r.realizadaBy):'')) : ''}
         ${realizada ? row('Nota', r.notaRealizada) : ''}
       </div>
@@ -11967,6 +12026,12 @@ async function icSubmitForm(ev){
 }
 
 // --- Acciones de administrador (requieren haber entrado por la vía Administrador) ---
+async function icDoAceptar(id){
+  if(!IC_UI.admin){ alert('Entra por la vía "Administrador" para aceptar interconsultas.'); return; }
+  icMarkAceptada(id);
+  renderIcModule(); updateIcBadges();
+  try{ await _icSyncVerified(id, r => !!r && (r.estado === 'aceptada' || r.estado === 'realizada')); }catch(e){}
+}
 async function icDoRealizada(id){
   if(!IC_UI.admin){ alert('Entra por la vía "Administrador" para marcar interconsultas como realizadas.'); return; }
   const nota = prompt('Nota / indicación de la interconsulta (opcional):', '');
