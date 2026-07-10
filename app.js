@@ -9633,10 +9633,18 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   lineas.push('— Servicio de Anestesia');
   const body = lineas.join('\n');
   // Secretarías de pabellón en copia (CC). Configurable en andes.json
-  // ("agendCcEmails": ["...","..."]). Si no está, usa estos dos por defecto.
+  // ("agendCcEmails": ["...","..."]). Si no está, usa estos por defecto.
   const ccList = (INSTITUTION && Array.isArray(INSTITUTION.agendCcEmails) && INSTITUTION.agendCcEmails.length)
-    ? INSTITUTION.agendCcEmails
-    : ['ahernandez@clinicauandes.cl','oacosta@clinicauandes.cl'];
+    ? INSTITUTION.agendCcEmails.slice()
+    : ['ahernandez@clinicauandes.cl','oacosta@clinicauandes.cl','cpvasquezz@clinicauandes.cl'];
+  // SOLO Accesos Vasculares: copia adicional (configurable en andes.json con
+  // "agendCcAccesosEmails"). Por defecto: enfermera coordinadora de accesos.
+  if(salaId === 'accesos_vasculares'){
+    const extraCc = (INSTITUTION && Array.isArray(INSTITUTION.agendCcAccesosEmails) && INSTITUTION.agendCcAccesosEmails.length)
+      ? INSTITUTION.agendCcAccesosEmails
+      : ['cbrante@clinicauandes.cl'];
+    extraCc.forEach(e => { if(e && !ccList.includes(e)) ccList.push(e); });
+  }
   const cc = ccList.join(',');
   const url = `mailto:${encodeURIComponent(req.solicitanteEmail)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   // Confirmación rápida y luego abrir el cliente de correo
