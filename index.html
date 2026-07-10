@@ -2278,8 +2278,21 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
             <option value="no">No</option>
             <option value="si">Sí — acceso venoso difícil</option>
           </select>
-          <label>Hallazgos vasculares / accesos previos</label>
-          <textarea id="afAccesosVasc" placeholder="Vasos disponibles, accesos previos, trombosis, hematomas, ubicaciones a evitar..."></textarea>
+          <label>Hallazgos vasculares / accesos previos *</label>
+          <select id="afAccesosVasc">
+            <option value="">— Seleccionar —</option>
+            <option value="Sin hallazgos relevantes">Sin hallazgos relevantes</option>
+            <option value="Trombosis venosa previa">Trombosis venosa previa</option>
+            <option value="Múltiples accesos previos / capital venoso agotado">Múltiples accesos previos / capital venoso agotado</option>
+            <option value="CVC / PICC actual o reciente">CVC / PICC actual o reciente</option>
+            <option value="Fístula arteriovenosa (evitar esa extremidad)">Fístula arteriovenosa (evitar esa extremidad)</option>
+            <option value="Mastectomía / vaciamiento axilar (evitar ese lado)">Mastectomía / vaciamiento axilar (evitar ese lado)</option>
+            <option value="Marcapasos / DAI (dispositivo cardíaco)">Marcapasos / DAI (dispositivo cardíaco)</option>
+            <option value="Infección o hematoma en sitio de punción">Infección o hematoma en sitio de punción</option>
+            <option value="Linfedema de extremidad">Linfedema de extremidad</option>
+            <option value="otro">Otro (especificar)</option>
+          </select>
+          <input type="text" id="afAccesosVascOtro" placeholder="Describe el hallazgo vascular o qué zonas evitar..." style="display:none;margin-top:6px" autocomplete="off" />
           <label>Plaquetas / Coagulación</label>
           <input type="text" id="afAccesosCoag" placeholder="Ej: plaquetas 120k, INR 1.1, TACO suspendido hace 48h" autocomplete="off" />
         </div>
@@ -2948,6 +2961,6 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=91"></script>
+<script src="app.js?v=92"></script>
 </body>
 </html>

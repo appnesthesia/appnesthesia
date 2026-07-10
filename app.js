@@ -7317,6 +7317,7 @@ const AGEND_SALAS = [
   {
     id:'accesos_vasculares', name:'Accesos Vasculares', ico:'💉', color:'#0D9488',
     desc:'PICC, MidLine, CVC, catéter de diálisis transitorio, vía venosa periférica',
+    leadTimeHabilesH: 0, // sin anticipación mínima: se puede agendar el mismo día
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
       3:{start:'08:00', end:'20:00'}, 4:{start:'08:00', end:'20:00'},
@@ -7429,7 +7430,9 @@ const AGEND_CFG_LS_KEY     = 'appx_agend_cfg_v1';   // config sincronizada (día
 // Anticipación mínima para agendamiento REGULAR (horas hábiles: no cuentan
 // domingos ni feriados/cierres). Bajo este umbral solo queda la vía de
 // Agendamiento Extra (que requiere visado del administrador).
-const AGEND_LEAD_TIME_HABILES_H = 24;
+// jul 2026: se bajó de 24 → 12 h. Cada sala puede sobreescribirlo con
+// "leadTimeHabilesH" en AGEND_SALAS (Accesos Vasculares = 0, sin límite).
+const AGEND_LEAD_TIME_HABILES_H = 12;
 
 // Feriados irrenunciables de Chile (mes-día). Se repiten todos los años, por
 // lo que no requieren mantención anual. Las elecciones u otros feriados se
@@ -7556,11 +7559,20 @@ function _agendSlotDatetime(dateStr, startMin){
   dt.setHours(Math.floor((startMin||0)/60), (startMin||0)%60, 0, 0);
   return dt;
 }
+// Horas hábiles de anticipación mínima para una sala. Cada sala puede
+// definir "leadTimeHabilesH" (Accesos Vasculares = 0 → sin límite);
+// si no lo define, rige el general AGEND_LEAD_TIME_HABILES_H.
+function _agendLeadTimeHours(salaId){
+  const sala = _agendGetSala(salaId);
+  if(sala && typeof sala.leadTimeHabilesH === 'number') return sala.leadTimeHabilesH;
+  return AGEND_LEAD_TIME_HABILES_H;
+}
 // Primer instante permitido para agenda regular: ahora + N horas, descontando
 // domingos y feriados/cierres (no cuentan como horas hábiles).
-function _agendLeadTimeDeadline(){
-  let remaining = AGEND_LEAD_TIME_HABILES_H;
+function _agendLeadTimeDeadline(salaId){
+  let remaining = _agendLeadTimeHours(salaId);
   let cursor = new Date();
+  if(remaining <= 0) return cursor; // sin anticipación mínima
   let guard = 0;
   while(remaining > 0 && guard < 24*90){
     cursor = new Date(cursor.getTime() + 3600*1000); // +1 hora
@@ -7571,8 +7583,8 @@ function _agendLeadTimeDeadline(){
   }
   return cursor;
 }
-function _agendMeetsLeadTime(dateStr, startMin){
-  return _agendSlotDatetime(dateStr, startMin).getTime() >= _agendLeadTimeDeadline().getTime();
+function _agendMeetsLeadTime(dateStr, startMin, salaId){
+  return _agendSlotDatetime(dateStr, startMin).getTime() >= _agendLeadTimeDeadline(salaId).getTime();
 }
 
 // --- Sync del canal de config (cierres manuales) ---
@@ -8412,7 +8424,7 @@ function agendRenderCalendario(){
   const allowsExtra = !!(sala && sala.allowsExtra);
   // Primer día agendable por agenda regular (lead-time): los días anteriores
   // quedan "muy pronto" para la unidad (solo Extra).
-  const _dl = _agendLeadTimeDeadline();
+  const _dl = _agendLeadTimeDeadline(AGEND_STATE.salaId);
   const deadlineDs = _agendDateStr(_dl.getFullYear(), _dl.getMonth(), _dl.getDate());
   let html = '';
   for(let i=0; i<offset; i++) html += `<div class="agend-cal-day empty"></div>`;
@@ -8478,8 +8490,8 @@ function agendOfrecerExtraDesdeCal(dateStr){
   let motivo;
   if(_agendIsClosedDate(dateStr)){
     motivo = `El ${fmt} está cerrado (${_agendClosureLabel(dateStr)}).`;
-  } else if(_agendSlotDatetime(dateStr, AGEND_DAY_END_MIN).getTime() < _agendLeadTimeDeadline().getTime()){
-    motivo = `El ${fmt} está dentro de las ${AGEND_LEAD_TIME_HABILES_H} h hábiles de anticipación mínima para agenda regular.`;
+  } else if(_agendSlotDatetime(dateStr, AGEND_DAY_END_MIN).getTime() < _agendLeadTimeDeadline(AGEND_STATE.salaId).getTime()){
+    motivo = `El ${fmt} está dentro de las ${_agendLeadTimeHours(AGEND_STATE.salaId)} h hábiles de anticipación mínima para agenda regular.`;
   } else {
     motivo = `${sala.name} no tiene agenda regular el ${fmt}.`;
   }
@@ -8922,7 +8934,8 @@ function _agendApplyFormModeForSala(sala){
     if(esAccesos){
       const el1 = document.getElementById('afAccesosLado'); if(el1) el1.value = '';
       const el2 = document.getElementById('afAccesosUrg');  if(el2) el2.value = 'programado';
-      const el3 = document.getElementById('afAccesosVasc'); if(el3) el3.value = '';
+      const el3 = document.getElementById('afAccesosVasc'); if(el3){ el3.value = ''; el3.onchange = _agendOnAccesosVascChange; }
+      const el3b = document.getElementById('afAccesosVascOtro'); if(el3b){ el3b.value = ''; el3b.style.display = 'none'; }
       const el4 = document.getElementById('afAccesosCoag'); if(el4) el4.value = '';
       const el5 = document.getElementById('afAccesosTrat'); if(el5){ el5.value = ''; el5.onchange = _agendOnAccesosTratChange; }
       const el6 = document.getElementById('afAccesosTratOtro'); if(el6){ el6.value = ''; el6.style.display = 'none'; }
@@ -8931,6 +8944,16 @@ function _agendApplyFormModeForSala(sala){
       const el9 = document.getElementById('afAccesosDiva'); if(el9) el9.value = '';
     }
   }
+}
+
+// Si en "Hallazgos vasculares" se eligió "Otro" se muestra un input libre
+function _agendOnAccesosVascChange(){
+  const sel = document.getElementById('afAccesosVasc');
+  const otro = document.getElementById('afAccesosVascOtro');
+  if(!sel || !otro) return;
+  const esOtro = (sel.value === 'otro');
+  otro.style.display = esOtro ? '' : 'none';
+  if(!esOtro) otro.value = '';
 }
 
 // Si en "Tratamiento que se solicita" se eligió "Otro" se muestra un input libre
@@ -9150,11 +9173,12 @@ async function agendSubmitSolicitud(ev){
         (sala && sala.allowsExtra ? '\n\nSi es imprescindible, usa "Agendamiento Extra" (requiere visado del administrador).' : '\n\nElige otra fecha.'));
       return;
     }
-    if(prio !== 'urgente' && !_agendMeetsLeadTime(dateStr, startMin)){
-      const dl = _agendLeadTimeDeadline();
-      alert(`Las solicitudes electivas requieren al menos ${AGEND_LEAD_TIME_HABILES_H} horas hábiles de anticipación ` +
+    if(prio !== 'urgente' && !_agendMeetsLeadTime(dateStr, startMin, salaId)){
+      const dl = _agendLeadTimeDeadline(salaId);
+      const _lh = _agendLeadTimeHours(salaId);
+      alert(`Las solicitudes electivas requieren al menos ${_lh} horas hábiles de anticipación ` +
         `(sin contar domingos ni feriados).\n\nEl primer horario disponible es a partir del ${dl.toLocaleString('es-CL')}.` +
-        `\n\nSi el caso es de menos de 24 h, marca la prioridad como "Urgente"` +
+        `\n\nSi el caso es de menos de ${_lh} h, marca la prioridad como "Urgente"` +
         (sala && sala.allowsExtra ? ', o solicita un "Agendamiento Extra" (requiere visado).' : '.'));
       return;
     }
@@ -9225,7 +9249,13 @@ async function agendSubmitSolicitud(ev){
   if(sala && sala.id === 'accesos_vasculares'){
     const lado = document.getElementById('afAccesosLado'); if(lado) req.accesosLado = lado.value;
     const urg  = document.getElementById('afAccesosUrg');  if(urg)  req.accesosUrgencia = urg.value;
-    const vasc = document.getElementById('afAccesosVasc'); if(vasc) req.accesosHallazgos = vasc.value.trim();
+    // Hallazgos vasculares: ahora es un select obligatorio (jul 2026)
+    const vasc = document.getElementById('afAccesosVasc');
+    const vascOtro = document.getElementById('afAccesosVascOtro');
+    let vascVal = vasc ? vasc.value : '';
+    if(vascVal === 'otro') vascVal = (vascOtro && vascOtro.value.trim()) ? ('Otro: ' + vascOtro.value.trim()) : '';
+    if(!vascVal){ alert('Indica los HALLAZGOS VASCULARES del paciente (si no tiene, selecciona "Sin hallazgos relevantes").'); return; }
+    req.accesosHallazgos = vascVal;
     const coag = document.getElementById('afAccesosCoag'); if(coag) req.accesosCoagulacion = coag.value.trim();
     // Tratamiento / infusión / duración / DIVA (jul 2026) — obligatorios,
     // orientan la elección del dispositivo (PICC vs MidLine vs CVC vs VVP)
