@@ -9,7 +9,11 @@
   "backendToken": "pollo1902",
   "agendCcEmails": [
     "ahernandez@clinicauandes.cl",
-    "oacosta@clinicauandes.cl"
+    "oacosta@clinicauandes.cl",
+    "cpvasquezz@clinicauandes.cl"
+  ],
+  "agendCcAccesosEmails": [
+    "cbrante@clinicauandes.cl"
   ],
   "aiURL": "https://appnesthesia-ia.fernandorojasbravo.workers.dev",
   "pushURL": "https://appnesthesia-push.fernandorojasbravo.workers.dev",
@@ -174,28 +178,6 @@
     {
       "id": "s_rojas",
       "name": "Rojas",
-      "role": "Staff",
-      "cumplimientoJornadas": "75-85",
-      "jornadasBorradas": 0,
-      "equipoTMT": false,
-      "equipoCardio": false,
-      "equipoPediatria": false,
-      "rolCoordinacion": false,
-      "noFondoComun": false,
-      "residenciaAnios": "1-5",
-      "esResidente": false,
-      "llamadaPediatrica": false,
-      "llamadaCardio": false,
-      "primeraLlamadaFija": false,
-      "segundaLlamadaFija": false,
-      "coberturaTurnoUrg": false,
-      "coberturaLlamada1": false,
-      "coberturaLlamada2": false,
-      "exentoCobertura": false
-    },
-    {
-      "id": "s_canepa",
-      "name": "Canepa",
       "role": "Staff",
       "cumplimientoJornadas": "75-85",
       "jornadasBorradas": 0,
