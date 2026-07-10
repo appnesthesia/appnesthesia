@@ -1386,6 +1386,7 @@ button.ic-cal-cell:hover{background:var(--tint1);border-color:var(--green-light)
 .agend-slot.aprobada{background:linear-gradient(90deg,#dcfce7 0%,var(--card) 60%);border-color:#bbf7d0;border-left:4px solid #16a34a}
 .agend-slot.rechazada{background:#fef2f2;border-color:#fecaca;border-left:4px solid var(--danger);opacity:.7}
 .agend-slot.propuesta{background:linear-gradient(90deg,#eef2ff 0%,var(--card) 60%);border-color:#c7d2fe;border-left:4px solid #6366f1}
+.agend-slot.realizada{background:linear-gradient(90deg,#e0f2fe 0%,var(--card) 60%);border-color:#bae6fd;border-left:4px solid #0284c7;opacity:.9}
 .agend-slot-hour{font-family:'Manrope','Inter',sans-serif;font-size:15px;font-weight:800;color:var(--primary-dark);min-width:62px;letter-spacing:.4px}
 .agend-slot-body{flex:1;font-size:13px;line-height:1.4}
 .agend-slot-name{font-weight:700;color:var(--primary-dark);font-size:13.5px}
@@ -1393,6 +1394,7 @@ button.ic-cal-cell:hover{background:var(--tint1);border-color:var(--green-light)
 .agend-slot-meta{font-size:11px;color:var(--muted);margin-top:3px}
 .agend-slot-status{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;flex-shrink:0}
 .agend-slot-status.pendiente{background:#fef3c7;color:#92400e}
+.agend-slot-status.realizada{background:#e0f2fe;color:#075985}
 .agend-slot-status.aprobada{background:#dcfce7;color:#166534}
 .agend-slot-status.rechazada{background:#fee2e2;color:#991b1b}
 .agend-slot-status.propuesta{background:#e0e7ff;color:#3730a3}
@@ -1699,6 +1701,17 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 .pu-crit ol{margin:0;padding-left:20px;font-size:13px;line-height:1.55;color:var(--text)}
 .pu-dl{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
 .pu-dl .btn-primary{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:var(--shadow)}
+/* Seguimiento de solicitudes (Agendamiento) */
+.agend-seg-intro{font-size:12.5px;color:var(--muted);background:var(--tint1);border:1px solid var(--green-pale);border-radius:10px;padding:9px 12px;margin:10px 0;line-height:1.5}
+.agend-seg-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.agend-seg-chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:9px;background:#f3f4f6;color:#374151;white-space:nowrap}
+/* Mismos colores que las píldoras del Seguimiento de Interconsultas */
+.agend-seg-chip.pendiente{background:#fef9c3;color:#854d0e}
+.agend-seg-chip.propuesta{background:#e0e7ff;color:#3730a3}
+.agend-seg-chip.aprobada{background:#e0f2fe;color:#075985}
+.agend-seg-chip.realizada{background:#dcfce7;color:#166534}
+.agend-seg-chip.rechazada{background:#fee2e2;color:#991b1b}
+.agend-seg-coment{font-size:11.5px;color:var(--muted);margin-top:3px;font-style:italic}
 </style>
 </head>
 <body>
@@ -2063,6 +2076,14 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
           </div>
           <div class="agend-cta-arrow">›</div>
         </button>
+        <button type="button" class="agend-cta" onclick="agendEnterSeguimiento()">
+          <div class="agend-cta-ico">🔎</div>
+          <div class="agend-cta-body">
+            <div class="agend-cta-name">Seguimiento de solicitudes</div>
+            <div class="agend-cta-desc">Estado de todas las solicitudes: pendientes, con propuesta, aprobadas o rechazadas</div>
+          </div>
+          <div class="agend-cta-arrow">›</div>
+        </button>
         <button type="button" class="agend-cta" onclick="agendGoToAdmin()">
           <div class="agend-cta-ico">✅</div>
           <div class="agend-cta-body">
@@ -2215,6 +2236,48 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
               </select>
             </div>
           </div>
+          <label>Tratamiento que se solicita *</label>
+          <select id="afAccesosTrat">
+            <option value="">— Seleccionar —</option>
+            <option value="Antibiótico">Antibiótico</option>
+            <option value="Quimioterapia">Quimioterapia</option>
+            <option value="Nutrición parenteral">Nutrición parenteral</option>
+            <option value="Drogas vasoactivas">Drogas vasoactivas</option>
+            <option value="Analgesia / manejo del dolor">Analgesia / manejo del dolor</option>
+            <option value="Hidratación / fleboclisis">Hidratación / fleboclisis</option>
+            <option value="Hemoderivados / transfusión">Hemoderivados / transfusión</option>
+            <option value="Extracciones frecuentes / monitoreo">Extracciones frecuentes / monitoreo</option>
+            <option value="Hemodiálisis / aféresis">Hemodiálisis / aféresis</option>
+            <option value="Medio de contraste EV">Medio de contraste EV</option>
+            <option value="otro">Otro (especificar)</option>
+          </select>
+          <input type="text" id="afAccesosTratOtro" placeholder="Especifica el tratamiento solicitado..." style="display:none;margin-top:6px" autocomplete="off" />
+          <div class="row2">
+            <div>
+              <label>Tipo de infusión *</label>
+              <select id="afAccesosInfusion">
+                <option value="">— Seleccionar —</option>
+                <option value="central">Central</option>
+                <option value="periférica">Periférica</option>
+                <option value="a definir por Anestesia">A definir por Anestesia</option>
+              </select>
+            </div>
+            <div>
+              <label>Duración del tratamiento *</label>
+              <select id="afAccesosDuracion">
+                <option value="">— Seleccionar —</option>
+                <option value="0 a 7 días">0 a 7 días</option>
+                <option value="más de 7 a 30 días">Más de 7 a 30 días</option>
+                <option value="más de 30 días">Más de 30 días</option>
+              </select>
+            </div>
+          </div>
+          <label>¿Acceso venoso difícil (DIVA)?</label>
+          <select id="afAccesosDiva">
+            <option value="">— No evaluado —</option>
+            <option value="no">No</option>
+            <option value="si">Sí — acceso venoso difícil</option>
+          </select>
           <label>Hallazgos vasculares / accesos previos</label>
           <textarea id="afAccesosVasc" placeholder="Vasos disponibles, accesos previos, trombosis, hematomas, ubicaciones a evitar..."></textarea>
           <label>Plaquetas / Coagulación</label>
@@ -2283,9 +2346,17 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
         <button type="button" class="agend-overview-tab active" data-tab="pendiente" onclick="agendOverviewTab('pendiente')">Pendientes <span class="agend-overview-count" id="ovCountPend">0</span></button>
         <button type="button" class="agend-overview-tab" data-tab="propuesta" onclick="agendOverviewTab('propuesta')">Propuestas <span class="agend-overview-count" id="ovCountProp">0</span></button>
         <button type="button" class="agend-overview-tab" data-tab="aprobada" onclick="agendOverviewTab('aprobada')">Aprobadas <span class="agend-overview-count" id="ovCountAprob">0</span></button>
+        <button type="button" class="agend-overview-tab" data-tab="realizada" onclick="agendOverviewTab('realizada')">Realizadas <span class="agend-overview-count" id="ovCountReal">0</span></button>
         <button type="button" class="agend-overview-tab" data-tab="rechazada" onclick="agendOverviewTab('rechazada')">Rechazadas <span class="agend-overview-count" id="ovCountRech">0</span></button>
       </div>
       <div id="agendOverviewList" class="agend-slot-list"></div>
+    </div>
+
+    <!-- Vista: Seguimiento de solicitudes (solo lectura, sin PIN) -->
+    <div class="agend-view" data-view="seguimiento">
+      <div class="agend-seg-intro">Estado de cada solicitud: <b>🎫 Recibida</b> (en espera de visado) → <b>🔁 Propuesta</b> (Anestesia propuso otro horario) → <b>🔵 Aprobada</b> → <b>✅ Realizada</b> · <b>❌ Rechazada</b>. Por privacidad, los pacientes aparecen con sus iniciales.</div>
+      <div id="agendSegCounts" class="agend-seg-chips"></div>
+      <div id="agendSegList" class="agend-slot-list"></div>
     </div>
   </div>
 </div>
@@ -2877,6 +2948,6 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=88"></script>
+<script src="app.js?v=90"></script>
 </body>
 </html>

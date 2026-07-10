@@ -4559,7 +4559,11 @@ async function aiAnalizarSolicitud(reqId){
     accesos_lado: r.accesosLado || undefined,
     accesos_urgencia: r.accesosUrgencia || undefined,
     accesos_hallazgos: r.accesosHallazgos || undefined,
-    accesos_coagulacion: r.accesosCoagulacion || undefined
+    accesos_coagulacion: r.accesosCoagulacion || undefined,
+    accesos_tratamiento: r.accesosTratamiento || undefined,
+    accesos_tipo_infusion: r.accesosInfusion || undefined,
+    accesos_duracion_tratamiento: r.accesosDuracion || undefined,
+    accesos_diva_acceso_dificil: r.accesosDiva ? (r.accesosDiva === 'si' ? 'SÍ — acceso venoso difícil' : 'no') : undefined
   };
   const cont = document.getElementById('aiVisadoResult');
   if(cont){
@@ -7917,7 +7921,7 @@ function _agendCountDay(salaId, dateStr){
   let pend=0, aprob=0, rech=0;
   slots.forEach(r => {
     if(r.estado === 'pendiente' || r.estado === 'propuesta') pend++;
-    else if(r.estado === 'aprobada') aprob++;
+    else if(r.estado === 'aprobada' || r.estado === 'realizada') aprob++;
     else if(r.estado === 'rechazada') rech++;
   });
   return {pend, aprob, rech, total: pend+aprob+rech};
@@ -8119,6 +8123,9 @@ function _agendRefreshChromeForView(view){
   } else if(view === 'overview'){
     _agendSetTitle('Bandeja de solicitudes', AGEND_STATE.mode === 'admin' ? (AGEND_STATE.staffNombre || 'Admin') : '');
     _agendSetHeadAction('Salas', () => agendShowSalasView());
+  } else if(view === 'seguimiento'){
+    _agendSetTitle('Seguimiento de solicitudes','Estado de las solicitudes enviadas');
+    _agendSetHeadAction(null);
   }
 }
 
@@ -8917,8 +8924,23 @@ function _agendApplyFormModeForSala(sala){
       const el2 = document.getElementById('afAccesosUrg');  if(el2) el2.value = 'programado';
       const el3 = document.getElementById('afAccesosVasc'); if(el3) el3.value = '';
       const el4 = document.getElementById('afAccesosCoag'); if(el4) el4.value = '';
+      const el5 = document.getElementById('afAccesosTrat'); if(el5){ el5.value = ''; el5.onchange = _agendOnAccesosTratChange; }
+      const el6 = document.getElementById('afAccesosTratOtro'); if(el6){ el6.value = ''; el6.style.display = 'none'; }
+      const el7 = document.getElementById('afAccesosInfusion'); if(el7) el7.value = '';
+      const el8 = document.getElementById('afAccesosDuracion'); if(el8) el8.value = '';
+      const el9 = document.getElementById('afAccesosDiva'); if(el9) el9.value = '';
     }
   }
+}
+
+// Si en "Tratamiento que se solicita" se eligió "Otro" se muestra un input libre
+function _agendOnAccesosTratChange(){
+  const sel = document.getElementById('afAccesosTrat');
+  const otro = document.getElementById('afAccesosTratOtro');
+  if(!sel || !otro) return;
+  const esOtro = (sel.value === 'otro');
+  otro.style.display = esOtro ? '' : 'none';
+  if(!esOtro) otro.value = '';
 }
 
 // Si en el catálogo se eligió "Otro acceso vascular" se muestra un input libre
@@ -9205,6 +9227,22 @@ async function agendSubmitSolicitud(ev){
     const urg  = document.getElementById('afAccesosUrg');  if(urg)  req.accesosUrgencia = urg.value;
     const vasc = document.getElementById('afAccesosVasc'); if(vasc) req.accesosHallazgos = vasc.value.trim();
     const coag = document.getElementById('afAccesosCoag'); if(coag) req.accesosCoagulacion = coag.value.trim();
+    // Tratamiento / infusión / duración / DIVA (jul 2026) — obligatorios,
+    // orientan la elección del dispositivo (PICC vs MidLine vs CVC vs VVP)
+    const trat = document.getElementById('afAccesosTrat');
+    const tratOtro = document.getElementById('afAccesosTratOtro');
+    const inf  = document.getElementById('afAccesosInfusion');
+    const dur  = document.getElementById('afAccesosDuracion');
+    const diva = document.getElementById('afAccesosDiva');
+    let tratVal = trat ? trat.value : '';
+    if(tratVal === 'otro') tratVal = (tratOtro && tratOtro.value.trim()) ? ('Otro: ' + tratOtro.value.trim()) : '';
+    if(!tratVal){ alert('Indica el TRATAMIENTO que se solicita (antibiótico, quimioterapia, nutrición parenteral...).'); return; }
+    if(inf && !inf.value){ alert('Indica el TIPO DE INFUSIÓN (central o periférica).'); return; }
+    if(dur && !dur.value){ alert('Indica la DURACIÓN estimada del tratamiento.'); return; }
+    req.accesosTratamiento = tratVal;
+    req.accesosInfusion = inf ? inf.value : '';
+    req.accesosDuracion = dur ? dur.value : '';
+    req.accesosDiva = diva ? diva.value : '';
   }
   req.updatedAt = Date.now();
   data[salaId][dateStr].push(req);
@@ -9345,6 +9383,21 @@ function agendOpenDetalle(reqId){
       </div>
       <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>
       ${btnIA}`;
+  } else if(AGEND_STATE.mode === 'admin' && req.estado === 'aprobada'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-action-btn aprobar" onclick="agendVisarSolicitud('${req.id}','realizada')">✅ Marcar realizada</button>
+        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','pendiente')" style="background:var(--card);color:var(--muted)">Revertir a pendiente</button>
+      </div>
+      <div class="agend-detalle-actions" style="margin-top:8px">${btnEliminar}</div>
+      ${btnIA}`;
+  } else if(AGEND_STATE.mode === 'admin' && req.estado === 'realizada'){
+    actionsHtml = `
+      <div class="agend-detalle-actions">
+        <button type="button" class="agend-btn-secondary" onclick="agendVisarSolicitud('${req.id}','aprobada')" style="background:var(--card);color:var(--muted)">↩ Volver a aprobada</button>
+        ${btnEliminar}
+      </div>
+      ${btnIA}`;
   } else if(AGEND_STATE.mode === 'admin' && req.estado !== 'pendiente'){
     actionsHtml = `
       <div class="agend-detalle-actions">
@@ -9383,6 +9436,10 @@ function agendOpenDetalle(reqId){
   // Bloque opcional con campos extras de Accesos Vasculares
   const accesosRows = (sala && sala.id === 'accesos_vasculares')
     ? `
+      ${req.accesosTratamiento ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Tratamiento</div><div class="agend-detalle-v">${_gpEsc(req.accesosTratamiento)}</div></div>` : ''}
+      ${req.accesosInfusion ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Infusión</div><div class="agend-detalle-v">${_gpEsc(req.accesosInfusion)}</div></div>` : ''}
+      ${req.accesosDuracion ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Duración tto.</div><div class="agend-detalle-v">${_gpEsc(req.accesosDuracion)}</div></div>` : ''}
+      ${req.accesosDiva ? `<div class="agend-detalle-row"><div class="agend-detalle-k">DIVA</div><div class="agend-detalle-v">${req.accesosDiva==='si' ? '<b style="color:#dc2626">⚠ Sí — acceso venoso difícil</b>' : 'No'}</div></div>` : ''}
       ${req.accesosLado ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Lado</div><div class="agend-detalle-v">${_gpEsc(req.accesosLado)}</div></div>` : ''}
       ${req.accesosUrgencia ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Urgencia</div><div class="agend-detalle-v">${_gpEsc(req.accesosUrgencia)}</div></div>` : ''}
       ${req.accesosHallazgos ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Hallazgos vasculares</div><div class="agend-detalle-v">${_gpEsc(req.accesosHallazgos)}</div></div>` : ''}
@@ -9409,6 +9466,7 @@ function agendOpenDetalle(reqId){
       <div class="agend-detalle-row"><div class="agend-detalle-k">Solicitante</div><div class="agend-detalle-v">${_gpEsc(req.solicitanteNombre||'—')}${req.solicitanteTel?`<br><span style="color:var(--muted);font-size:12px">📞 ${_gpEsc(req.solicitanteTel)}</span>`:''}${req.solicitanteEmail?`<br><span style="color:var(--muted);font-size:12px">✉️ ${_gpEsc(req.solicitanteEmail)}</span>`:''}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Creada</div><div class="agend-detalle-v">${new Date(req.createdAt).toLocaleString('es-CL')}</div></div>
       <div class="agend-detalle-row"><div class="agend-detalle-k">Visado</div><div class="agend-detalle-v">${visadoTxt}</div></div>
+      ${req.realizadaAt ? `<div class="agend-detalle-row"><div class="agend-detalle-k">Realizada</div><div class="agend-detalle-v">✅ ${_gpEsc(req.realizadaBy||'Anestesia')} · ${new Date(req.realizadaAt).toLocaleString('es-CL')}</div></div>` : ''}
       ${actionsHtml}
     </div>`;
 }
@@ -9431,7 +9489,8 @@ async function agendVisarSolicitud(reqId, nuevoEstado){
   if(idx < 0) return;
   const slot = arr[idx];
   // Si vamos a revertir a pendiente o aprobar y antes estaba rechazada, validar overlap + cross-block
-  if(nuevoEstado !== 'rechazada'){
+  // ("realizada" no valida: el procedimiento ya ocurrió, el horario no cambia)
+  if(nuevoEstado !== 'rechazada' && nuevoEstado !== 'realizada'){
     const overlap = _agendFindOverlap(found.salaId, found.dateStr, slot.startMin, slot.endMin, reqId, !!slot.isExtra);
     if(overlap){
       alert(`No se puede ${nuevoEstado === 'aprobada' ? 'aprobar' : 'revertir'}: choca con otra solicitud activa (${_agendFmtRange(overlap.startMin, overlap.endMin)}).`);
@@ -9445,10 +9504,19 @@ async function agendVisarSolicitud(reqId, nuevoEstado){
     }
   }
   slot.estado = nuevoEstado;
-  slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
-  slot.visadoAt = Date.now();
-  slot.updatedAt = Date.now();
-  slot.comentarioVisado = comentario;
+  if(nuevoEstado === 'realizada'){
+    // Marcar realizada NO pisa los datos del visado (quién aprobó y su comentario)
+    slot.realizadaBy = AGEND_STATE.staffNombre || 'Anestesia';
+    slot.realizadaAt = Date.now();
+    slot.updatedAt = Date.now();
+  } else {
+    slot.visadoBy = AGEND_STATE.staffNombre || 'Anestesia';
+    slot.visadoAt = Date.now();
+    slot.updatedAt = Date.now();
+    slot.comentarioVisado = comentario;
+    // Si se revierte/reaprueba, ya no está "realizada"
+    delete slot.realizadaBy; delete slot.realizadaAt;
+  }
   // Cualquier visado directo (aprobar/rechazar/revertir) descarta una
   // contrapropuesta vigente para no dejar un recuadro de propuesta huérfano.
   if(slot.propuesta) delete slot.propuesta;
@@ -9541,6 +9609,10 @@ function _agendOfrecerMailtoConfirmacion(req, salaId, dateStr){
   if(req.notas) lineas.push(`• Antecedentes: ${req.notas}`);
   // Extras Accesos Vasculares
   if(salaId === 'accesos_vasculares'){
+    if(req.accesosTratamiento) lineas.push(`• Tratamiento solicitado: ${req.accesosTratamiento}`);
+    if(req.accesosInfusion)    lineas.push(`• Tipo de infusión: ${req.accesosInfusion}`);
+    if(req.accesosDuracion)    lineas.push(`• Duración del tratamiento: ${req.accesosDuracion}`);
+    if(req.accesosDiva)        lineas.push(`• DIVA (acceso venoso difícil): ${req.accesosDiva === 'si' ? 'SÍ' : 'No'}`);
     if(req.accesosLado)        lineas.push(`• Lado preferente: ${req.accesosLado}`);
     if(req.accesosUrgencia)    lineas.push(`• Urgencia: ${req.accesosUrgencia}`);
     if(req.accesosHallazgos)   lineas.push(`• Hallazgos vasculares: ${req.accesosHallazgos}`);
@@ -9890,17 +9962,91 @@ function agendShowOverview(tab){
   // Refrescar desde la nube por si llegaron solicitudes nuevas
   try{ agendSyncNow().then(()=>{ if(AGEND_STATE.view==='overview') agendOverviewTab(AGEND_STATE.overviewTab); }); }catch(e){}
 }
+// ============================================================
+// SEGUIMIENTO DE SOLICITUDES (vista pública de solo lectura, sin PIN)
+// Igual que el Seguimiento de Interconsultas: cualquiera puede ver el
+// estado de las solicitudes. Pacientes anonimizados con iniciales.
+// ============================================================
+// Mismas etiquetas e íconos que el Seguimiento de Interconsultas:
+// 🎫 Recibida → 🔁 Propuesta → 🔵 Aprobada → ✅ Realizada · ❌ Rechazada
+const AGEND_SEG_META = {
+  pendiente: { ico:'🎫', label:'Recibida' },
+  propuesta: { ico:'🔁', label:'Propuesta' },
+  aprobada:  { ico:'🔵', label:'Aprobada' },
+  realizada: { ico:'✅', label:'Realizada' },
+  rechazada: { ico:'❌', label:'Rechazada' }
+};
+function agendEnterSeguimiento(){
+  _agendShowView('seguimiento', true);
+  _agendRefreshChromeForView('seguimiento');
+  _agendRenderSeguimiento();
+  // Refrescar desde la nube por si hubo cambios de estado
+  try{ agendSyncNow().then(()=>{ if(AGEND_STATE.view==='seguimiento') _agendRenderSeguimiento(); }); }catch(e){}
+}
+function _agendInicialesPaciente(nombre){
+  const parts = String(nombre||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '—';
+  return parts.map(p => (p[0]||'').toUpperCase() + '.').join(' ');
+}
+function _agendRenderSeguimiento(){
+  const cont = document.getElementById('agendSegList');
+  const cCont = document.getElementById('agendSegCounts');
+  if(!cont) return;
+  const all = _agendAllRequests();
+  const counts = { pendiente:0, propuesta:0, aprobada:0, realizada:0, rechazada:0 };
+  all.forEach(r => { if(counts[r.estado] !== undefined) counts[r.estado]++; });
+  if(cCont){
+    cCont.innerHTML = Object.keys(AGEND_SEG_META).map(k =>
+      `<span class="agend-seg-chip ${k}">${AGEND_SEG_META[k].ico} ${AGEND_SEG_META[k].label}s · ${counts[k]}</span>`
+    ).join('');
+  }
+  if(all.length === 0){
+    cont.innerHTML = '<div class="agend-empty">Aún no hay solicitudes para seguir.</div>';
+    return;
+  }
+  // Activas primero (pendiente → propuesta), luego aprobadas y rechazadas;
+  // dentro de cada grupo por fecha del procedimiento.
+  const orden = { pendiente:0, propuesta:1, aprobada:2, realizada:3, rechazada:4 };
+  const list = all.slice().sort((a,b)=>{
+    const o = (orden[a.estado] ?? 9) - (orden[b.estado] ?? 9);
+    if(o !== 0) return o;
+    const c = String(a.dateStr).localeCompare(String(b.dateStr));
+    if(c !== 0) return c;
+    return (a.startMin||0) - (b.startMin||0);
+  });
+  cont.innerHTML = list.map(r => {
+    const sala = _agendGetSala(r.salaId);
+    const unidad = _agendGetUnidad(r.unidadCode);
+    const dt = _agendParseDateStr(r.dateStr);
+    const m = AGEND_SEG_META[r.estado] || AGEND_SEG_META.pendiente;
+    const hor = r.block
+      ? ('Bloque ' + r.block)
+      : ((typeof r.startMin==='number' && typeof r.endMin==='number') ? _agendFmtRange(r.startMin, r.endMin) : '—');
+    const coment = r.comentarioVisado ? `<div class="agend-seg-coment">💬 ${_gpEsc(r.comentarioVisado)}</div>` : '';
+    return `
+      <div class="agend-slot ${r.estado}" style="cursor:default">
+        <div class="agend-slot-body">
+          <div class="agend-slot-name">${_gpEsc(_agendInicialesPaciente(r.paciente))} · ${_gpEsc(r.procedimiento||'—')}</div>
+          <div class="agend-slot-meta">${sala ? sala.ico+' '+sala.name : ''} · ${dt.getDate()}/${_agendPad(dt.getMonth()+1)}/${dt.getFullYear()} · ${hor}${unidad ? ' · '+unidad.name : ''}${r.solicitanteNombre ? ' · '+_gpEsc(r.solicitanteNombre) : ''}</div>
+          ${coment}
+        </div>
+        <div class="agend-seg-chip ${r.estado}" style="flex-shrink:0;align-self:center">${m.ico} ${m.label}</div>
+      </div>`;
+  }).join('');
+}
+
 function agendOverviewTab(tab){
   AGEND_STATE.overviewTab = tab;
   document.querySelectorAll('#agendScreen .agend-overview-tab').forEach(b => {
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
   const all = _agendAllRequests();
-  const counts = { pendiente:0, propuesta:0, aprobada:0, rechazada:0 };
+  const counts = { pendiente:0, propuesta:0, aprobada:0, realizada:0, rechazada:0 };
   all.forEach(r => { if(counts[r.estado]!==undefined) counts[r.estado]++; });
   document.getElementById('ovCountPend').textContent = counts.pendiente;
   const elProp = document.getElementById('ovCountProp'); if(elProp) elProp.textContent = counts.propuesta;
   document.getElementById('ovCountAprob').textContent = counts.aprobada;
+  const elReal = document.getElementById('ovCountReal'); if(elReal) elReal.textContent = counts.realizada;
   document.getElementById('ovCountRech').textContent = counts.rechazada;
   // Filtrar y ordenar por fecha+inicio ascendente
   const list = all
