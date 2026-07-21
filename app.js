@@ -193,6 +193,12 @@ let _syncTimer = null;
 let _syncStatus = 'idle';
 // Caché de PINs vistos en la nube (para nunca borrarlos en pushes sin fetch previo)
 const _remotePinCache = { staff: {}, admin: null };
+// ¿Tiene este miembro un REINICIO de PIN (del admin) más nuevo que su último
+// PIN registrado? Si es así, NO hay que re-inyectarle el pinHash viejo desde
+// ningún caché: la persona debe crear un PIN nuevo en su próximo ingreso.
+function _pinResetActive(s){
+  return !!(s && (s.pinResetAt||0) > (s.pinSetAt||0));
+}
 function _updateRemotePinCache(remote){
   if(!remote || remote._empty) return;
   (remote.staff||[]).forEach(s=>{ if(s && s.id && s.pinHash) _remotePinCache.staff[s.id] = s.pinHash; });
@@ -201,7 +207,7 @@ function _updateRemotePinCache(remote){
 function _mergePinsFromCache(payload){
   if(Array.isArray(payload.staff)){
     payload.staff = payload.staff.map(s=>
-      (s && s.id && !s.pinHash && _remotePinCache.staff[s.id]) ? {...s, pinHash: _remotePinCache.staff[s.id]} : s);
+      (s && s.id && !s.pinHash && !_pinResetActive(s) && _remotePinCache.staff[s.id]) ? {...s, pinHash: _remotePinCache.staff[s.id]} : s);
   }
   if(!payload.adminPinHash && _remotePinCache.admin) payload.adminPinHash = _remotePinCache.admin;
   return payload;
@@ -301,8 +307,17 @@ function _mergeStaffPreservingDeviceLocal(remoteStaff, localStaff){
       if(ls[k] !== undefined) merged[k] = ls[k];
     });
     // pinHash: si el remoto no tiene PIN pero el local sí, preservamos el local
-    // para que el próximo push lo suba a la nube.
-    if(!merged.pinHash && ls && ls.pinHash) merged.pinHash = ls.pinHash;
+    // para que el próximo push lo suba a la nube… SALVO que el remoto traiga
+    // un REINICIO del admin más nuevo que el PIN local: en ese caso el PIN
+    // local también se borra (la persona creará uno nuevo al entrar).
+    if(!merged.pinHash && ls && ls.pinHash){
+      if((rs.pinResetAt||0) > (ls.pinSetAt||0)){
+        merged.pinHash = null; // reinicio del admin: gana sobre el PIN local
+      } else {
+        merged.pinHash = ls.pinHash;
+        if(ls.pinSetAt) merged.pinSetAt = ls.pinSetAt;
+      }
+    }
     return merged;
   });
 }
@@ -466,7 +481,7 @@ async function pushRemoteState(){
         const remotePinById = {};
         remote.staff.forEach(s=>{ if(s && s.id && s.pinHash) remotePinById[s.id] = s.pinHash; });
         payload.staff = payload.staff.map(s=>
-          (s && s.id && !s.pinHash && remotePinById[s.id]) ? {...s, pinHash: remotePinById[s.id]} : s);
+          (s && s.id && !s.pinHash && !_pinResetActive(s) && remotePinById[s.id]) ? {...s, pinHash: remotePinById[s.id]} : s);
       }
       if(!payload.adminPinHash && remote.adminPinHash) payload.adminPinHash = remote.adminPinHash;
     }
@@ -600,7 +615,7 @@ async function _pushMyPinHash(staffId, pinHash) {
     const remote = await rr.json();
     if(!remote || remote._empty) return;
     const staffArr = Array.isArray(remote.staff)
-      ? remote.staff.map(s => s.id === staffId ? {...s, pinHash} : s)
+      ? remote.staff.map(s => s.id === staffId ? {...s, pinHash, pinSetAt: Date.now()} : s)
       : [];
     const payload = {...remote, staff: staffArr};
     delete payload._updatedAt;
@@ -11000,7 +11015,7 @@ async function selectUser(userId){
   ensureUserDefaults(u);
   // Antes de tratar como "primer ingreso", revisar si este usuario YA tiene
   // un PIN registrado en la nube (configurado desde otro dispositivo).
-  if(!u.pinHash){
+  if(!u.pinHash && !_pinResetActive(u)){
     try{
       const pins = await _fetchRemotePins();
       if(pins && pins.staffPins[u.id]){
@@ -11062,6 +11077,7 @@ async function promptSetupUserPin(user){
               }
               try{
                 user.pinHash = await makePINHash(pin, user.id);
+                user.pinSetAt = Date.now(); // marca "PIN vigente" (gana a reinicios anteriores)
               }catch(e){ pinError('No se pudo guardar el PIN: ' + (e && e.message ? e.message : e)); return; }
               save();
               // Sube el PIN a la nube de inmediato (los no-admin no hacen push del staff array)
@@ -11092,7 +11108,7 @@ async function promptVerifyUserPin(user){
           const r = await verifyPINHash(pin, user.id, user.pinHash);
           if(r.ok){
             if(r.upgrade){ // migración transparente a PBKDF2: re-guardar y subir a la nube
-              user.pinHash = r.upgrade; save();
+              user.pinHash = r.upgrade; user.pinSetAt = Date.now(); save();
               _pushMyPinHash(user.id, user.pinHash).catch(()=>{});
             }
             closePinPad(); res(true);
@@ -11151,6 +11167,7 @@ async function changeUserPIN(){
                 state.adminPinHash = await makePINHash(pin, '__admin__');
               } else {
                 u.pinHash = await makePINHash(pin, u.id);
+                u.pinSetAt = Date.now();
                 // Sube el PIN a la nube de inmediato
                 _pushMyPinHash(u.id, u.pinHash).catch(()=>{});
               }
@@ -11259,6 +11276,8 @@ function renderMiPanel(){
 
   // Facturación (admin: administrar montos · staff: ver el propio)
   try{ renderMiFacturacion(); }catch(e){}
+  // PINs del equipo (solo admin: reiniciar PIN de un staff)
+  try{ renderMiPins(); }catch(e){}
 }
 
 function setPref(k,v){
@@ -11338,6 +11357,109 @@ function renderMiFacturacion(){
   }
 }
 
+// --- Reinicio de PIN por el ADMIN ---
+// Sección "PINs del equipo" en Mi Panel (solo modo admin): permite reiniciar
+// el PIN de cualquier staff. El reinicio pone pinHash=null + pinResetAt=ahora
+// y se propaga: la nube lo respeta (gana a la protección anti-borrado) y el
+// dispositivo de la persona borra su PIN local al sincronizar. En su próximo
+// ingreso, la persona crea un PIN nuevo de 4 dígitos.
+function renderMiPins(){
+  const title = document.getElementById('miPinsTitle');
+  const box = document.getElementById('miPins');
+  if(!title || !box) return;
+  if(!state || !state.isAdmin){ title.style.display='none'; box.style.display='none'; return; }
+  title.style.display = '';
+  box.style.display = '';
+  box.innerHTML = '<div class="mi-pref-row"><div><div class="mi-pref-label">Reiniciar el PIN de un staff</div>'
+    +'<div class="mi-pref-sub">Para quien olvidó o tiene "bloqueado" su PIN. La persona creará uno nuevo en su próximo ingreso.</div></div>'
+    +'<button class="btn sm secondary" onclick="openPinAdmin()">Administrar</button></div>';
+}
+
+function openPinAdmin(){
+  if(!state.isAdmin){ toast('Solo el administrador'); return; }
+  const rows = (state.staff||[]).map(s=>
+    '<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:13px">'+s.name+'</div>'
+    +'<div id="pinst_'+s.id+'" style="font-size:11px;color:var(--muted)">'+(s.pinHash?'PIN registrado en este dispositivo':'Sin PIN en este dispositivo')+'</div></div>'
+    +'<button class="btn sm warn" onclick="adminResetStaffPin(\''+s.id+'\')">Reiniciar</button>'
+    +'</div>'
+  ).join('');
+  modal('<h3>🔑 PINs del equipo</h3>'
+    +'<div class="alert info" style="font-size:12px">Al reiniciar, el PIN actual queda invalidado en la nube y en los dispositivos de la persona (al sincronizar). En su próximo ingreso definirá un PIN nuevo de 4 dígitos. Su perfil y datos no se tocan.</div>'
+    +'<div id="pinAdminStatus" style="font-size:12px;color:var(--muted);margin:6px 0">Consultando PINs registrados en la nube…</div>'
+    +'<div style="max-height:45vh;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:8px 0">'+rows+'</div>'
+    +'<div class="btn-row"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>');
+  _loadPinAdminStatus();
+}
+
+async function _loadPinAdminStatus(){
+  const el = document.getElementById('pinAdminStatus');
+  try{
+    if(!getBackendURL() || !INSTITUTION){ if(el) el.textContent = 'Sin backend configurado: el reinicio solo aplicará en este dispositivo.'; return; }
+    const r = await fetch(getBackendURL() + '/api/state/' + encodeURIComponent(INSTITUTION.id), _stateGetOpts());
+    if(!r.ok){ if(el) el.textContent = 'No se pudo consultar la nube.'; return; }
+    const remote = await r.json();
+    if(!remote || remote._empty){ if(el) el.textContent = 'Nube vacía.'; return; }
+    let n = 0;
+    (remote.staff||[]).forEach(s=>{
+      const span = document.getElementById('pinst_' + s.id);
+      if(!span) return;
+      if(s.pinHash){ n++; span.textContent = '☁️ PIN registrado en la nube'; }
+      else if(_pinResetActive(s)){ span.textContent = '🔄 Reiniciado — creará PIN nuevo al entrar'; }
+      else { span.textContent = 'Sin PIN en la nube (creará uno al entrar)'; }
+    });
+    if(el) el.textContent = n + ' de ' + (state.staff||[]).length + ' con PIN registrado en la nube.';
+  }catch(e){
+    if(el) el.textContent = 'Sin conexión para consultar la nube.';
+  }
+}
+
+// Push del reinicio: igual que _pushMyPinHash pero dejando pinHash=null +
+// pinResetAt, para que la nube y los dispositivos respeten el borrado.
+async function _pushPinReset(staffId, resetAt){
+  const base = getBackendURL();
+  if(!base || !INSTITUTION) throw new Error('sin backend');
+  const token = getBackendToken();
+  if(!token) throw new Error('sin token');
+  const rr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {cache:'no-store', headers:{'Authorization':'Bearer '+token}});
+  if(!rr.ok) throw new Error('GET ' + rr.status);
+  const remote = await rr.json();
+  if(!remote || remote._empty) throw new Error('nube vacía');
+  const staffArr = Array.isArray(remote.staff)
+    ? remote.staff.map(s => s.id === staffId ? {...s, pinHash: null, pinResetAt: resetAt} : s)
+    : [];
+  const payload = {...remote, staff: staffArr};
+  delete payload._updatedAt;
+  delete payload._empty;
+  const pr = await fetch(base + '/api/state/' + encodeURIComponent(INSTITUTION.id), {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body: JSON.stringify(payload)
+  });
+  if(!pr.ok) throw new Error('POST ' + pr.status);
+}
+
+async function adminResetStaffPin(staffId){
+  if(!state.isAdmin){ toast('Solo el administrador'); return; }
+  const s = (state.staff||[]).find(x=>x.id===staffId);
+  if(!s) return;
+  if(!confirm('¿Reiniciar el PIN de ' + s.name + '?\n\nSu PIN actual quedará invalidado y en su próximo ingreso deberá crear uno nuevo de 4 dígitos.')) return;
+  const resetAt = Date.now();
+  s.pinHash = null;
+  s.pinResetAt = resetAt;
+  delete _remotePinCache.staff[staffId]; // que ningún caché lo re-inyecte
+  save();
+  const span = document.getElementById('pinst_' + staffId);
+  try{
+    await _pushPinReset(staffId, resetAt);
+    toast('✅ PIN de ' + s.name + ' reiniciado');
+    if(span) span.textContent = '🔄 Reiniciado — creará PIN nuevo al entrar';
+  }catch(e){
+    toast('Reiniciado en este dispositivo; se subirá a la nube al reconectar');
+    if(span) span.textContent = '🔄 Reiniciado localmente (pendiente de sincronizar)';
+  }
+}
+
 // --- Vista del STAFF: consultar solo el monto propio (sin re-pedir PIN;
 //     entrar al perfil ya exigió el PIN de la persona) ---
 async function billingViewMine(){
@@ -11361,6 +11483,7 @@ async function billingViewMine(){
     if(resp.status === 403 || resp.status === 401){
       // El PIN de este dispositivo no está (o difiere) en la nube — un envío
       // antiguo del staff pudo haberlo pisado. Re-subirlo y reintentar una vez.
+      if(!u.pinSetAt){ u.pinSetAt = Date.now(); saveRaw && saveRaw(); }
       try{ await _pushMyPinHash(u.id, u.pinHash); }catch(e){}
       ({ resp, data } = await _fetchMine());
     }
