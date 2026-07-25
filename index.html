@@ -1802,7 +1802,15 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
         <div class="mod-item-ico">📅</div>
         <div class="mod-item-body">
           <div class="mod-item-name">Agendamiento de procedimientos <span id="agendModBadge" style="display:none;font-size:10px;background:#ea580c;color:#fff;padding:2px 7px;border-radius:9px;font-weight:700"></span></div>
-          <div class="mod-item-desc">Agenda procedimientos con sedación, instalación de accesos vasculares, punción lumbar y otros</div>
+          <div class="mod-item-desc">Agenda procedimientos con sedación, punción lumbar y otros</div>
+        </div>
+        <div class="mod-item-arrow">›</div>
+      </button>
+      <button type="button" class="mod-item" onclick="openVascModule()">
+        <div class="mod-item-ico">💉</div>
+        <div class="mod-item-body">
+          <div class="mod-item-name">Portal Vascular</div>
+          <div class="mod-item-desc">Accesos vasculares: agendamiento, registro de procedimientos y evaluación</div>
         </div>
         <div class="mod-item-arrow">›</div>
       </button>
@@ -1870,6 +1878,21 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
   </div>
   <div class="guias-body">
     <div id="icModuleBody"></div>
+  </div>
+</div>
+
+<!-- PORTAL VASCULAR (módulo propio, oculto hasta abrirse desde el selector de módulo) -->
+<div id="vascScreen" class="guias-screen hidden">
+  <div class="guias-head">
+    <button type="button" class="back-btn" onclick="vascBack()">‹ Volver</button>
+    <div class="logo" role="button" tabindex="0" title="Volver al inicio" aria-label="Volver al inicio" onclick="goToInicio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToInicio();}"><img src="icon-192.png?v=39" alt="Volver al inicio" onerror="this.replaceWith(document.createTextNode('A'))"/></div>
+    <div style="flex:1;min-width:0">
+      <h1>Portal Vascular</h1>
+      <div class="guias-sub" id="vascHeadSub">Accesos vasculares</div>
+    </div>
+  </div>
+  <div class="guias-body">
+    <div id="vascModuleBody"></div>
   </div>
 </div>
 

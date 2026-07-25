@@ -5424,6 +5424,7 @@ function goToInicio(){
   try{ const g  = document.getElementById('guiasScreen');  if(g)  g.classList.add('hidden'); }catch(e){}
   try{ const ic = document.getElementById('icScreen');     if(ic) ic.classList.add('hidden'); }catch(e){}
   try{ const ag = document.getElementById('agendScreen');  if(ag) ag.classList.add('hidden'); }catch(e){}
+  try{ const vs = document.getElementById('vascScreen');   if(vs) vs.classList.add('hidden'); }catch(e){}
   try{ const pu = document.getElementById('pabUrgScreen'); if(pu) pu.classList.add('hidden'); }catch(e){}
   try{ const sc = document.getElementById('solChooser');   if(sc) sc.classList.add('hidden'); }catch(e){}
   try{ const pc = document.getElementById('portalChooser'); if(pc) pc.classList.add('hidden'); }catch(e){}
@@ -7332,6 +7333,7 @@ const AGEND_SALAS = [
   {
     id:'accesos_vasculares', name:'Accesos Vasculares', ico:'💉', color:'#0D9488',
     desc:'PICC, MidLine, CVC, catéter de diálisis transitorio, vía venosa periférica',
+    vascular: true, // vive en el Portal Vascular; se oculta de la lista general de Agendamiento
     leadTimeHabilesH: 0, // sin anticipación mínima: se puede agendar el mismo día
     schedule: {
       1:{start:'08:00', end:'20:00'}, 2:{start:'08:00', end:'20:00'},
@@ -7469,7 +7471,8 @@ const AGEND_STATE = {
   formEndMin: null,
   detalleId: null,
   overviewTab: 'pendiente',
-  navStack: []
+  navStack: [],
+  vascOnly: false   // true cuando se entra desde el Portal Vascular (solo salas vasculares)
 };
 
 // --- Persistencia ---
@@ -8202,7 +8205,9 @@ function agendSalirAdminConfirm(){
 }
 
 // --- Apertura / cierre del módulo ---
-function openAgendamientoModule(){
+function openAgendamientoModule(opts){
+  // opts.vasc = true → contexto Portal Vascular (solo salas vasculares).
+  AGEND_STATE.vascOnly = !!(opts && opts.vasc);
   const mod = document.getElementById('modulesScreen');
   if(mod) mod.classList.add('hidden');
   const ov = document.getElementById('agendScreen');
@@ -8300,8 +8305,18 @@ function agendUnidadDoLogin(){
 // Tras identificarse, la unidad entra DIRECTO a su sala asociada (si tiene una).
 // "Volver" desde el calendario lleva al listado de salas por si necesita otra.
 function agendEntrarASalaDeUnidad(){
+  // Portal Vascular: entra directo a la (única) sala vascular.
+  if(AGEND_STATE.vascOnly){
+    const vs = AGEND_SALAS.filter(s => s.vascular);
+    agendShowSalasView();
+    if(vs.length === 1) agendOpenSala(vs[0].id);
+    return;
+  }
   const u = _agendGetUnidad(AGEND_STATE.unidadCode);
-  if(AGEND_STATE.mode === 'unidad' && u && u.salaId && _agendGetSala(u.salaId)){
+  // Si la sala asociada es vascular, NO auto-entrar en el agendamiento general
+  // (esa sala vive en el Portal Vascular). Muestra la lista general.
+  const uSala = u && u.salaId ? _agendGetSala(u.salaId) : null;
+  if(AGEND_STATE.mode === 'unidad' && uSala && !uSala.vascular){
     agendShowSalasView();        // queda como base del stack para "Volver"
     agendOpenSala(u.salaId);     // y entra directo al calendario de SU sala
   } else {
@@ -8378,7 +8393,9 @@ function agendShowSalasView(){
   _agendRefreshChromeForView('salas');
   const cont = document.getElementById('agendSalaList');
   if(!cont) return;
-  cont.innerHTML = AGEND_SALAS.map(s => `
+  // Portal Vascular: solo salas vasculares. Agendamiento general: solo NO vasculares.
+  const salas = AGEND_SALAS.filter(s => AGEND_STATE.vascOnly ? !!s.vascular : !s.vascular);
+  cont.innerHTML = salas.map(s => `
     <button type="button" class="agend-sala-card" onclick="agendOpenSala('${s.id}')">
       <div class="agend-sala-ico" style="background:${s.color}">${s.ico}</div>
       <div class="agend-sala-body">
@@ -12432,6 +12449,52 @@ async function icDoDelete(id){
   IC_UI.view='home'; renderIcModule(); updateIcBadges();
   try{ await _icSyncVerified(id, r => !r || r.deleted === true); }catch(e){}
 }
+
+// ============================================================
+// PORTAL VASCULAR (módulo propio) — Fase 1
+// Landing con 3 vías: Agendamiento Vascular (activo, reusa el motor de
+// agendamiento en contexto vascular), Registro de Procedimientos y Evaluación
+// de Acceso Vascular (Fases 2 y 3).
+// ============================================================
+const VASC_UI = { view:'landing' };
+function openVascModule(){
+  ['modulesScreen','guiasScreen','icScreen','agendScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('hidden'); });
+  const s=document.getElementById('vascScreen'); if(s) s.classList.remove('hidden');
+  VASC_UI.view='landing';
+  renderVascModule();
+}
+function closeVascModule(){ const s=document.getElementById('vascScreen'); if(s) s.classList.add('hidden'); showModulesScreen(); }
+function vascBack(){ closeVascModule(); }
+function renderVascModule(){
+  const body=document.getElementById('vascModuleBody'); if(!body) return;
+  body.innerHTML=_vascRenderLanding();
+  const wrap=document.querySelector('#vascScreen .guias-body');
+  if(wrap){ try{ wrap.scrollTo({top:0,behavior:'instant'}); }catch(e){ wrap.scrollTop=0; } }
+}
+function _vascRenderLanding(){
+  return `
+    <div class="ic-wrap">
+      <div class="ic-intro">Portal de <b>Accesos Vasculares</b> del Servicio de Anestesiología. Agenda, registra y solicita evaluaciones de accesos.</div>
+      <button type="button" class="ic-land-btn" onclick="openVascAgendamiento()">
+        <div class="ic-land-ico">🗓️</div>
+        <div class="ic-land-tx"><b>Agendamiento Vascular</b><span>Agenda instalación de accesos: PICC, MidLine, CVC, diálisis, port-a-cath…</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
+      <button type="button" class="ic-land-btn" onclick="alert('En construcción (Fase 2).\\n\\nAquí quedará la bitácora de accesos instalados —agendados y NO agendados— guardados por 120 días.')">
+        <div class="ic-land-ico">📋</div>
+        <div class="ic-land-tx"><b>Registro de Procedimientos</b><span>Bitácora de accesos instalados · próximamente</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
+      <button type="button" class="ic-land-btn" onclick="alert('En construcción (Fase 3).\\n\\nAquí se solicitará una evaluación para instalar accesos vasculares (enfermera de accesos o anestesiólogo).')">
+        <div class="ic-land-ico">🩻</div>
+        <div class="ic-land-tx"><b>Evaluación de Acceso Vascular</b><span>Solicitar evaluación para instalar accesos · próximamente</span></div>
+        <span class="ic-land-arrow">›</span>
+      </button>
+    </div>`;
+}
+// Abre el motor de agendamiento en contexto vascular, ENCIMA del Portal Vascular
+// (al cerrar el agendamiento se vuelve a ver el Portal Vascular).
+function openVascAgendamiento(){ openAgendamientoModule({ vasc:true }); }
 
 async function boot(){
   // 0) Deep-link desde una notificación: si la app arranca con ?ic=/?agend= se
