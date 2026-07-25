@@ -4145,6 +4145,7 @@ function _appxParseDeepLink(urlStr){
     const p = new URLSearchParams(String(urlStr).slice(qi+1));
     if(p.get('ic')) return { kind:'ic', id:p.get('ic') };
     if(p.get('agend')) return { kind:'agend', id:p.get('agend') };
+    if(p.get('vev')) return { kind:'vev', id:p.get('vev') };
   }catch(e){}
   return null;
 }
@@ -4164,6 +4165,7 @@ function _appxApplyDeepLink(dl){
   if(!dl) return;
   if(dl.kind === 'ic'){ try{ icOpenRequestById(dl.id); }catch(e){} }
   else if(dl.kind === 'agend'){ try{ agendOpenRequestById(dl.id); }catch(e){} }
+  else if(dl.kind === 'vev'){ try{ vascOpenEvalById(dl.id); }catch(e){} }
 }
 // Abre el módulo Interconsultas directo en el detalle de la solicitud dada.
 function icOpenRequestById(id){
@@ -12459,7 +12461,7 @@ async function icDoDelete(id){
 // agendamiento en contexto vascular), Registro de Procedimientos y Evaluación
 // de Acceso Vascular (Fases 2 y 3).
 // ============================================================
-const VASC_UI = { view:'landing', detailId:null, detailSrc:null };
+const VASC_UI = { view:'landing', detailId:null, detailSrc:null, evalAdmin:false };
 function openVascModule(){
   ['modulesScreen','solChooser','portalChooser','guiasScreen','icScreen','agendScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('hidden'); });
   const s=document.getElementById('vascScreen'); if(s) s.classList.remove('hidden');
@@ -12470,13 +12472,15 @@ function openVascModule(){
 function closeVascModule(){ const s=document.getElementById('vascScreen'); if(s) s.classList.add('hidden'); showModulesScreen(); }
 function vascBack(){
   if(VASC_UI.view === 'regform' || VASC_UI.view === 'regdetail'){ VASC_UI.view='registro'; renderVascModule(); return; }
-  if(VASC_UI.view === 'registro'){ VASC_UI.view='landing'; renderVascModule(); return; }
+  if(VASC_UI.view === 'evalform' || VASC_UI.view === 'evaldetail'){ VASC_UI.view='eval'; renderVascModule(); return; }
+  if(VASC_UI.view === 'registro' || VASC_UI.view === 'eval'){ VASC_UI.view='landing'; renderVascModule(); return; }
   closeVascModule();
 }
 function vascGoLanding(){ VASC_UI.view='landing'; renderVascModule(); }
 function _vascSetHeadSub(){
   const el=document.getElementById('vascHeadSub'); if(!el) return;
   if(VASC_UI.view==='registro' || VASC_UI.view==='regform' || VASC_UI.view==='regdetail') el.textContent='📋 Registro de procedimientos';
+  else if(VASC_UI.view==='eval' || VASC_UI.view==='evalform' || VASC_UI.view==='evaldetail') el.textContent=_vascEvalHeadSub();
   else el.textContent='Accesos vasculares';
 }
 function renderVascModule(){
@@ -12485,6 +12489,9 @@ function renderVascModule(){
   if(VASC_UI.view==='registro') html=_vascRenderRegistro();
   else if(VASC_UI.view==='regform') html=_vascRenderRegForm();
   else if(VASC_UI.view==='regdetail') html=_vascRenderRegDetail();
+  else if(VASC_UI.view==='eval') html=_vascRenderEval();
+  else if(VASC_UI.view==='evalform') html=_vascRenderEvalForm();
+  else if(VASC_UI.view==='evaldetail') html=_vascRenderEvalDetail();
   else html=_vascRenderLanding();
   body.innerHTML=html;
   _vascSetHeadSub();
@@ -12506,9 +12513,9 @@ function _vascRenderLanding(){
         <div class="ic-land-tx"><b>Registro de Procedimientos</b><span>Bitácora de accesos instalados (agendados y no agendados) · últimos 120 días${n?` · ${n}`:''}</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
-      <button type="button" class="ic-land-btn" onclick="alert('En construcción (Fase 3).\\n\\nAquí se solicitará una evaluación para instalar accesos vasculares (enfermera de accesos o anestesiólogo).')">
+      <button type="button" class="ic-land-btn" onclick="openVascEval()">
         <div class="ic-land-ico">🩻</div>
-        <div class="ic-land-tx"><b>Evaluación de Acceso Vascular</b><span>Solicitar evaluación para instalar accesos · próximamente</span></div>
+        <div class="ic-land-tx"><b>Evaluación de Acceso Vascular</b><span>Solicitar evaluación para instalar accesos (enfermera o anestesiólogo)</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
     </div>`;
@@ -12591,10 +12598,11 @@ async function _vascSyncVerified(reqId, predicate, tries){
   }
   return false;
 }
-// Registros MANUALES vigentes (dentro de la retención).
+// Registros MANUALES vigentes (dentro de la retención). Excluye las solicitudes
+// de evaluación (tipo:'evaluacion'), que tienen su propio módulo.
 function _vascManualRecords(){
   const cut=_vascCutoffDate();
-  return vascLoadData().filter(r=> r && !r.deleted && String(r.fecha||'') >= cut).map(r=>({ ...r, src:'manual' }));
+  return vascLoadData().filter(r=> r && !r.deleted && r.tipo!=='evaluacion' && String(r.fecha||'') >= cut).map(r=>({ ...r, src:'manual' }));
 }
 // Agendamientos VASCULARES (leídos del canal de agendamiento, sala accesos_vasculares).
 function _vascAgendRecords(){
@@ -12771,6 +12779,229 @@ async function vascSubmitReg(ev){
   let ok=false; try{ ok=await _vascSyncVerified(req.id, r=>!!r && !r.deleted); }catch(e){ ok=false; }
   alert(ok ? '✅ Registro guardado en la nube.' : '⚠️ Guardado en este dispositivo; no se pudo registrar en la nube (se reintentará al reabrir).');
   VASC_UI.view='registro'; renderVascModule();
+}
+
+// ============================================================
+// PORTAL VASCULAR · EVALUACIÓN DE ACCESO VASCULAR (Fase 3)
+// Solicitud SEPARADA (canal -vasc, tipo:'evaluacion') para pedir evaluación
+// de instalación de accesos. Estados Recibida→Aceptada→Realizada (reusa los
+// chips de Interconsultas). Al enviar: push (deep-link ?vev=<id>) + correo
+// inmediato (mailto a agendCcEmails). Gestión (aceptar/realizar/borrar) tras PIN.
+// ============================================================
+function _vascEvalRecords(){
+  return vascLoadData().filter(r=> r && !r.deleted && r.tipo==='evaluacion')
+    .sort((a,b)=>{
+      const rank={pendiente:0,aceptada:1,realizada:2};
+      return (rank[a.estado]??0)-(rank[b.estado]??0) || (b.createdAt||0)-(a.createdAt||0);
+    });
+}
+function vascCreateEval(f){
+  const arr=vascLoadData(); const now=Date.now();
+  const req={ id:_vascGenId(), tipo:'evaluacion', fecha:f.fecha||'', iniciales:(f.iniciales||'').slice(0,8), edad:f.edad||'', pieza:f.pieza||'', unidad:f.unidad||'', solicitante:f.solicitante||'', solicitanteRol:f.solicitanteRol||'enfermera', accesos:f.accesos||'', motivo:f.motivo||'', comorbilidades:f.comorbilidades||'', coagulacion:f.coagulacion||'', prioridad:f.prioridad||'rutinaria', estado:'pendiente', createdAt:now, updatedAt:now, aceptadaAt:null, aceptadaBy:null, realizadaAt:null, realizadaBy:null, notaRealizada:'' };
+  _vascSanitize(req);
+  arr.push(req); vascSaveData(arr); return req;
+}
+function _vascEvalName(){ try{ const u=(typeof getCurrentUser==='function')?getCurrentUser():null; if(u&&u.name) return u.name; }catch(e){} return 'Anestesia'; }
+function vascEvalMarkAceptada(id){ const arr=vascLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return; r.estado='aceptada'; r.aceptadaAt=Date.now(); r.aceptadaBy=_vascEvalName(); r.updatedAt=Date.now(); vascSaveData(arr); }
+function vascEvalMarkRealizada(id, nota){ const arr=vascLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return; if(!r.aceptadaAt){ r.aceptadaAt=Date.now(); r.aceptadaBy=_vascEvalName(); } r.estado='realizada'; r.realizadaAt=Date.now(); r.realizadaBy=_vascEvalName(); r.notaRealizada=nota||''; r.updatedAt=Date.now(); vascSaveData(arr); }
+function vascEvalReabrir(id){ const arr=vascLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return; r.estado='pendiente'; r.aceptadaAt=null; r.aceptadaBy=null; r.realizadaAt=null; r.realizadaBy=null; r.updatedAt=Date.now(); vascSaveData(arr); }
+function vascEvalDelete(id){ const arr=vascLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return; r.deleted=true; r.deletedAt=Date.now(); r.updatedAt=Date.now(); vascSaveData(arr); }
+
+// Correo inmediato (mailto) a los mismos destinatarios del agendamiento antiguo.
+function _vascEvalMailto(req){
+  const cc = (INSTITUTION && Array.isArray(INSTITUTION.agendCcEmails)) ? INSTITUTION.agendCcEmails.slice() : [];
+  if(!cc.length) return;
+  const to = cc.shift();
+  const subject = `Solicitud de evaluación vascular · ${req.iniciales||''} · ${_vascFmtFecha(req.fecha)}`;
+  const body = [
+    'Nueva solicitud de EVALUACIÓN DE ACCESO VASCULAR:',
+    '',
+    'Paciente (iniciales): ' + (req.iniciales||'—') + (req.edad?(' · '+req.edad+' años'):''),
+    'Ubicación: ' + ([req.pieza,req.unidad].filter(Boolean).join(' · ') || '—'),
+    'Solicitante: ' + ((req.solicitanteRol==='medico'?'Dr(a). ':'Enf. ') + (req.solicitante||'—')),
+    'Accesos a evaluar: ' + (req.accesos||'—'),
+    'Prioridad: ' + (_icPrioMeta(req.prioridad).label),
+    'Motivo / contexto: ' + (req.motivo||'—'),
+    req.comorbilidades ? ('Comorbilidades: ' + req.comorbilidades) : '',
+    req.coagulacion ? ('Coagulación: ' + req.coagulacion) : '',
+    '',
+    'Enviado desde Appnesthesia · Portal Vascular'
+  ].filter(x=>x!=='').join('\n');
+  const url = `mailto:${encodeURIComponent(to)}?cc=${encodeURIComponent(cc.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  try{ const a=document.createElement('a'); a.href=url; a.style.display='none'; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ a.remove(); }catch(e){} }, 500); }catch(e){ try{ window.location.href=url; }catch(_){ } }
+}
+
+// --- Navegación / vistas de Evaluación ---
+function openVascEval(){
+  VASC_UI.view='eval'; VASC_UI.evalAdmin=false; VASC_UI.detailId=null;
+  _vascSetHeadSub();
+  renderVascModule();
+  try{ vascSyncNow().then(()=>{ if(VASC_UI.view==='eval'||VASC_UI.view==='evaldetail') renderVascModule(); }); }catch(e){}
+}
+function _vascEvalHeadSub(){ return VASC_UI.evalAdmin ? '🔒 Evaluaciones · gestión' : '🩻 Evaluación de acceso vascular'; }
+function _vascRenderEval(){
+  const isAdmin=!!VASC_UI.evalAdmin;
+  const recs=_vascEvalRecords();
+  const head=`
+    <div class="ic-modehead">
+      <button type="button" class="ic-back" onclick="vascGoLanding()">‹ Portal Vascular</button>
+      <span class="ic-mode-pill ${isAdmin?'admin':''}">${isAdmin?'🔒 Admin':'🩻 Evaluación'}</span>
+    </div>
+    <div class="ic-intro">Solicita una <b>evaluación de acceso vascular</b> (enfermera de accesos o anestesiólogo). Estado: 🎫 Recibida → 🔵 Aceptada → ✅ Realizada.</div>
+    <button type="button" class="ic-newbtn" onclick="vascEvalGoForm()">+ Nueva solicitud de evaluación</button>
+    ${isAdmin ? '' : '<button type="button" class="ic-land-btn admin" style="margin-top:2px" onclick="vascEvalEnterAdmin()"><div class="ic-land-ico">🔒</div><div class="ic-land-tx"><b>Administrador</b><span>Aceptar, marcar realizada o borrar</span></div><span class="ic-land-arrow">›</span></button>'}`;
+  let list;
+  if(recs.length===0){ list=`<div class="ic-empty"><span>📭</span>No hay solicitudes de evaluación.</div>`; }
+  else { list=recs.map(r=>_vascEvalCard(r,isAdmin)).join(''); }
+  return `<div class="ic-wrap">${head}<div class="ic-list">${list}</div></div>`;
+}
+function _vascEvalCard(r, isAdmin){
+  const lineas=[];
+  lineas.push(`<b>${_vascEsc(r.iniciales||'—')}</b>${r.edad?` · ${_vascEsc(String(r.edad))} a`:''}${r.pieza?` · 🛏 ${_vascEsc(r.pieza)}`:''}`);
+  if(r.accesos) lineas.push(`💉 ${_vascEsc(r.accesos)}`);
+  if(r.solicitante) lineas.push(`${r.solicitanteRol==='medico'?'🩺 Dr(a).':'👩‍⚕️ Enf.'} ${_vascEsc(r.solicitante)}`);
+  const meta=lineas.map(l=>`<div class="ic-card-line">${l}</div>`).join('');
+  let actBtns;
+  if(r.estado==='realizada') actBtns=`<button type="button" class="ic-mini-btn" onclick="vascEvalDoReabrir('${r.id}')">↩ Reabrir</button>`;
+  else if(r.estado==='aceptada') actBtns=`<button type="button" class="ic-mini-btn ok" onclick="vascEvalDoRealizada('${r.id}')">✅ Realizada</button>`;
+  else actBtns=`<button type="button" class="ic-mini-btn acc" onclick="vascEvalDoAceptar('${r.id}')">🔵 Aceptar</button><button type="button" class="ic-mini-btn ok" onclick="vascEvalDoRealizada('${r.id}')">✅ Realizada</button>`;
+  const acts=isAdmin?`<div class="ic-card-acts" onclick="event.stopPropagation()">${actBtns}<button type="button" class="ic-mini-btn danger" onclick="vascEvalDoDelete('${r.id}')">🗑 Borrar</button></div>`:'';
+  return `
+    <div class="ic-card prio-${r.prioridad}" onclick="vascEvalOpenDetail('${r.id}')">
+      <div class="ic-card-top">
+        <div class="ic-card-tipo">🩻 Evaluación vascular</div>
+        ${_icStatusChip(r.estado)}
+      </div>
+      <div class="ic-card-body">${meta}</div>
+      <div class="ic-card-foot">${_icPrioChip(r.prioridad)}${r.fecha?` · 📅 <b>${_icFmtFechaLarga(r.fecha)}</b>`:''}</div>
+      ${acts}
+    </div>`;
+}
+function vascEvalOpenDetail(id){ VASC_UI.detailId=id; VASC_UI.view='evaldetail'; renderVascModule(); }
+function _vascRenderEvalDetail(){
+  const r=vascLoadData().find(x=>x&&x.id===VASC_UI.detailId && x.tipo==='evaluacion');
+  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="vascEvalBackToList()">‹ Volver</button><div class="ic-empty"><span>❓</span>Solicitud no encontrada.</div></div>`; }
+  const isAdmin=!!VASC_UI.evalAdmin;
+  const row=(k,v)=> v ? `<div class="ic-d-row"><div class="ic-d-lbl">${k}</div><div class="ic-d-val">${_vascEsc(String(v))}</div></div>` : '';
+  const created=r.createdAt?new Date(r.createdAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const realAt=r.realizadaAt?new Date(r.realizadaAt).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  let actBtns;
+  if(r.estado==='realizada') actBtns=`<button type="button" class="ic-btn-sec" onclick="vascEvalDoReabrir('${r.id}')">↩ Reabrir</button>`;
+  else if(r.estado==='aceptada') actBtns=`<button type="button" class="ic-btn-pri" onclick="vascEvalDoRealizada('${r.id}')">✅ Marcar realizada</button>`;
+  else actBtns=`<button type="button" class="ic-btn-acc" onclick="vascEvalDoAceptar('${r.id}')">🔵 Aceptar</button><button type="button" class="ic-btn-pri" onclick="vascEvalDoRealizada('${r.id}')">✅ Realizada</button>`;
+  const acts=isAdmin?`<div class="ic-d-actions">${actBtns}<button type="button" class="ic-btn-danger" onclick="vascEvalDoDelete('${r.id}')">🗑 Borrar</button></div>`:'';
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="vascEvalBackToList()">‹ Volver</button>
+      <div class="ic-d-head"><div class="ic-d-tipo">🩻 Evaluación de acceso vascular</div>${_icStatusChip(r.estado)}</div>
+      <div class="ic-d-card">
+        ${row('Prioridad', _icPrioMeta(r.prioridad).label)}
+        ${row('Día preferido', _icFmtFechaLarga(r.fecha))}
+        ${row('Iniciales', r.iniciales)}
+        ${row('Edad', r.edad?String(r.edad)+' años':'')}
+        ${row('Pieza / Ubicación', r.pieza)}
+        ${row('Unidad', r.unidad)}
+        ${row('Solicitante', (r.solicitanteRol==='medico'?'Dr(a). ':'Enf. ')+(r.solicitante||''))}
+        ${row('Accesos a evaluar', r.accesos)}
+        ${row('Motivo / contexto', r.motivo)}
+        ${row('Comorbilidades', r.comorbilidades)}
+        ${row('Coagulación', r.coagulacion)}
+        ${row('Enviada', created)}
+        ${(r.aceptadaAt&&r.estado!=='realizada')?row('Aceptada', (r.aceptadaBy||'')):''}
+        ${r.estado==='realizada'?row('Realizada', realAt+(r.realizadaBy?(' · '+r.realizadaBy):'')):''}
+        ${r.estado==='realizada'?row('Nota', r.notaRealizada):''}
+      </div>
+      ${acts}
+    </div>`;
+}
+function vascEvalBackToList(){ VASC_UI.view='eval'; renderVascModule(); }
+async function vascEvalEnterAdmin(){
+  if(state && typeof ADMIN_USER_ID!=='undefined' && state.currentUserId===ADMIN_USER_ID){ VASC_UI.evalAdmin=true; renderVascModule(); return; }
+  if(typeof adminSetupNeeded==='function' && adminSetupNeeded()){ try{ await _syncAdminPinFromCloud(); }catch(e){} }
+  if(typeof adminSetupNeeded==='function' && adminSetupNeeded()){ alert('Aún no hay PIN de Administrador. Créalo en la pantalla principal → Staff → Administrador.'); return; }
+  let ok=false; try{ ok=await promptVerifyAdminPin(); }catch(e){ ok=false; }
+  if(!ok) return;
+  VASC_UI.evalAdmin=true; renderVascModule();
+}
+function _vascEvalReqGuard(){ if(!VASC_UI.evalAdmin){ alert('Entra como "Administrador" para gestionar las evaluaciones.'); return false; } return true; }
+async function vascEvalDoAceptar(id){ if(!_vascEvalReqGuard()) return; vascEvalMarkAceptada(id); renderVascModule(); try{ await _vascSyncVerified(id, r=>!!r && (r.estado==='aceptada'||r.estado==='realizada')); }catch(e){} }
+async function vascEvalDoRealizada(id){ if(!_vascEvalReqGuard()) return; const nota=prompt('Nota / indicación (opcional):',''); if(nota===null) return; vascEvalMarkRealizada(id,(nota||'').trim()); renderVascModule(); try{ await _vascSyncVerified(id, r=>!!r && r.estado==='realizada'); }catch(e){} }
+async function vascEvalDoReabrir(id){ if(!_vascEvalReqGuard()) return; vascEvalReabrir(id); renderVascModule(); try{ await _vascSyncVerified(id, r=>!!r && r.estado==='pendiente'); }catch(e){} }
+async function vascEvalDoDelete(id){ if(!_vascEvalReqGuard()) return; if(!confirm('¿Borrar esta solicitud de evaluación? No se puede deshacer.')) return; vascEvalDelete(id); VASC_UI.view='eval'; renderVascModule(); try{ await _vascSyncVerified(id, r=>!r||r.deleted===true); }catch(e){} }
+
+function vascEvalGoForm(){ VASC_UI.view='evalform'; renderVascModule(); setTimeout(()=>{ const e=document.getElementById('veIniciales'); if(e) e.focus(); },60); }
+function _vascRenderEvalForm(){
+  const prioOpts=IC_PRIOS.map(p=>`<option value="${p.v}">${p.label}</option>`).join('');
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="vascEvalBackToList()">‹ Volver</button>
+      <div class="ic-intro">Solicita una <b>evaluación de acceso vascular</b>. Datos del paciente anonimizados (solo iniciales).</div>
+      <form class="ic-form" onsubmit="vascSubmitEval(event)">
+        <div class="ic-fsec">Paciente (anonimizado)</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Iniciales *</span><input id="veIniciales" type="text" maxlength="8" placeholder="Ej: J.P.R." autocomplete="off" required></label>
+          <label class="ic-field sm"><span>Edad</span><input id="veEdad" type="text" inputmode="numeric" maxlength="3" placeholder="años"></label>
+        </div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Pieza / Ubicación *</span><input id="vePieza" type="text" placeholder="Ej: MQ 303, UPC 478" required></label>
+          <label class="ic-field"><span>Unidad</span><input id="veUnidad" type="text" placeholder="Ej: Medicina, UPC"></label>
+        </div>
+        <div class="ic-fsec">Solicitud</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Solicitante *</span><input id="veSolic" type="text" placeholder="Nombre" required></label>
+          <label class="ic-field sm"><span>Rol</span><select id="veRol"><option value="enfermera">Enf. accesos</option><option value="medico">Anestesiólogo/Médico</option></select></label>
+        </div>
+        <label class="ic-field"><span>Accesos a evaluar *</span><input id="veAccesos" type="text" placeholder="Ej: evaluar para PICC vs CVC; VVP difícil…" required></label>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Día preferido</span><input id="veFecha" type="date"></label>
+          <label class="ic-field sm"><span>Prioridad</span><select id="vePrio">${prioOpts}</select></label>
+        </div>
+        <label class="ic-field"><span>Motivo / contexto clínico</span><textarea id="veMotivo" rows="2" placeholder="¿Por qué se necesita el acceso? Terapias, duración prevista…"></textarea></label>
+        <label class="ic-field"><span>Comorbilidades</span><textarea id="veComorb" rows="2" placeholder="Ej: ERC, obesidad, trombosis previas…"></textarea></label>
+        <label class="ic-field"><span>Coagulación / plaquetas</span><input id="veCoag" type="text" placeholder="Ej: plaquetas 120k, TACO suspendido 48h"></label>
+        <div class="ic-form-actions">
+          <button type="button" class="ic-btn-sec" onclick="vascEvalBackToList()">Cancelar</button>
+          <button type="submit" id="veSubmit" class="ic-btn-pri">Enviar solicitud</button>
+        </div>
+      </form>
+    </div>`;
+}
+async function vascSubmitEval(ev){
+  if(ev&&ev.preventDefault) ev.preventDefault();
+  const g=id=>document.getElementById(id);
+  const iniciales=(g('veIniciales').value||'').trim();
+  const pieza=(g('vePieza').value||'').trim();
+  const solic=(g('veSolic').value||'').trim();
+  const accesos=(g('veAccesos').value||'').trim();
+  if(!iniciales){ alert('Ingresa las iniciales del paciente.'); return; }
+  if(!pieza){ alert('Ingresa la pieza / ubicación.'); return; }
+  if(!solic){ alert('Ingresa el nombre del solicitante.'); return; }
+  if(!accesos){ alert('Indica qué accesos hay que evaluar.'); return; }
+  const req=vascCreateEval({ fecha:(g('veFecha').value||'').trim(), iniciales, edad:(g('veEdad').value||'').trim(), pieza, unidad:(g('veUnidad').value||'').trim(), solicitante:solic, solicitanteRol:g('veRol').value, accesos, motivo:(g('veMotivo').value||'').trim(), comorbilidades:(g('veComorb').value||'').trim(), coagulacion:(g('veCoag').value||'').trim(), prioridad:g('vePrio').value });
+  const base=getBackendURL();
+  const btn=g('veSubmit'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+  if(!base){
+    alert('Solicitud guardada en este dispositivo (sin nube configurada). Se abrirá el correo.');
+    try{ _vascEvalMailto(req); }catch(e){}
+    VASC_UI.view='eval'; renderVascModule(); return;
+  }
+  let ok=false; try{ ok=await _vascSyncVerified(req.id, r=>!!r && !r.deleted); }catch(e){ ok=false; }
+  if(ok){ try{ notifyAdminsPush('evalvasc', req.id); }catch(e){} }
+  alert(ok
+    ? '✅ Solicitud de evaluación enviada y registrada. Se notificará al equipo y se abrirá el correo.'
+    : '⚠️ Quedó guardada en este dispositivo; no se pudo registrar en la nube (se reintentará). Igual se abrirá el correo.');
+  // Correo inmediato (mailto) a los destinatarios del agendamiento — al final,
+  // por si abre la app de correo (no interrumpe el guardado ni el push).
+  try{ _vascEvalMailto(req); }catch(e){}
+  VASC_UI.view='eval'; renderVascModule();
+}
+// Deep-link: abrir una evaluación vascular específica.
+function vascOpenEvalById(id){
+  ['modulesScreen','solChooser','portalChooser','guiasScreen','icScreen','agendScreen'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
+  const s=document.getElementById('vascScreen'); if(s) s.classList.remove('hidden');
+  VASC_UI.evalAdmin=false; VASC_UI.view='eval'; renderVascModule();
+  const show=()=>{ const scr=document.getElementById('vascScreen'); if(!scr||scr.classList.contains('hidden')) return; const r=vascLoadData().find(x=>x&&x.id===id && x.tipo==='evaluacion' && !x.deleted); if(r){ VASC_UI.detailId=id; VASC_UI.view='evaldetail'; } else { VASC_UI.view='eval'; } renderVascModule(); };
+  try{ vascSyncNow().then(show).catch(show); }catch(e){ show(); }
 }
 
 async function boot(){
