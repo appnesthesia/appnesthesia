@@ -10110,7 +10110,10 @@ function agendOverviewTab(tab){
   document.querySelectorAll('#agendScreen .agend-overview-tab').forEach(b => {
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
-  const all = _agendAllRequests();
+  // Separación vascular: en contexto Portal Vascular solo se ven las vasculares;
+  // en el agendamiento general se excluyen (viven en el Portal Vascular).
+  const _isVasc = r => { const s = _agendGetSala(r.salaId); return !!(s && s.vascular); };
+  const all = _agendAllRequests().filter(r => AGEND_STATE.vascOnly ? _isVasc(r) : !_isVasc(r));
   const counts = { pendiente:0, propuesta:0, aprobada:0, realizada:0, rechazada:0 };
   all.forEach(r => { if(counts[r.estado]!==undefined) counts[r.estado]++; });
   document.getElementById('ovCountPend').textContent = counts.pendiente;
@@ -12456,22 +12459,40 @@ async function icDoDelete(id){
 // agendamiento en contexto vascular), Registro de Procedimientos y Evaluación
 // de Acceso Vascular (Fases 2 y 3).
 // ============================================================
-const VASC_UI = { view:'landing' };
+const VASC_UI = { view:'landing', detailId:null, detailSrc:null };
 function openVascModule(){
-  ['modulesScreen','guiasScreen','icScreen','agendScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('hidden'); });
+  ['modulesScreen','solChooser','portalChooser','guiasScreen','icScreen','agendScreen'].forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('hidden'); });
   const s=document.getElementById('vascScreen'); if(s) s.classList.remove('hidden');
   VASC_UI.view='landing';
+  _vascSetHeadSub();
   renderVascModule();
 }
 function closeVascModule(){ const s=document.getElementById('vascScreen'); if(s) s.classList.add('hidden'); showModulesScreen(); }
-function vascBack(){ closeVascModule(); }
+function vascBack(){
+  if(VASC_UI.view === 'regform' || VASC_UI.view === 'regdetail'){ VASC_UI.view='registro'; renderVascModule(); return; }
+  if(VASC_UI.view === 'registro'){ VASC_UI.view='landing'; renderVascModule(); return; }
+  closeVascModule();
+}
+function vascGoLanding(){ VASC_UI.view='landing'; renderVascModule(); }
+function _vascSetHeadSub(){
+  const el=document.getElementById('vascHeadSub'); if(!el) return;
+  if(VASC_UI.view==='registro' || VASC_UI.view==='regform' || VASC_UI.view==='regdetail') el.textContent='📋 Registro de procedimientos';
+  else el.textContent='Accesos vasculares';
+}
 function renderVascModule(){
   const body=document.getElementById('vascModuleBody'); if(!body) return;
-  body.innerHTML=_vascRenderLanding();
+  let html;
+  if(VASC_UI.view==='registro') html=_vascRenderRegistro();
+  else if(VASC_UI.view==='regform') html=_vascRenderRegForm();
+  else if(VASC_UI.view==='regdetail') html=_vascRenderRegDetail();
+  else html=_vascRenderLanding();
+  body.innerHTML=html;
+  _vascSetHeadSub();
   const wrap=document.querySelector('#vascScreen .guias-body');
   if(wrap){ try{ wrap.scrollTo({top:0,behavior:'instant'}); }catch(e){ wrap.scrollTop=0; } }
 }
 function _vascRenderLanding(){
+  const n = _vascAllRecords().length;
   return `
     <div class="ic-wrap">
       <div class="ic-intro">Portal de <b>Accesos Vasculares</b> del Servicio de Anestesiología. Agenda, registra y solicita evaluaciones de accesos.</div>
@@ -12480,9 +12501,9 @@ function _vascRenderLanding(){
         <div class="ic-land-tx"><b>Agendamiento Vascular</b><span>Agenda instalación de accesos: PICC, MidLine, CVC, diálisis, port-a-cath…</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
-      <button type="button" class="ic-land-btn" onclick="alert('En construcción (Fase 2).\\n\\nAquí quedará la bitácora de accesos instalados —agendados y NO agendados— guardados por 120 días.')">
+      <button type="button" class="ic-land-btn" onclick="openVascRegistro()">
         <div class="ic-land-ico">📋</div>
-        <div class="ic-land-tx"><b>Registro de Procedimientos</b><span>Bitácora de accesos instalados · próximamente</span></div>
+        <div class="ic-land-tx"><b>Registro de Procedimientos</b><span>Bitácora de accesos instalados (agendados y no agendados) · últimos 120 días${n?` · ${n}`:''}</span></div>
         <span class="ic-land-arrow">›</span>
       </button>
       <button type="button" class="ic-land-btn" onclick="alert('En construcción (Fase 3).\\n\\nAquí se solicitará una evaluación para instalar accesos vasculares (enfermera de accesos o anestesiólogo).')">
@@ -12495,6 +12516,262 @@ function _vascRenderLanding(){
 // Abre el motor de agendamiento en contexto vascular, ENCIMA del Portal Vascular
 // (al cerrar el agendamiento se vuelve a ver el Portal Vascular).
 function openVascAgendamiento(){ openAgendamientoModule({ vasc:true }); }
+
+// ============================================================
+// PORTAL VASCULAR · REGISTRO DE PROCEDIMIENTOS (Fase 2)
+// Bitácora (retención 120 días) que junta: (a) agendamientos vasculares y
+// (b) instalaciones NO agendadas registradas a mano. Canal en la nube "<inst>-vasc"
+// (fusión por id + tombstones), mismo modelo verify-and-retry de Interconsultas.
+// ============================================================
+const VASC_DATA_LS_KEY = 'appx_vasc_data_v1';
+const VASC_RETENTION_DAYS = 120;
+const VASC_LATERALIDAD = [
+  { v:'',          label:'— Sin especificar —' },
+  { v:'derecho',   label:'Derecho' },
+  { v:'izquierdo', label:'Izquierdo' },
+  { v:'bilateral', label:'Bilateral / Indistinto' }
+];
+function _vascDispositivos(){
+  const s = (typeof _agendGetSala==='function') ? _agendGetSala('accesos_vasculares') : null;
+  const cat = (s && Array.isArray(s.procedimientosCatalogo)) ? s.procedimientosCatalogo.slice() : ['Vía Venosa Periférica','PICC Line','MidLine','Catéter Venoso Central (CVC)','Catéter de Diálisis Transitorio','Port-a-cath'];
+  if(!cat.some(x=>/otro/i.test(x))) cat.push('Otro');
+  return cat;
+}
+function _vascEsc(s){ return _gpEsc(s); }
+function _vascRemoteId(){ return INSTITUTION ? (INSTITUTION.id + '-vasc') : null; }
+function _vascGenId(){ return 'vx_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function _vascReqTs(r){ return r ? (r.updatedAt || r.createdAt || 0) : 0; }
+function _vascPad(n){ return String(n).padStart(2,'0'); }
+function _vascTodayStr(){ const d=new Date(); return `${d.getFullYear()}-${_vascPad(d.getMonth()+1)}-${_vascPad(d.getDate())}`; }
+function _vascCutoffDate(){ const d=new Date(); d.setDate(d.getDate()-VASC_RETENTION_DAYS); return `${d.getFullYear()}-${_vascPad(d.getMonth()+1)}-${_vascPad(d.getDate())}`; }
+
+// Privacidad: solo iniciales; nunca nombre completo ni RUT.
+function _vascSanitize(r){
+  if(!r || typeof r!=='object' || r.deleted) return r;
+  let ch=false;
+  if(r.rut){ delete r.rut; ch=true; }
+  if(typeof r.iniciales==='string' && /\s/.test(r.iniciales.trim()) && r.iniciales.trim().length>5){
+    const ini=r.iniciales.trim().split(/[\s.]+/).filter(Boolean).slice(0,3).map(p=>(p[0]||'').toUpperCase()).join('.')+'.';
+    if(ini && ini!==r.iniciales){ r.iniciales=ini; ch=true; }
+  }
+  if(ch) r.updatedAt=Date.now();
+  return r;
+}
+function vascLoadData(){
+  try{ let a=JSON.parse(localStorage.getItem(VASC_DATA_LS_KEY)||'[]'); if(!Array.isArray(a)) a=[]; a.forEach(_vascSanitize); return a; }
+  catch(e){ return []; }
+}
+function vascSaveData(arr){ try{ localStorage.setItem(VASC_DATA_LS_KEY, JSON.stringify(Array.isArray(arr)?arr:[])); }catch(e){} }
+function _vascMergeData(remoteArr, localArr){
+  const map={}; const cutoff=Date.now()-VASC_RETENTION_DAYS*24*3600*1000;
+  (Array.isArray(remoteArr)?remoteArr:[]).forEach(r=>{ if(r&&r.id) map[r.id]=r; });
+  (Array.isArray(localArr)?localArr:[]).forEach(r=>{ if(!r||!r.id) return; const ex=map[r.id]; if(!ex||_vascReqTs(r)>=_vascReqTs(ex)) map[r.id]=r; });
+  return Object.values(map).filter(r=>!(r&&r.deleted&&(r.deletedAt||0)<cutoff));
+}
+let _vascSyncing=false;
+async function vascSyncNow(){
+  const base=getBackendURL(); const id=_vascRemoteId();
+  if(!base||!id||_vascSyncing) return false;
+  _vascSyncing=true;
+  try{
+    let remoteArr=[];
+    try{ const r=await fetch(base+'/api/state/'+encodeURIComponent(id), _stateGetOpts()); if(!r.ok) return false; const j=await r.json(); if(j&&!j._empty&&Array.isArray(j.data)) remoteArr=j.data; }catch(e){ return false; }
+    const merged=_vascMergeData(remoteArr, vascLoadData()); merged.forEach(_vascSanitize);
+    vascSaveData(merged);
+    const token=getBackendToken(); if(!token) return false;
+    try{ const pr=await fetch(base+'/api/state/'+encodeURIComponent(id), {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify({data:merged})}); return pr.ok; }catch(e){ return false; }
+  }catch(e){ return false; } finally{ _vascSyncing=false; }
+}
+async function _vascSyncVerified(reqId, predicate, tries){
+  tries=tries||5;
+  for(let i=0;i<tries;i++){
+    let ok=false; try{ ok=await vascSyncNow(); }catch(e){ ok=false; }
+    if(ok){ try{ const base=getBackendURL(); const id=_vascRemoteId(); const r=await fetch(base+'/api/state/'+encodeURIComponent(id)+'?cb='+Date.now(), _stateGetOpts()); if(r.ok){ const j=await r.json(); const arr=(j&&Array.isArray(j.data))?j.data:[]; if(predicate(arr.find(x=>x&&x.id===reqId))) return true; } }catch(e){} }
+    await new Promise(res=>setTimeout(res,250+Math.floor(Math.random()*600)));
+  }
+  return false;
+}
+// Registros MANUALES vigentes (dentro de la retención).
+function _vascManualRecords(){
+  const cut=_vascCutoffDate();
+  return vascLoadData().filter(r=> r && !r.deleted && String(r.fecha||'') >= cut).map(r=>({ ...r, src:'manual' }));
+}
+// Agendamientos VASCULARES (leídos del canal de agendamiento, sala accesos_vasculares).
+function _vascAgendRecords(){
+  const cut=_vascCutoffDate();
+  let data={}; try{ data=(typeof agendLoadData==='function')?agendLoadData():{}; }catch(e){ data={}; }
+  const bySala=data['accesos_vasculares']||{};
+  const out=[];
+  Object.keys(bySala).forEach(dateStr=>{
+    if(String(dateStr) < cut) return;
+    let arr=bySala[dateStr];
+    if(!Array.isArray(arr)){ try{ arr=_agendMigrateDayEntry(arr); }catch(e){ arr=[]; } }
+    (arr||[]).forEach(r=>{ if(r && !r.deleted) out.push({ src:'agend', id:r.id, fecha:dateStr, iniciales:r.paciente, edad:r.edad, pieza:r.pieza, unidad:r.unidadHosp, lateralidad:r.accesosLado, dispositivo:r.procedimiento, hallazgos:r.accesosHallazgos, coagulacion:r.accesosCoagulacion, responsable:r.solicitanteNombre, estado:r.estado, urgencia:r.accesosUrgencia, createdAt:r.createdAt }); });
+  });
+  return out;
+}
+function _vascAllRecords(){
+  return _vascManualRecords().concat(_vascAgendRecords())
+    .sort((a,b)=> String(b.fecha||'').localeCompare(String(a.fecha||'')) || (b.createdAt||0)-(a.createdAt||0));
+}
+function vascCreateReg(f){
+  const arr=vascLoadData(); const now=Date.now();
+  const req={ id:_vascGenId(), tipo:'manual', fecha:f.fecha||'', iniciales:(f.iniciales||'').slice(0,8), edad:f.edad||'', pieza:f.pieza||'', unidad:f.unidad||'', lateralidad:f.lateralidad||'', dispositivo:f.dispositivo||'', dispositivoOtro:f.dispositivoOtro||'', hallazgos:f.hallazgos||'', coagulacion:f.coagulacion||'', responsable:f.responsable||'', responsableRol:f.responsableRol||'enfermera', notas:f.notas||'', createdAt:now, updatedAt:now };
+  _vascSanitize(req);
+  arr.push(req); vascSaveData(arr); return req;
+}
+function vascDeleteReg(id){
+  const arr=vascLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return false;
+  r.deleted=true; r.deletedAt=Date.now(); r.updatedAt=Date.now(); vascSaveData(arr); return true;
+}
+
+// --- UI del Registro ---
+function openVascRegistro(){
+  VASC_UI.view='registro';
+  _vascSetHeadSub();
+  renderVascModule();
+  try{ if(typeof agendSyncNow==='function') agendSyncNow().then(()=>{ if(VASC_UI.view==='registro') renderVascModule(); }); }catch(e){}
+  try{ vascSyncNow().then(()=>{ if(VASC_UI.view==='registro') renderVascModule(); }); }catch(e){}
+}
+function _vascFmtFecha(ds){
+  if(!ds) return '—';
+  try{ const d=_agendParseDateStr(ds); return `${d.getDate()}/${_vascPad(d.getMonth()+1)}/${d.getFullYear()}`; }catch(e){ return ds; }
+}
+function _vascLatLabel(v){ const m=VASC_LATERALIDAD.find(x=>x.v===v); return m?m.label:(v||''); }
+function _vascRenderRegistro(){
+  const recs=_vascAllRecords();
+  const head=`
+    <div class="ic-modehead">
+      <button type="button" class="ic-back" onclick="vascGoLanding()">‹ Portal Vascular</button>
+      <span class="ic-mode-pill">📋 Últimos ${VASC_RETENTION_DAYS} días</span>
+    </div>
+    <div class="ic-intro">Bitácora de accesos vasculares: <b>📅 agendados</b> y <b>✍️ registrados a mano</b> (no agendados). Se guardan ${VASC_RETENTION_DAYS} días.</div>
+    <button type="button" class="ic-newbtn" onclick="vascGoRegForm()">+ Registrar instalación (no agendada)</button>`;
+  if(recs.length===0){
+    return `<div class="ic-wrap">${head}<div class="ic-empty"><span>🗂️</span>Aún no hay procedimientos registrados.</div></div>`;
+  }
+  const rows=recs.map(_vascRegRow).join('');
+  return `<div class="ic-wrap">${head}<div class="ic-list">${rows}</div></div>`;
+}
+function _vascRegRow(r){
+  const src = r.src==='manual'
+    ? '<span class="ic-track-tk aceptada">✍️ Registro</span>'
+    : `<span class="ic-track-tk recibida">📅 Agendado${r.estado?(' · '+_vascEsc(r.estado)):''}</span>`;
+  const disp = r.dispositivo==='Otro' && r.dispositivoOtro ? r.dispositivoOtro : (r.dispositivo||'—');
+  const sub = [ disp, r.lateralidad?_vascLatLabel(r.lateralidad):'', r.responsable?('· '+_vascEsc(r.responsable)):'' ].filter(Boolean).join(' · ');
+  const main = `${_vascEsc(r.iniciales||'—')}${r.pieza?(' · 🛏 '+_vascEsc(r.pieza)):''}`;
+  return `
+    <div class="ic-track-row st-${r.src==='manual'?'aceptada':'recibida'}" onclick="vascOpenRegDetail('${r.src}','${r.id}')">
+      <div class="ic-track-info">
+        <div class="ic-track-main">${main}</div>
+        <div class="ic-track-sub">${_vascEsc(sub)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">${src}<div style="font-size:11px;color:var(--muted);margin-top:4px">${_vascFmtFecha(r.fecha)}</div></div>
+    </div>`;
+}
+function vascOpenRegDetail(src, id){ VASC_UI.detailSrc=src; VASC_UI.detailId=id; VASC_UI.view='regdetail'; renderVascModule(); }
+function _vascRenderRegDetail(){
+  const recs=_vascAllRecords();
+  const r=recs.find(x=>x.src===VASC_UI.detailSrc && x.id===VASC_UI.detailId);
+  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="vascBack()">‹ Volver</button><div class="ic-empty"><span>❓</span>Registro no encontrado.</div></div>`; }
+  const row=(k,v)=> v ? `<div class="ic-d-row"><div class="ic-d-lbl">${k}</div><div class="ic-d-val">${_vascEsc(String(v))}</div></div>` : '';
+  const disp = r.dispositivo==='Otro' && r.dispositivoOtro ? r.dispositivoOtro : r.dispositivo;
+  const esManual = r.src==='manual';
+  const del = esManual ? `<div class="ic-d-actions"><button type="button" class="ic-btn-danger" onclick="vascDoDeleteReg('${r.id}')">🗑 Borrar registro</button></div>` : '';
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="vascBack()">‹ Volver</button>
+      <div class="ic-d-head">
+        <div class="ic-d-tipo">💉 ${_vascEsc(disp||'Acceso vascular')}</div>
+        ${esManual?'<span class="ic-track-tk aceptada">✍️ Registro</span>':`<span class="ic-track-tk recibida">📅 Agendado${r.estado?(' · '+_vascEsc(r.estado)):''}</span>`}
+      </div>
+      <div class="ic-d-card">
+        ${row('Fecha', _vascFmtFecha(r.fecha))}
+        ${row('Iniciales', r.iniciales)}
+        ${row('Edad', r.edad?String(r.edad)+' años':'')}
+        ${row('Pieza / Ubicación', r.pieza)}
+        ${row('Unidad', r.unidad)}
+        ${row('Dispositivo', disp)}
+        ${row('Lateralidad', _vascLatLabel(r.lateralidad))}
+        ${row('Hallazgos vasculares', r.hallazgos)}
+        ${row('Coagulación', r.coagulacion)}
+        ${row(esManual?'Responsable':'Solicitante', (r.responsableRol==='medico'?'Dr(a). ':(r.responsableRol==='enfermera'?'Enf. ':'')) + (r.responsable||''))}
+        ${row('Notas', r.notas)}
+        ${row('Urgencia', r.urgencia)}
+      </div>
+      ${del}
+    </div>`;
+}
+async function vascDoDeleteReg(id){
+  if(!confirm('¿Borrar este registro manual? No se puede deshacer.')) return;
+  vascDeleteReg(id);
+  VASC_UI.view='registro'; renderVascModule();
+  try{ await _vascSyncVerified(id, r=> !r || r.deleted===true); }catch(e){}
+}
+function vascGoRegForm(){ VASC_UI.view='regform'; renderVascModule(); setTimeout(()=>{ const e=document.getElementById('vfIniciales'); if(e) e.focus(); },60); }
+function _vascRenderRegForm(){
+  const disp=_vascDispositivos().map(d=>`<option value="${_vascEsc(d)}">${_vascEsc(d)}</option>`).join('');
+  const lat=VASC_LATERALIDAD.map(l=>`<option value="${l.v}">${l.label}</option>`).join('');
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="vascBack()">‹ Volver</button>
+      <div class="ic-intro">Registra una instalación de acceso vascular <b>que NO fue agendada</b>. Datos anonimizados (solo iniciales).</div>
+      <form class="ic-form" onsubmit="vascSubmitReg(event)">
+        <div class="ic-fsec">Paciente (anonimizado)</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Iniciales *</span><input id="vfIniciales" type="text" maxlength="8" placeholder="Ej: J.P.R." autocomplete="off" required></label>
+          <label class="ic-field sm"><span>Edad</span><input id="vfEdad" type="text" inputmode="numeric" maxlength="3" placeholder="años"></label>
+        </div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Pieza / Ubicación</span><input id="vfPieza" type="text" placeholder="Ej: MQ 303, UPC 478"></label>
+          <label class="ic-field"><span>Unidad</span><input id="vfUnidad" type="text" placeholder="Ej: Medicina, UPC"></label>
+        </div>
+        <div class="ic-fsec">Procedimiento</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Dispositivo *</span><select id="vfDisp" onchange="vascOnDispChange()">${disp}</select></label>
+          <label class="ic-field sm"><span>Lateralidad</span><select id="vfLat">${lat}</select></label>
+        </div>
+        <label class="ic-field" id="vfDispOtroWrap" style="display:none"><span>Especificar dispositivo</span><input id="vfDispOtro" type="text" placeholder="Describe el acceso instalado"></label>
+        <label class="ic-field"><span>Fecha de instalación *</span><input id="vfFecha" type="date" required></label>
+        <label class="ic-field"><span>Hallazgos vasculares</span><textarea id="vfHallazgos" rows="2" placeholder="Vasos, accesos previos, dificultades…"></textarea></label>
+        <label class="ic-field"><span>Coagulación / plaquetas</span><input id="vfCoag" type="text" placeholder="Ej: plaquetas 120k, INR 1.1"></label>
+        <div class="ic-fsec">Responsable</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Quién lo instaló/solicitó *</span><input id="vfResp" type="text" placeholder="Nombre" required></label>
+          <label class="ic-field sm"><span>Rol</span><select id="vfRol"><option value="enfermera">Enfermera</option><option value="medico">Médico</option></select></label>
+        </div>
+        <label class="ic-field"><span>Notas</span><textarea id="vfNotas" rows="2" placeholder="Observaciones adicionales"></textarea></label>
+        <div class="ic-form-actions">
+          <button type="button" class="ic-btn-sec" onclick="vascBack()">Cancelar</button>
+          <button type="submit" id="vfSubmit" class="ic-btn-pri">Guardar registro</button>
+        </div>
+      </form>
+    </div>`;
+}
+function vascOnDispChange(){
+  const sel=document.getElementById('vfDisp'); const w=document.getElementById('vfDispOtroWrap');
+  if(sel && w) w.style.display = /otro/i.test(sel.value) ? '' : 'none';
+}
+async function vascSubmitReg(ev){
+  if(ev&&ev.preventDefault) ev.preventDefault();
+  const g=id=>document.getElementById(id);
+  const iniciales=(g('vfIniciales').value||'').trim();
+  const disp=g('vfDisp').value;
+  const dispOtro=(g('vfDispOtro').value||'').trim();
+  const fecha=(g('vfFecha').value||'').trim();
+  const resp=(g('vfResp').value||'').trim();
+  if(!iniciales){ alert('Ingresa las iniciales del paciente.'); return; }
+  if(/otro/i.test(disp) && !dispOtro){ alert('Especifica el dispositivo instalado.'); return; }
+  if(!fecha){ alert('Ingresa la fecha de instalación.'); return; }
+  if(!resp){ alert('Ingresa quién instaló o solicitó el acceso.'); return; }
+  const req=vascCreateReg({ fecha, iniciales, edad:(g('vfEdad').value||'').trim(), pieza:(g('vfPieza').value||'').trim(), unidad:(g('vfUnidad').value||'').trim(), lateralidad:g('vfLat').value, dispositivo:disp, dispositivoOtro:dispOtro, hallazgos:(g('vfHallazgos').value||'').trim(), coagulacion:(g('vfCoag').value||'').trim(), responsable:resp, responsableRol:g('vfRol').value, notas:(g('vfNotas').value||'').trim() });
+  const base=getBackendURL();
+  const btn=g('vfSubmit'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  if(!base){ alert('Registro guardado en este dispositivo (sin nube configurada).'); VASC_UI.view='registro'; renderVascModule(); return; }
+  let ok=false; try{ ok=await _vascSyncVerified(req.id, r=>!!r && !r.deleted); }catch(e){ ok=false; }
+  alert(ok ? '✅ Registro guardado en la nube.' : '⚠️ Guardado en este dispositivo; no se pudo registrar en la nube (se reintentará al reabrir).');
+  VASC_UI.view='registro'; renderVascModule();
+}
 
 async function boot(){
   // 0) Deep-link desde una notificación: si la app arranca con ?ic=/?agend= se
