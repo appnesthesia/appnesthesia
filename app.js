@@ -8315,10 +8315,7 @@ function agendEntrarASalaDeUnidad(){
     return;
   }
   const u = _agendGetUnidad(AGEND_STATE.unidadCode);
-  // Si la sala asociada es vascular, NO auto-entrar en el agendamiento general
-  // (esa sala vive en el Portal Vascular). Muestra la lista general.
-  const uSala = u && u.salaId ? _agendGetSala(u.salaId) : null;
-  if(AGEND_STATE.mode === 'unidad' && uSala && !uSala.vascular){
+  if(AGEND_STATE.mode === 'unidad' && u && u.salaId && _agendGetSala(u.salaId)){
     agendShowSalasView();        // queda como base del stack para "Volver"
     agendOpenSala(u.salaId);     // y entra directo al calendario de SU sala
   } else {
@@ -8395,8 +8392,10 @@ function agendShowSalasView(){
   _agendRefreshChromeForView('salas');
   const cont = document.getElementById('agendSalaList');
   if(!cont) return;
-  // Portal Vascular: solo salas vasculares. Agendamiento general: solo NO vasculares.
-  const salas = AGEND_SALAS.filter(s => AGEND_STATE.vascOnly ? !!s.vascular : !s.vascular);
+  // Portal Vascular: SOLO salas vasculares (foco de la enfermera de accesos).
+  // Agendamiento general: TODAS las salas (incluye vasculares → los residentes
+  // también pueden solicitar y ver accesos vasculares). Es la misma data.
+  const salas = AGEND_SALAS.filter(s => AGEND_STATE.vascOnly ? !!s.vascular : true);
   cont.innerHTML = salas.map(s => `
     <button type="button" class="agend-sala-card" onclick="agendOpenSala('${s.id}')">
       <div class="agend-sala-ico" style="background:${s.color}">${s.ico}</div>
@@ -10112,10 +10111,11 @@ function agendOverviewTab(tab){
   document.querySelectorAll('#agendScreen .agend-overview-tab').forEach(b => {
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
-  // Separación vascular: en contexto Portal Vascular solo se ven las vasculares;
-  // en el agendamiento general se excluyen (viven en el Portal Vascular).
+  // Portal Vascular: solo se ven las vasculares (foco de la enfermera de accesos).
+  // Agendamiento general: se ven TODAS, incluidas las vasculares (los residentes
+  // también las revisan). Misma solicitud, visible desde ambos portales.
   const _isVasc = r => { const s = _agendGetSala(r.salaId); return !!(s && s.vascular); };
-  const all = _agendAllRequests().filter(r => AGEND_STATE.vascOnly ? _isVasc(r) : !_isVasc(r));
+  const all = _agendAllRequests().filter(r => AGEND_STATE.vascOnly ? _isVasc(r) : true);
   const counts = { pendiente:0, propuesta:0, aprobada:0, realizada:0, rechazada:0 };
   all.forEach(r => { if(counts[r.estado]!==undefined) counts[r.estado]++; });
   document.getElementById('ovCountPend').textContent = counts.pendiente;
