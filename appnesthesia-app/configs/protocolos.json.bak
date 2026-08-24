@@ -1,0 +1,18 @@
+{
+  "_ayuda": "Protocolos institucionales PERMANENTES de la Clínica Universidad de los Andes. Viven en GitHub (este archivo) y en la carpeta /protocolos los PDF. NO se guardan en el estado sincronizado, por lo que no se pierden. La app los muestra como solo lectura en Staff > Protocolos, y ARIA los usa como contexto (campo 'texto') para cruzar sus respuestas. Para agregar uno: sube el PDF a /protocolos en GitHub, copia su texto al campo 'texto', y agrega un objeto a la lista 'protocolos'.",
+  "version": 1,
+  "institucion": "Clínica Universidad de los Andes",
+  "protocolos": [
+    {
+      "id": "p_eras",
+      "titulo": "ERAS Cirugía Bariátrica",
+      "fuente": "Servicio de Anestesiología, Clínica Universidad de los Andes",
+      "vigencia": "",
+      "fileUrl": "protocolos/ERAS-Colon-y-Bariatrica.pdf",
+      "fileName": "ERAS Cirugia Bariatrica.pdf",
+      "keywords": ["eras", "bariatrica", "bariátrica", "obeso", "manga gastrica", "bypass gastrico", "recuperacion acelerada", "premedicacion bariatrica", "akynzeo", "pregabalina", "metadona", "protocolo institucional"],
+      "resumen": "Protocolo institucional de recuperación acelerada (ERAS) para cirugía bariátrica del Servicio de Anestesiología. Cubre las 3 fases (preadmisión/preoperatorio, intraoperatorio y postoperatorio inmediato) con premedicación, técnica anestésica baja en opioides, manejo de fluidos restrictivo, analgesia multimodal, profilaxis y registros obligatorios. Abre el PDF para el detalle completo.",
+      "texto": "ERAS Cirugía Bariátrica — Clínica Universidad de los Andes (Anestesiología). FASE 1 PREADMISIÓN / PREOPERATORIO INMEDIATO: realizar evaluación preanestésica; confirmar ingesta de premedicación (Akynzeo 300 mg + pregabalina 75 mg + paracetamol 1 g, 4 h antes de la cirugía) y registrar; resolver dudas; firmar consentimiento anestésico. Preparación de pabellón: monitorización no invasiva; calentador de aire forzado (manta cuerpo superior); termómetro nasofaríngeo (no esofágico) fijo en piel/spot-on; tromboprofilaxis MAE + compresión neumática intermitente (CNI); sonda de calibración cuando se utilice. FASE 2 INTRAOPERATORIO — Inducción: anestesia baja en opioides individualizada según paciente; normotermia; normoglicemia y normovolemia; profilaxis antibiótica según norma institucional; Propofol 2,5 mg/kg EV; rocuronio (Esmeron) 0,5 mg/kg EV; Dexametasona 8 mg + Ketorolaco 60 mg EV (no administrar paracetamol si lo tomó en la premedicación); Omeprazol 40 mg EV/día; Metadona 5-10 mg SC; Metoclopramida 10 mg EV; Metamizol 2 g EV. Mantención: sevoflurano/desflurano (registrar ET de gases); vasopresores para mantener PAM (registrar); volumen EV hasta 1000 ml total, evitar sobrehidratación; infiltración local por el cirujano con Chirocaína en los puertos laparoscópicos. Despertar: comprobar correcta reversión del bloqueo neuromuscular (registrar); neostigmina o sugammadex según TOF; semisentado; O2 por mascarilla para SatO2 >93% para traslado. FASE 3 POSTOPERATORIO INMEDIATO: semisentado, cabeza a 30°; O2 por mascarilla para SatO2 >93%; instalar CPAP en usuarios crónicos; reposo relativo; levantar con kinesiólogo 60 minutos después de llegar a Recuperación; suero glucosalino 80 ml/hr; Metadona 3 mg EV SOS en Recuperación si EVA >3; Parecoxib 40 mg EV SOS por una vez; Droperidol 0,625 mg EV SOS para náuseas/vómitos; Ketorolaco 10 mg VO cada 8 h; Metamizol 1 g EV cada 8 h SOS; Paracetamol 1 g c/6 h oral (considerando el horario de premedicación); Enoxaparina 40 mg/día (confirmar la hora de administración con el cirujano). Registros obligatorios: volumen EV administrado, pérdidas hemáticas estimadas, temperatura de egreso de pabellón, TOF al término, ET de gases."
+    }
+  ]
+}

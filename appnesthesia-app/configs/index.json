@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "lastUpdated": "2026-05-16",
+  "institutions": [
+    {
+      "id": "andes",
+      "name": "Clínica Universidad de los Andes",
+      "shortName": "Clínica Universidad de los Andes",
+      "country": "Chile",
+      "city": "Santiago"
+    }
+  ]
+}
