@@ -19,7 +19,6 @@
   "pushURL": "https://appnesthesia-push.fernandorojasbravo.workers.dev",
   "vapidPublicKey": "BLJucKzmwttsEwTq0z1N2EEQtZ4GdGpxVnIWw9Jun3Q4txfAF74M17gWmjiELUiygrP83meCEyYziqaLAQbnj1o",
   "turnstileSiteKey": "",
-  "horarioEmbedURL": "https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc",
   "staff": [
     {
       "id": "s_arriagada",
@@ -681,5 +680,6 @@
       "coberturaLlamada2": false,
       "exentoCobertura": false
     }
-  ]
+  ],
+  "horarioXlsxURL": "https://1drv.ms/x/c/bed7497a3e8c32fc/IQBBpJeNHTftSZb88BUSVCqiAfl7g81vAbUFHDVKWKkISzU?e=1rS2QK"
 }
