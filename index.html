@@ -383,6 +383,15 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .card p{margin:0;font-size:12px;color:var(--muted);line-height:1.35}
 .section{background:var(--card);border-radius:14px;padding:18px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:14px}
 @keyframes hor-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* --- Visor de horario (.xlsx dibujado por la app) --- */
+.hx-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;-webkit-overflow-scrolling:touch}
+.hx-tab{flex:0 0 auto;padding:7px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.hx-tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.hx-scroll{overflow:auto;max-width:100%;max-height:72vh;-webkit-overflow-scrolling:touch;background:#fff}
+.hx-table{border-collapse:collapse;table-layout:fixed;font-size:11px;background:#fff;color:#000}
+.hx-table td{padding:1px 3px;overflow:hidden;white-space:nowrap;vertical-align:middle;border:0;color:#000}
+#horarioFrameWrap:fullscreen{background:#fff;padding:10px}
+#horarioFrameWrap:fullscreen .hx-scroll{max-height:96vh}
 /* Indicador de sincronización */
 .sync-status{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:5px 10px;border-radius:14px;font-size:11px;color:#fff;cursor:pointer;font-weight:600;letter-spacing:.3px;transition:background .15s}
 .sync-status:hover{background:rgba(255,255,255,.28)}
@@ -2568,7 +2577,7 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
   </div>
 </section>
 
-<!-- HORARIO EN LINEA (EMBED) -->
+<!-- HORARIO EN LINEA (visor propio del .xlsx — ver horario-xlsx.js) -->
 <section class="view" id="view-horario">
   <div class="section">
     <h3>📊 Horario en línea <span class="badge" id="horarioBadge" style="display:none">conectado</span></h3>
@@ -2579,19 +2588,20 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
     </div>
     <div id="horarioContainer" style="display:none">
       <div class="btn-row" style="margin-bottom:10px">
-        <button class="btn sm secondary" onclick="reloadHorario()">🔄 Recargar</button>
+        <button class="btn sm secondary" onclick="reloadHorario()">🔄 Actualizar</button>
         <button class="btn sm secondary" onclick="openHorarioFullscreen()">⛶ Pantalla completa</button>
-        <a class="btn sm secondary" id="horarioOpenLink" target="_blank" rel="noopener">↗ Abrir en OneDrive</a>
         <button class="btn sm secondary admin-only" style="display:none" onclick="openHorarioModal()">⚙️ Cambiar enlace</button>
       </div>
       <div id="horarioLoading" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--tint1) 0%,var(--card) 100%);border:1.5px solid var(--green-sage);color:var(--primary-dark);padding:14px 16px;border-radius:12px;margin-bottom:12px;font-size:13.5px;font-weight:600;box-shadow:0 2px 8px rgba(30,107,84,.12)">
         <span class="horario-spinner" style="display:inline-block;width:20px;height:20px;border:3px solid var(--green-pale);border-top-color:var(--green-forest);border-radius:50%;animation:hor-spin 0.9s linear infinite;flex-shrink:0"></span>
-        <span>⏳ Espera unos segundos a que se cargue el documento online… No cierres esta pantalla.</span>
+        <span>⏳ Cargando el horario…</span>
       </div>
-      <div id="horarioFrameWrap" style="position:relative;width:100%;height:70vh;min-height:480px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card)">
-        <iframe id="horarioFrame" src="" style="width:100%;height:100%;border:0" allowfullscreen onload="hideHorarioLoading()"></iframe>
+      <div id="horarioError" class="alert warn" style="display:none;margin-bottom:12px"></div>
+      <div id="horarioTabs" class="hx-tabs" style="display:none"></div>
+      <div id="horarioFrameWrap" style="position:relative;width:100%;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff">
+        <div id="horarioSheet"></div>
       </div>
-      <div class="help" style="margin-top:8px">Si el horario no aparece, tu enlace de OneDrive puede necesitar permisos públicos. Mira la guía o toca "⚙️ Cambiar enlace".</div>
+      <div class="help" id="horarioMeta" style="margin-top:8px"></div>
     </div>
   </div>
 </section>
@@ -2987,6 +2997,8 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=92"></script>
+<script src="vendor/fflate.min.js?v=1"></script>
+<script src="horario-xlsx.js?v=1"></script>
+<script src="app.js?v=93"></script>
 </body>
 </html>

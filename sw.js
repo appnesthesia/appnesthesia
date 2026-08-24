@@ -10,13 +10,15 @@
 // ⚠️ SUBIR ESTE NÚMERO EN CADA DEPLOY (v72 → v73 → …). Es lo que hace que el
 // navegador detecte un service worker nuevo y muestre el aviso "Nueva versión
 // disponible". Si no cambia, la app NO se entera de que hay una actualización.
-const CACHE = 'anestesia-v128';
+const CACHE = 'anestesia-v129';
 const ASSETS = [
   './',
   './index.html',
   './privacy.html',
   './terms.html',
   './app.js',
+  './horario-xlsx.js',
+  './vendor/fflate.min.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',

@@ -30,7 +30,8 @@ const DEFAULT_STATE = {
   },
   currentMonth: new Date().toISOString().slice(0,7),
   externalSource: null, // { url, type:'gsheet-csv'|'xlsx', lastSync, replace:true }
-  horarioEmbedURL: '' // se llena desde configs/<id>.json en boot(),
+  horarioEmbedURL: '', // legado: visor incrustado (OneDrive ya no lo permite)
+  horarioXlsxURL: ''   // se llena desde configs/<id>.json en boot(),
 };
 
 let state = null; // se asigna en boot()
@@ -42,6 +43,7 @@ function load(){
     if(!raw) return def;
     const merged = {...def, ...JSON.parse(raw)};
     if(!merged.horarioEmbedURL) merged.horarioEmbedURL = def.horarioEmbedURL;
+    if(!merged.horarioXlsxURL) merged.horarioXlsxURL = def.horarioXlsxURL;
     // Migración v2: cargar nombres reales del servicio si la instalación previa tenía el equipo de muestra
     if((merged.seedVersion||1) < 2){
       merged.staff = def.staff;
@@ -2451,18 +2453,53 @@ function deleteProto(id){
 }
 
 // ============================================================
-// HORARIO EN LÍNEA (EMBED del Excel de OneDrive / Sheets)
+// HORARIO EN LÍNEA (visor propio del .xlsx)
 // ============================================================
+// Los visores de OneDrive/Google ya no permiten incrustar planillas en otra
+// web (devuelven "no se puede cargar este elemento"). En vez de depender de
+// ellos, la app descarga el .xlsx a través del Worker (/api/horario/:id) y lo
+// DIBUJA ella misma respetando colores, bordes, fuentes y celdas combinadas
+// del archivo original. Ver horario-xlsx.js.
+//
+// Campo de estado: horarioXlsxURL (el enlace público del Excel).
+// Se mantiene horarioEmbedURL solo para migrar configuraciones antiguas.
+
+const HORARIO_MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+let _horarioSheet = null;   // hoja mostrada actualmente
+let _horarioLoading = false;
+
+function getHorarioURL(){
+  return (state.horarioXlsxURL || state.horarioEmbedURL || '').trim();
+}
+
+function _horarioEndpoint(){
+  const base = getBackendURL();
+  if(!base || !INSTITUTION || !INSTITUTION.id) return null;
+  return base + '/api/horario/' + encodeURIComponent(INSTITUTION.id);
+}
+
+// Elige la hoja del mes en curso; si no existe, la primera disponible.
+function _horarioDefaultSheet(names){
+  if(!names || !names.length) return null;
+  if(_horarioSheet && names.indexOf(_horarioSheet) >= 0) return _horarioSheet;
+  const mes = HORARIO_MESES[new Date().getMonth()];
+  const exacta = names.find(n => n.trim().toUpperCase() === mes);
+  if(exacta) return exacta;
+  const parcial = names.find(n => n.trim().toUpperCase().indexOf(mes) === 0);
+  return parcial || names[0];
+}
+
 function renderHorario(){
-  const url = state.horarioEmbedURL;
+  const url = getHorarioURL();
   const empty = document.getElementById('horarioEmpty');
   const cont = document.getElementById('horarioContainer');
   const badge = document.getElementById('horarioBadge');
+  if(!empty || !cont) return;
+
   if(!url){
     empty.style.display = '';
     cont.style.display = 'none';
-    badge.style.display = 'none';
-    // Si no es admin, mostrar mensaje distinto
+    if(badge) badge.style.display = 'none';
     if(!state.isAdmin){
       empty.innerHTML = `<span class="big">📊</span>El administrador todavía no configuró el horario en línea.`;
     } else {
@@ -2470,77 +2507,113 @@ function renderHorario(){
     }
     return;
   }
+
   empty.style.display = 'none';
   cont.style.display = '';
-  badge.style.display = '';
-  const embedURL = toEmbedURL(url);
-  const frame = document.getElementById('horarioFrame');
-  if(frame.src !== embedURL){
-    showHorarioLoading();
-    frame.src = embedURL;
-  } else {
-    // Si el iframe ya estaba cargado, igual mostramos brevemente el mensaje
-    // por si tarda en aparecer al volver a la vista.
-    showHorarioLoading();
-    setTimeout(hideHorarioLoading, 1200);
+  if(badge) badge.style.display = '';
+
+  // Si ya está cargado en esta sesión, solo repintamos.
+  if(window.HorarioXLSX && HorarioXLSX.isLoaded()){
+    _paintHorario();
+    return;
   }
-  document.getElementById('horarioOpenLink').href = url;
+  loadHorario(false);
 }
-function toEmbedURL(url){
-  // Si el usuario pegó el enlace de iframe completo, extraemos el src
-  const srcMatch = url.match(/src=["']([^"']+)["']/i);
-  if(srcMatch) return srcMatch[1];
-  // OneDrive personal: convertir varios formatos a la URL de embed
-  if(url.includes('onedrive.live.com')){
-    // Caso 1: enlace de edición ".../edit?id=...&resid=...&authkey=..."
-    if(url.includes('/edit?') || url.includes('/edit.aspx')){
-      try{
-        const q = new URL(url);
-        const resid = q.searchParams.get('resid') || q.searchParams.get('id');
-        const authkey = q.searchParams.get('authkey');
-        const cid = q.searchParams.get('cid') || (resid ? resid.split('!')[0] : '');
-        if(resid){
-          let embed = `https://onedrive.live.com/embed?resid=${encodeURIComponent(resid)}`;
-          if(authkey) embed += `&authkey=${encodeURIComponent(authkey)}`;
-          if(cid) embed += `&cid=${encodeURIComponent(cid)}`;
-          embed += '&em=2';
-          return embed;
-        }
-      }catch(e){/* fallback debajo */}
-    }
-    // Caso 2: view.aspx / redir
-    let u = url.replace('view.aspx','embed.aspx').replace('redir?','embed?');
-    if(!u.includes('action=embedview') && !u.includes('/embed?')) u += (u.includes('?')?'&':'?')+'action=embedview';
-    return u;
+
+function loadHorario(force){
+  if(_horarioLoading) return;
+  const ep = _horarioEndpoint();
+  const errBox = document.getElementById('horarioError');
+  if(errBox){ errBox.style.display = 'none'; errBox.innerHTML = ''; }
+
+  if(!window.HorarioXLSX || !window.fflate){
+    _horarioError('No se pudo iniciar el visor de planillas. Cierra la app por completo y vuelve a abrirla para que termine de actualizarse.');
+    return;
   }
-  // OneDrive 1drv.ms (acortado): añadimos hint embed; el usuario debería pegar el embed completo
-  if(url.includes('1drv.ms')){
-    return url; // se carga tal cual; recomendamos al usuario usar el embed code
+  if(!ep){
+    _horarioError('No hay conexión con el servidor de la app configurada.');
+    return;
   }
-  // SharePoint / Office 365 business: cambiar :x: (Excel viewer) por embed
-  if(url.includes('sharepoint.com') || url.includes('-my.sharepoint.com') || url.includes('officeapps.live.com')){
-    if(!url.includes('action=embedview')) return url + (url.includes('?')?'&':'?')+'action=embedview';
-    return url;
-  }
-  // Google Sheets: convertir a versión embed
-  if(url.includes('docs.google.com/spreadsheets')){
-    let u = url.replace(/\/edit.*$/,'/preview');
-    if(!u.endsWith('/preview') && !u.includes('/htmlview') && !u.includes('/pubhtml')) u = u.replace(/\/?$/,'/preview');
-    return u;
-  }
-  return url;
+
+  _horarioLoading = true;
+  showHorarioLoading();
+  HorarioXLSX.load(ep, { force: !!force })
+    .then(() => { _horarioLoading = false; hideHorarioLoading(); _paintHorario(); })
+    .catch(err => {
+      _horarioLoading = false;
+      hideHorarioLoading();
+      const msg = String(err && err.message || err);
+      if(msg.indexOf('409') >= 0){
+        _horarioError('El enlace del horario ya no entrega el archivo. Revisa en OneDrive que esté compartido como <b>"cualquier persona con el enlace"</b>.');
+      } else if(msg.indexOf('404') >= 0){
+        _horarioError('El servidor todavía no tiene guardado el enlace del horario. Un administrador debe abrir <b>⚙️ Cambiar enlace</b> y guardarlo de nuevo.');
+      } else {
+        _horarioError('No se pudo cargar el horario (' + _gpEsc(msg) + '). Revisa tu conexión y toca 🔄 Actualizar.');
+      }
+    });
 }
+
+function _horarioError(html){
+  const errBox = document.getElementById('horarioError');
+  if(!errBox) return;
+  errBox.style.display = '';
+  errBox.innerHTML = '⚠️ ' + html;
+  const sheet = document.getElementById('horarioSheet');
+  if(sheet && !sheet.innerHTML) sheet.innerHTML = '';
+}
+
+function _paintHorario(){
+  const names = HorarioXLSX.sheetNames();
+  const tabs = document.getElementById('horarioTabs');
+  const sheetBox = document.getElementById('horarioSheet');
+  const metaBox = document.getElementById('horarioMeta');
+  if(!sheetBox) return;
+
+  _horarioSheet = _horarioDefaultSheet(names);
+
+  if(tabs){
+    tabs.style.display = names.length > 1 ? '' : 'none';
+    tabs.innerHTML = names.map(n =>
+      `<button class="hx-tab${n === _horarioSheet ? ' active' : ''}" onclick="showHorarioSheet(${JSON.stringify(n).replace(/"/g,'&quot;')})">${_gpEsc(n)}</button>`
+    ).join('');
+  }
+
+  sheetBox.innerHTML = HorarioXLSX.renderSheet(_horarioSheet);
+
+  if(metaBox){
+    const m = HorarioXLSX.meta();
+    const d = m.fetchedAt ? new Date(m.fetchedAt) : null;
+    const hora = d ? d.toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+    metaBox.innerHTML = (m.stale ? '📴 Sin conexión — mostrando la última versión guardada. ' : '')
+      + 'Actualizado: ' + hora + ' · Toca 🔄 Actualizar para traer los últimos cambios.';
+  }
+}
+
+function showHorarioSheet(name){
+  _horarioSheet = name;
+  const tabs = document.getElementById('horarioTabs');
+  if(tabs){
+    Array.prototype.forEach.call(tabs.children, btn => {
+      btn.classList.toggle('active', btn.textContent === name);
+    });
+  }
+  const sheetBox = document.getElementById('horarioSheet');
+  if(sheetBox) sheetBox.innerHTML = HorarioXLSX.renderSheet(name);
+  const sc = sheetBox && sheetBox.querySelector('.hx-scroll');
+  if(sc){ sc.scrollTop = 0; sc.scrollLeft = 0; }
+}
+
 function openHorarioModal(){
-  const cur = state.horarioEmbedURL || '';
+  const cur = getHorarioURL();
   modal(`
     <h3>📊 Configurar horario en línea</h3>
     <div class="alert info" style="font-size:12px">
-      Pegá el enlace de tu Excel de OneDrive. La App lo mostrará embebido. Recomendado: usar el código <b>"Insertar / Embed"</b> de OneDrive (ver instrucciones abajo).
+      Pegá el <b>enlace para compartir</b> del Excel (OneDrive, SharePoint o Google Drive). La App descarga el archivo y lo dibuja ella misma, así que <b>no</b> necesitas código para insertar.
     </div>
     <div class="field">
-      <label>URL del Excel o código embed</label>
-      <textarea id="hor_url" rows="3" placeholder="https://onedrive.live.com/... o pegá el código &lt;iframe src=&quot;...&quot;&gt;...&lt;/iframe&gt;">${cur.replace(/</g,'&lt;')}</textarea>
-      <div class="help">Acepta enlaces de OneDrive, SharePoint, Google Sheets, o el código iframe completo (se extrae el src automáticamente).</div>
+      <label>Enlace del Excel</label>
+      <textarea id="hor_url" rows="3" placeholder="https://1drv.ms/x/...">${cur.replace(/</g,'&lt;')}</textarea>
+      <div class="help">Debe estar compartido como <b>"cualquier persona con el enlace"</b> en modo lectura; si no, la App no puede leerlo.</div>
     </div>
     <div class="btn-row">
       <button class="btn accent" onclick="saveHorario()">Guardar</button>
@@ -2548,45 +2621,54 @@ function openHorarioModal(){
       <button class="btn secondary" onclick="closeModal()">Cancelar</button>
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.5">
-      <b>¿Cómo obtener el código embed de tu Excel en OneDrive?</b><br>
-      1. Abre tu Excel en OneDrive (Excel para web).<br>
-      2. Menú <b>Archivo → Compartir → Insertar</b> (o "Embed").<br>
-      3. Configura qué hoja/rango se muestra (puedes mostrar la del mes actual).<br>
-      4. Copiá el código que empieza con <code>&lt;iframe src="..."&gt;</code>.<br>
-      5. Pegalo entero acá arriba. Se extrae el src automático.<br><br>
-      <b>Alternativa (más simple):</b> Compartir → "Cualquiera con el enlace puede ver" → copiar enlace → pegar acá.
+      <b>Cómo obtener el enlace en OneDrive</b><br>
+      1. Abre tu Excel en OneDrive.<br>
+      2. <b>Compartir</b> → en "Cualquier persona con el vínculo" deja el acceso en <b>solo lectura</b>.<br>
+      3. <b>Copiar vínculo</b> y pégalo acá arriba.<br><br>
+      <b>Comprobación:</b> abre ese enlace en una ventana de incógnito. Si se ve el horario sin pedir sesión, va a funcionar en la App.
     </div>
   `);
 }
+
 function saveHorario(){
   const val = document.getElementById('hor_url').value.trim();
   if(!val){ toast('Pegá un enlace'); return; }
-  state.horarioEmbedURL = val;
-  save(); closeModal(); renderHorario(); toast('Horario en línea guardado');
+  const src = (val.match(/src=["']([^"']+)["']/i) || [])[1] || val; // por si pegan un iframe antiguo
+  state.horarioXlsxURL = src;
+  state.horarioEmbedURL = '';   // el visor incrustado ya no se usa
+  save(); closeModal();
+  if(window.HorarioXLSX) HorarioXLSX.forget && HorarioXLSX.forget();
+  loadHorario(true);
+  renderHorario();
+  toast('Horario guardado');
 }
+
 function clearHorario(){
   if(!confirm('¿Quitar el enlace del horario en línea?')) return;
+  state.horarioXlsxURL = '';
   state.horarioEmbedURL = '';
   save(); closeModal(); renderHorario(); toast('Enlace quitado');
 }
+
 function showHorarioLoading(){
   const el = document.getElementById('horarioLoading');
   if(el) el.style.display = 'flex';
 }
+
 function hideHorarioLoading(){
   const el = document.getElementById('horarioLoading');
   if(!el) return;
-  // Pequeño delay para que el render dentro del iframe alcance a aparecer
-  setTimeout(()=>{ el.style.display = 'none'; }, 400);
+  setTimeout(()=>{ el.style.display = 'none'; }, 200);
 }
+
 function reloadHorario(){
-  const frame = document.getElementById('horarioFrame');
-  showHorarioLoading();
-  frame.src = frame.src;
-  toast('Recargando...');
+  toast('Actualizando…');
+  loadHorario(true);
 }
+
 function openHorarioFullscreen(){
   const wrap = document.getElementById('horarioFrameWrap');
+  if(!wrap) return;
   if(wrap.requestFullscreen) wrap.requestFullscreen();
   else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
 }
@@ -5195,7 +5277,7 @@ const LEGACY_LS_KEY = 'anestesia_app_v1';
 // Fallback inline (para apertura por file:// donde fetch está bloqueado)
 const INLINE_INSTITUTIONS_INDEX = JSON.parse('{"version":1,"lastUpdated":"2026-05-16","institutions":[{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago"}]}');
 const INLINE_INSTITUTION_CONFIGS = {
-  'andes': JSON.parse('{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago","welcome":"Servicio de Anestesiología","horarioEmbedURL":"https://onedrive.live.com/edit?id=BED7497A3E8C32FC!2204&resid=BED7497A3E8C32FC!2204&ithint=file%2Cxlsx&authkey=!AOBslmFUGIX9rW8&wdo=2&cid=bed7497a3e8c32fc","staff":[{"id":"s_arriagada","name":"Arriagada","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_molina","name":"Molina","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_martinez","name":"Martinez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rodriguez","name":"Rodriguez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_guerrero","name":"Guerrero","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_vozmediano","name":"Vozmediano","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_fierro","name":"Fierro","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rojas","name":"Rojas","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_duran","name":"Duran","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_cardemil","name":"Cardemil","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_juliov","name":"Julio V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_gonzalez","name":"Gonzalez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larraguibel","name":"Larraguibel","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_barra","name":"Barra","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_biancardi","name":"Biancardi","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_coloma","name":"Coloma","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larosa","name":"La Rosa","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_silva","name":"Silva","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_jara","name":"Jara","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_gallardo","name":"Gallardo","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_hugov","name":"Hugo V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_camilar","name":"Camila R.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_stamaria","name":"Sta. María","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_leisewitz","name":"Leisewitz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_chuen","name":"Chuen","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_miranda","name":"Miranda","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_salazar","name":"Salazar","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_ricke","name":"Ricke","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_veliz","name":"Veliz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_astorga","name":"Astorga","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false}]}')
+  'andes': JSON.parse('{"id":"andes","name":"Clínica Universidad de los Andes","shortName":"Clínica Universidad de los Andes","country":"Chile","city":"Santiago","welcome":"Servicio de Anestesiología","horarioXlsxURL":"https://1drv.ms/x/c/bed7497a3e8c32fc/IQBBpJeNHTftSZb88BUSVCqiAfl7g81vAbUFHDVKWKkISzU?e=1rS2QK","staff":[{"id":"s_arriagada","name":"Arriagada","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_molina","name":"Molina","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_martinez","name":"Martinez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rodriguez","name":"Rodriguez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_guerrero","name":"Guerrero","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_vozmediano","name":"Vozmediano","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_fierro","name":"Fierro","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_rojas","name":"Rojas","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_duran","name":"Duran","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_cardemil","name":"Cardemil","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_juliov","name":"Julio V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_gonzalez","name":"Gonzalez","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larraguibel","name":"Larraguibel","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_barra","name":"Barra","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_biancardi","name":"Biancardi","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_coloma","name":"Coloma","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_larosa","name":"La Rosa","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_silva","name":"Silva","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_jara","name":"Jara","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_gallardo","name":"Gallardo","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_hugov","name":"Hugo V.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_camilar","name":"Camila R.","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_stamaria","name":"Sta. María","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_leisewitz","name":"Leisewitz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_chuen","name":"Chuen","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_miranda","name":"Miranda","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_salazar","name":"Salazar","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false},{"id":"s_ricke","name":"Ricke","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_veliz","name":"Veliz","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":true},{"id":"s_astorga","name":"Astorga","role":"Staff","cumplimientoJornadas":"75-85","jornadasBorradas":0,"equipoTMT":false,"equipoCardio":false,"equipoPediatria":false,"rolCoordinacion":false,"noFondoComun":false,"residenciaAnios":"1-5","esResidente":false,"llamadaPediatrica":false,"llamadaCardio":false,"primeraLlamadaFija":false,"segundaLlamadaFija":false,"coberturaTurnoUrg":false,"coberturaLlamada1":false,"coberturaLlamada2":false,"exentoCobertura":false}]}')
 };
 
 async function fetchJSON(url){
@@ -5239,6 +5321,7 @@ function applyInstitutionConfig(cfg){
   INSTITUTION = cfg;
   DEFAULT_STATE.staff = JSON.parse(JSON.stringify(cfg.staff||[]));
   DEFAULT_STATE.horarioEmbedURL = cfg.horarioEmbedURL || '';
+  DEFAULT_STATE.horarioXlsxURL  = cfg.horarioXlsxURL || '';
   LS_KEY = 'anestesia_app_'+cfg.id;
 }
 
