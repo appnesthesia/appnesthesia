@@ -160,6 +160,25 @@ function load(){
       });
       merged.seedVersion = 10;
     }
+    // Migración v11: Cobertura Emergencia v2.
+    //  a) "Años de residencia" → binario "Residencia fija previa" (+5) / sin (0).
+    //     Decisión Fernando (sep 2026): '1-5' y '5+' migran a fija; '0' a sin.
+    //  b) Coberturas realizadas pasan de checkbox a CONTADOR (×N veces).
+    //  Los campos antiguos (residenciaAnios, coberturaTurnoUrg/Llamada1/Llamada2
+    //  booleanos) se CONSERVAN intactos como respaldo — no se borra ningún dato.
+    if((merged.seedVersion||1) < 11){
+      merged.staff = (merged.staff||[]).map(s=>{
+        const n = {...s};
+        if(typeof n.residenciaFija !== 'boolean'){
+          n.residenciaFija = (s.residenciaAnios === '5+' || s.residenciaAnios === '1-5');
+        }
+        if(typeof n.coberturaTurnoUrgN  !== 'number') n.coberturaTurnoUrgN  = s.coberturaTurnoUrg  ? 1 : 0;
+        if(typeof n.coberturaLlamada1N !== 'number') n.coberturaLlamada1N = s.coberturaLlamada1 ? 1 : 0;
+        if(typeof n.coberturaLlamada2N !== 'number') n.coberturaLlamada2N = s.coberturaLlamada2 ? 1 : 0;
+        return n;
+      });
+      merged.seedVersion = 11;
+    }
     return merged;
   }catch(e){return JSON.parse(JSON.stringify(DEFAULT_STATE));}
 }
@@ -1313,7 +1332,7 @@ function ingestRows(rows, replace){
     }
     if(!staff){
       // Si no existe, lo creamos
-      staff = {id:'s'+Date.now()+Math.random().toString(36).slice(2,5), name:String(name).trim(), role:'Staff', cumplimientoJornadas:'75-85', jornadasBorradas:0, equipoTMT:false, equipoCardio:false, equipoPediatria:false, rolCoordinacion:false, noFondoComun:false, residenciaAnios:'1-5', esResidente:false, llamadaPediatrica:false, llamadaCardio:false, primeraLlamadaFija:false, segundaLlamadaFija:false, coberturaTurnoUrg:false, coberturaLlamada1:false, coberturaLlamada2:false, exentoCobertura:false};
+      staff = {id:'s'+Date.now()+Math.random().toString(36).slice(2,5), name:String(name).trim(), role:'Staff', cumplimientoJornadas:'75-85', jornadasBorradas:0, equipoTMT:false, equipoCardio:false, equipoPediatria:false, rolCoordinacion:false, noFondoComun:false, residenciaAnios:'1-5', residenciaFija:false, esResidente:false, llamadaPediatrica:false, llamadaCardio:false, primeraLlamadaFija:false, segundaLlamadaFija:false, coberturaTurnoUrg:false, coberturaLlamada1:false, coberturaLlamada2:false, coberturaTurnoUrgN:0, coberturaLlamada1N:0, coberturaLlamada2N:0, exentoCobertura:false};
       state.staff.push(staff);
     }
     state.shifts.push({date, staffId:staff.id, type:String(type||'Mañana').trim()});
@@ -1488,26 +1507,29 @@ function saveStaffScore(id){
 // ============================================================
 // COBERTURA EMERGENCIA
 // ============================================================
-function residenciaLabel(v){
-  if(v==='5+') return '5+ años';
-  if(v==='1-5') return '1–5 años';
-  if(v==='0') return '0 años';
-  return '—';
+// Residencia fija previa: binario. Fallback para registros aún no migrados:
+// '1-5' y '5+' cuentan como fija (decisión Fernando, sep 2026).
+function _covResidenciaFija(s){
+  if(typeof s.residenciaFija === 'boolean') return s.residenciaFija;
+  return s.residenciaAnios === '5+' || s.residenciaAnios === '1-5';
+}
+// Contadores de coberturas realizadas (fallback: booleano antiguo = 1 vez).
+function _covN(s, nField, boolField){
+  if(typeof s[nField] === 'number') return Math.max(0, Math.min(99, s[nField]));
+  return s[boolField] ? 1 : 0;
 }
 function computeCoberturaScore(s){
   let score = 0;
-  if(s.residenciaAnios==='5+') score += 5;
-  else if(s.residenciaAnios==='1-5') score += 1;
-  // 0 años = 0 puntos
+  if(_covResidenciaFija(s)) score += 5;       // Residencia fija previa
   if(s.esResidente) score += 8;
   if(s.llamadaPediatrica) score += 1;
   if(s.llamadaCardio) score += 1;
   if(s.primeraLlamadaFija) score += 2;
   if(s.segundaLlamadaFija) score += 1;
   if(s.noFondoComun) score += 2;
-  if(s.coberturaTurnoUrg) score += 3;
-  if(s.coberturaLlamada1) score += 2;
-  if(s.coberturaLlamada2) score += 1;
+  score += _covN(s,'coberturaTurnoUrgN','coberturaTurnoUrg')   * 3;  // +3 c/u
+  score += _covN(s,'coberturaLlamada1N','coberturaLlamada1')  * 2;  // +2 c/u
+  score += _covN(s,'coberturaLlamada2N','coberturaLlamada2')  * 1;  // +1 c/u
   return score;
 }
 function renderCobertura(){
@@ -1523,16 +1545,21 @@ function renderCobertura(){
   const list = document.getElementById('covList');
   list.innerHTML = ranked.map((s,i)=>{
     const chips = [];
-    chips.push(`<span class="chip gray">Residencia: ${residenciaLabel(s.residenciaAnios)}</span>`);
+    chips.push(_covResidenciaFija(s)
+      ? `<span class="chip green">Residencia fija previa</span>`
+      : `<span class="chip gray">Sin residencia fija</span>`);
     if(s.esResidente) chips.push(`<span class="chip green">Residente</span>`);
     if(s.llamadaPediatrica) chips.push(`<span class="chip green">Ll. Pediátrica</span>`);
     if(s.llamadaCardio) chips.push(`<span class="chip green">Ll. Cardio</span>`);
     if(s.primeraLlamadaFija) chips.push(`<span class="chip green">1ª Ll. Fija</span>`);
     if(s.segundaLlamadaFija) chips.push(`<span class="chip green">2ª Ll. Fija</span>`);
     if(s.noFondoComun) chips.push(`<span class="chip green">No Fondo Común</span>`);
-    if(s.coberturaTurnoUrg) chips.push(`<span class="chip green">Cob. Turno Urg.</span>`);
-    if(s.coberturaLlamada1) chips.push(`<span class="chip green">Cob. Llamada 1</span>`);
-    if(s.coberturaLlamada2) chips.push(`<span class="chip green">Cob. Llamada 2</span>`);
+    const nTu = _covN(s,'coberturaTurnoUrgN','coberturaTurnoUrg');
+    const nL1 = _covN(s,'coberturaLlamada1N','coberturaLlamada1');
+    const nL2 = _covN(s,'coberturaLlamada2N','coberturaLlamada2');
+    if(nTu) chips.push(`<span class="chip green">Cob. Turno Urg. ×${nTu}</span>`);
+    if(nL1) chips.push(`<span class="chip green">Cob. Llamada 1 ×${nL1}</span>`);
+    if(nL2) chips.push(`<span class="chip green">Cob. Llamada 2 ×${nL2}</span>`);
     const editBtn = state.isAdmin ? `<button class="btn sm secondary" onclick="editCoberturaScore('${s.id}')" style="margin-left:8px">Editar</button>` : '';
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
@@ -1546,20 +1573,33 @@ function renderCobertura(){
   document.getElementById('covCount').textContent = `${ranked.length} en lista`;
 }
 
+// Stepper del modal de cobertura: cambia el contador y refresca el preview.
+function covStep(spanId, delta, staffId){
+  const el = document.getElementById(spanId);
+  if(!el) return;
+  let v = parseInt(el.textContent,10) || 0;
+  v = Math.max(0, Math.min(99, v + delta));
+  el.textContent = v;
+  previewCoberturaScore(staffId);
+}
+function _covStepperHTML(spanId, val, staffId){
+  return `<span class="cov-stepper">
+    <button type="button" onclick="covStep('${spanId}',-1,'${staffId}')" aria-label="Restar">−</button>
+    <b id="${spanId}">${val}</b>
+    <button type="button" onclick="covStep('${spanId}',1,'${staffId}')" aria-label="Sumar">+</button>
+  </span>`;
+}
 function editCoberturaScore(id){
   if(!state.isAdmin){ toast('Solo el administrador puede editar puntajes'); return; }
   const s = state.staff.find(x=>x.id===id);
   if(!s) return;
-  const res = s.residenciaAnios || '1-5';
+  const nTu = _covN(s,'coberturaTurnoUrgN','coberturaTurnoUrg');
+  const nL1 = _covN(s,'coberturaLlamada1N','coberturaLlamada1');
+  const nL2 = _covN(s,'coberturaLlamada2N','coberturaLlamada2');
   modal(`
     <h3>Editar Cobertura · ${s.name}</h3>
-    <div class="field">
-      <label>Años de residencia</label>
-      <select id="cv_res" onchange="previewCoberturaScore('${id}')">
-        <option value="0" ${res==='0'?'selected':''}>0 años (0 puntos)</option>
-        <option value="1-5" ${res==='1-5'?'selected':''}>1 a 5 años (+1)</option>
-        <option value="5+" ${res==='5+'?'selected':''}>5 o más años (+5)</option>
-      </select>
+    <div class="field"><label><input type="checkbox" id="cv_resfija" ${_covResidenciaFija(s)?'checked':''} onchange="previewCoberturaScore('${id}')" /> Residencia fija previa — +5</label>
+      <div class="help">Sin residencia fija previa: 0 puntos.</div>
     </div>
     <div class="field"><label><input type="checkbox" id="cv_resi" ${s.esResidente?'checked':''} onchange="previewCoberturaScore('${id}')" /> Es residente — +8</label></div>
     <div class="field"><label><input type="checkbox" id="cv_lped" ${s.llamadaPediatrica?'checked':''} onchange="previewCoberturaScore('${id}')" /> Llamada pediátrica — +1</label></div>
@@ -1568,10 +1608,10 @@ function editCoberturaScore(id){
     <div class="field"><label><input type="checkbox" id="cv_l2" ${s.segundaLlamadaFija?'checked':''} onchange="previewCoberturaScore('${id}')" /> Segunda Llamada fija — +1</label></div>
     <div class="field"><label><input type="checkbox" id="cv_nofc" ${s.noFondoComun?'checked':''} onchange="previewCoberturaScore('${id}')" /> No pertenece al Fondo Común — +2</label></div>
     <hr style="margin:12px 0;border:0;border-top:1px solid var(--border)">
-    <div class="help" style="margin-bottom:6px"><b>Coberturas ya realizadas</b> (suman puntaje y bajan en la lista de prioridad):</div>
-    <div class="field"><label><input type="checkbox" id="cv_ctu" ${s.coberturaTurnoUrg?'checked':''} onchange="previewCoberturaScore('${id}')" /> Cobertura de Turno de Urgencia — +3</label></div>
-    <div class="field"><label><input type="checkbox" id="cv_cl1" ${s.coberturaLlamada1?'checked':''} onchange="previewCoberturaScore('${id}')" /> Cobertura Llamada 1 — +2</label></div>
-    <div class="field"><label><input type="checkbox" id="cv_cl2" ${s.coberturaLlamada2?'checked':''} onchange="previewCoberturaScore('${id}')" /> Cobertura Llamada 2 — +1</label></div>
+    <div class="help" style="margin-bottom:6px"><b>Coberturas ya realizadas</b> — indica CUÁNTAS VECES cubrió cada instancia (cada una suma su puntaje y baja en la lista de prioridad):</div>
+    <div class="field cov-count-row"><span>Cobertura de Turno de Urgencia — +3 c/u</span>${_covStepperHTML('cv_ctu', nTu, id)}</div>
+    <div class="field cov-count-row"><span>Cobertura Llamada 1 — +2 c/u</span>${_covStepperHTML('cv_cl1', nL1, id)}</div>
+    <div class="field cov-count-row"><span>Cobertura Llamada 2 — +1 c/u</span>${_covStepperHTML('cv_cl2', nL2, id)}</div>
     <hr style="margin:12px 0;border:0;border-top:1px solid var(--border)">
     <div class="field"><label><input type="checkbox" id="cv_ex" ${s.exentoCobertura?'checked':''}> Exento del listado de cobertura</label>
       <div class="help">Si está marcado, este anestesiólogo no aparecerá en el ranking.</div>
@@ -1586,18 +1626,22 @@ function editCoberturaScore(id){
   `);
 }
 
+function _covReadN(spanId){
+  const el = document.getElementById(spanId);
+  return Math.max(0, Math.min(99, parseInt(el && el.textContent, 10) || 0));
+}
 function previewCoberturaScore(id){
   const draft = {
-    residenciaAnios: document.getElementById('cv_res').value,
+    residenciaFija: document.getElementById('cv_resfija').checked,
     esResidente: document.getElementById('cv_resi').checked,
     llamadaPediatrica: document.getElementById('cv_lped').checked,
     llamadaCardio: document.getElementById('cv_lcar').checked,
     primeraLlamadaFija: document.getElementById('cv_l1').checked,
     segundaLlamadaFija: document.getElementById('cv_l2').checked,
     noFondoComun: document.getElementById('cv_nofc').checked,
-    coberturaTurnoUrg: document.getElementById('cv_ctu').checked,
-    coberturaLlamada1: document.getElementById('cv_cl1').checked,
-    coberturaLlamada2: document.getElementById('cv_cl2').checked,
+    coberturaTurnoUrgN: _covReadN('cv_ctu'),
+    coberturaLlamada1N: _covReadN('cv_cl1'),
+    coberturaLlamada2N: _covReadN('cv_cl2'),
   };
   const el = document.getElementById('cv_preview');
   if(el) el.textContent = computeCoberturaScore(draft);
@@ -1606,16 +1650,21 @@ function previewCoberturaScore(id){
 function saveCoberturaScore(id){
   const s = state.staff.find(x=>x.id===id);
   if(!s) return;
-  s.residenciaAnios = document.getElementById('cv_res').value;
+  s.residenciaFija = document.getElementById('cv_resfija').checked;
   s.esResidente = document.getElementById('cv_resi').checked;
   s.llamadaPediatrica = document.getElementById('cv_lped').checked;
   s.llamadaCardio = document.getElementById('cv_lcar').checked;
   s.primeraLlamadaFija = document.getElementById('cv_l1').checked;
   s.segundaLlamadaFija = document.getElementById('cv_l2').checked;
   s.noFondoComun = document.getElementById('cv_nofc').checked;
-  s.coberturaTurnoUrg = document.getElementById('cv_ctu').checked;
-  s.coberturaLlamada1 = document.getElementById('cv_cl1').checked;
-  s.coberturaLlamada2 = document.getElementById('cv_cl2').checked;
+  s.coberturaTurnoUrgN  = _covReadN('cv_ctu');
+  s.coberturaLlamada1N = _covReadN('cv_cl1');
+  s.coberturaLlamada2N = _covReadN('cv_cl2');
+  // Compatibilidad: mantener los booleanos antiguos coherentes por si algún
+  // dispositivo aún corre una versión anterior de la app.
+  s.coberturaTurnoUrg  = s.coberturaTurnoUrgN  > 0;
+  s.coberturaLlamada1 = s.coberturaLlamada1N > 0;
+  s.coberturaLlamada2 = s.coberturaLlamada2N > 0;
   s.exentoCobertura = document.getElementById('cv_ex').checked;
   save();
   closeModal();
@@ -2251,7 +2300,7 @@ function renderTeam(){
 }
 function openStaffModal(s){
   const isNew = !s;
-  s = s || {id:'s'+Date.now(), name:'', role:'Staff', cumplimientoJornadas:'75-85', jornadasBorradas:0, equipoTMT:false, equipoCardio:false, equipoPediatria:false, rolCoordinacion:false, noFondoComun:false, residenciaAnios:'1-5', esResidente:false, llamadaPediatrica:false, llamadaCardio:false, primeraLlamadaFija:false, segundaLlamadaFija:false, coberturaTurnoUrg:false, coberturaLlamada1:false, coberturaLlamada2:false, exentoCobertura:false};
+  s = s || {id:'s'+Date.now(), name:'', role:'Staff', cumplimientoJornadas:'75-85', jornadasBorradas:0, equipoTMT:false, equipoCardio:false, equipoPediatria:false, rolCoordinacion:false, noFondoComun:false, residenciaAnios:'1-5', residenciaFija:false, esResidente:false, llamadaPediatrica:false, llamadaCardio:false, primeraLlamadaFija:false, segundaLlamadaFija:false, coberturaTurnoUrg:false, coberturaLlamada1:false, coberturaLlamada2:false, coberturaTurnoUrgN:0, coberturaLlamada1N:0, coberturaLlamada2N:0, exentoCobertura:false};
   modal(`
     <h3>${isNew?'Agregar miembro':'Editar miembro'}</h3>
     <div class="field"><label>Nombre completo</label><input id="st_name" value="${s.name||''}"></div>
