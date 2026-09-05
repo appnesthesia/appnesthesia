@@ -907,7 +907,8 @@ function showView(name){
     protocolos:'Protocolos',
     pediatria:'Pediatría',
     coagulacion:'Coagulación',
-    reloj:'Reloj Control'
+    reloj:'Reloj Control',
+    cppd:'Cefalea Post Punción'
   };
   document.getElementById('hdrTitle').textContent = titles[name] || titles.home;
   // Actualizar badges de notificación en la home (vacaciones / intercambios)
@@ -943,6 +944,7 @@ function showView(name){
   if(name==='eventos') renderEventos();
   if(name==='home'){ updateEventBadge(); try{ updateAgendAdminNotice(); }catch(e){} try{ updatePushBtn(); }catch(e){} }
   if(name==='reloj') relojInit();
+  if(name==='cppd') cppdOpen();
   window.scrollTo(0,0);
 }
 function showHome(){ showView('home'); }
@@ -4756,6 +4758,7 @@ const SEARCH_INDEX = [
   { ico:'📊', label:'Horario en línea', hint:'Excel del rol', kw:'horario excel onedrive rol', go:()=>_goView('horario') },
   { ico:'🏆', label:'Índice de permanencia', hint:'Ranking y puntaje', kw:'indice permanencia ranking puntaje', go:()=>_goView('indice') },
   { ico:'🛡️', label:'Cobertura de emergencia', hint:'Listado de cobertura', kw:'cobertura emergencia urgencia', go:()=>_goView('cobertura') },
+  { ico:'🤕', label:'Cefalea Post Punción', hint:'Registro PDA / CPPD / parche de sangre', kw:'cefalea post puncion dural parche sangre pdph cppd calidad', go:()=>_goView('cppd') },
   { ico:'🔄', label:'Intercambio de turnos', hint:'Ofrecer o tomar turnos', kw:'intercambio turnos cambio permuta llamada', go:()=>_goView('intercambios') },
   { ico:'🌴', label:'Vacaciones', hint:'Solicitudes y aprobaciones', kw:'vacaciones permiso solicitud feriado', go:()=>_goView('vacaciones') },
   { ico:'📈', label:'Estadísticas del servicio', hint:'Indicadores', kw:'estadisticas indicadores produccion', go:()=>_goView('estadisticas') },
@@ -13742,6 +13745,646 @@ function closePortalChooser(goHome){
   if(goHome === true){ showModulesScreen(); }
 }
 
+
+// ============================================================
+// REGISTRO NEUROAXIAL · CEFALEA POST PUNCIÓN DURAL (CPPD), PUNCIÓN DURAL
+// ADVERTIDA (PDA) Y PARCHE DE SANGRE — indicador de calidad del servicio.
+// Vive SOLO en el portal Staff (vista 'cppd'). Cada registro consigna quién lo
+// ingresó (usuario logueado) y quién hizo cada modificación posterior.
+// Privacidad: NUNCA identifica al paciente (solo iniciales + fecha; sin RUT,
+// sin nombre, sin ficha). Canal en la nube "<inst>-cppd" (arreglo plano
+// fusionado por id + tombstones), mismo modelo verify-and-retry del Portal
+// Vascular. Retención: permanente (es un registro histórico de calidad).
+// ============================================================
+const CPPD_LS_KEY = 'appx_cppd_data_v1';
+const CPPD_UI = { view:'home', detailId:null, editId:null, filtTipo:'', filtCtx:'', filtAnio:'', resAnio:'' };
+const CPPD_TIPOS = {
+  pda:    { ico:'💉', label:'Punción dural advertida',   short:'PDA',    desc:'Punción de duramadre reconocida durante el procedimiento neuroaxial (epidural / CSE).', cls:'recibida' },
+  cppd:   { ico:'🤕', label:'Cefalea post punción dural', short:'CPPD',  desc:'Cefalea post punción identificada después (advertida o inadvertida), en la misma unidad o por otra persona.', cls:'aceptada' },
+  parche: { ico:'🩸', label:'Parche de sangre (otra indicación)', short:'Parche', desc:'Parche hemático epidural fuera del contexto de CPPD: interconsulta de neurología por sospecha de hipotensión intracraneal, fístula de LCR, etc.', cls:'realizada' }
+};
+const CPPD_CONTEXTOS = [
+  { v:'maternidad',  label:'Maternidad' },
+  { v:'pabellon',    label:'Pabellón central' },
+  { v:'hemodinamia', label:'Hemodinamia' },
+  { v:'otro',        label:'Otro (especificar)' }
+];
+const CPPD_PROCS = [
+  { v:'epidural',   label:'Epidural' },
+  { v:'espinal',    label:'Espinal (raquídea)' },
+  { v:'cse',        label:'Combinada espinal-epidural (CSE)' },
+  { v:'pl',         label:'Punción lumbar diagnóstica (no anestésica)' },
+  { v:'desconocido',label:'No precisado / desconocido' },
+  { v:'otro',       label:'Otro (especificar)' }
+];
+const CPPD_AGUJAS = ['Tuohy 16G','Tuohy 17G','Tuohy 18G','Whitacre 25G','Whitacre 27G','Sprotte 24G','Sprotte 25G','Pencan 25G','Pencan 27G','Quincke 22G','Quincke 25G','Quincke 27G','Otra / no precisada'];
+const CPPD_OPERADORES = [ { v:'staff', label:'Staff' }, { v:'residente', label:'Residente' }, { v:'otro', label:'Otro / no precisado' } ];
+const CPPD_PDA_MANEJO = [
+  { v:'cateter_intratecal', label:'Catéter intratecal dejado in situ' },
+  { v:'reposicion',         label:'Reposición epidural en otro espacio' },
+  { v:'conversion_espinal', label:'Conversión a técnica espinal' },
+  { v:'conversion_general', label:'Conversión a anestesia general' },
+  { v:'sin_cambio',         label:'Sin cambio de técnica' },
+  { v:'otro',               label:'Otro' }
+];
+const CPPD_IDENTIFICADO = [
+  { v:'anestesia',   label:'Anestesiología (visita / control)' },
+  { v:'obstetricia', label:'Obstetricia / Matronería' },
+  { v:'cirugia',     label:'Equipo quirúrgico tratante' },
+  { v:'neurologia',  label:'Neurología' },
+  { v:'urgencia',    label:'Servicio de Urgencia (reconsulta)' },
+  { v:'paciente',    label:'Paciente (contacto telefónico)' },
+  { v:'otro',        label:'Otro' }
+];
+const CPPD_INTENSIDAD = [ { v:'leve', label:'Leve' }, { v:'moderada', label:'Moderada' }, { v:'severa', label:'Severa / invalidante' } ];
+const CPPD_SINTOMAS = [
+  { v:'postural',  label:'Componente postural' },
+  { v:'nauseas',   label:'Náuseas / vómitos' },
+  { v:'rigidez',   label:'Rigidez de nuca' },
+  { v:'tinnitus',  label:'Tinnitus / hipoacusia' },
+  { v:'visual',    label:'Alteración visual / diplopía' },
+  { v:'fotofobia', label:'Fotofobia' }
+];
+const CPPD_MANEJO_MED = [
+  { v:'reposo',        label:'Reposo / medidas generales' },
+  { v:'hidratacion',   label:'Hidratación' },
+  { v:'analgesia',     label:'Analgesia (paracetamol / AINEs)' },
+  { v:'cafeina',       label:'Cafeína' },
+  { v:'gabapentinoide',label:'Gabapentina / pregabalina' },
+  { v:'esfenopalatino',label:'Bloqueo esfenopalatino' },
+  { v:'occipital',     label:'Bloqueo occipital mayor' },
+  { v:'otro',          label:'Otro' }
+];
+const CPPD_PARCHE_RES = [
+  { v:'pendiente', label:'Pendiente de evaluar' },
+  { v:'completa',  label:'Resolución completa' },
+  { v:'parcial',   label:'Mejoría parcial' },
+  { v:'sin',       label:'Sin respuesta' }
+];
+const CPPD_PARCHE_INDIC = [
+  { v:'hipotension', label:'Sospecha de hipotensión intracraneal espontánea' },
+  { v:'fistula',     label:'Fístula de LCR (post cirugía de columna / trauma)' },
+  { v:'post_pl',     label:'Cefalea post punción lumbar diagnóstica' },
+  { v:'otro',        label:'Otra (especificar)' }
+];
+const CPPD_SOLICITANTE = [ { v:'neurologia', label:'Neurología' }, { v:'neurocirugia', label:'Neurocirugía' }, { v:'traumatologia', label:'Traumatología / Columna' }, { v:'otro', label:'Otro' } ];
+const CPPD_EVOL = [
+  { v:'pendiente',   label:'En seguimiento' },
+  { v:'resuelto',    label:'Resuelto' },
+  { v:'derivado',    label:'Derivado a Neurología' },
+  { v:'persistente', label:'Síntomas persistentes al alta' }
+];
+
+function _cppdEsc(s){ return _gpEsc(s); }
+function _cppdLbl(list, v){ const m=(list||[]).find(x=>x.v===v); return m?m.label:(v||''); }
+function _cppdRemoteId(){ return INSTITUTION ? (INSTITUTION.id + '-cppd') : null; }
+function _cppdGenId(){ return 'cp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function _cppdTs(r){ return r ? (r.updatedAt || r.createdAt || 0) : 0; }
+function _cppdPad(n){ return String(n).padStart(2,'0'); }
+function _cppdTodayStr(){ const d=new Date(); return `${d.getFullYear()}-${_cppdPad(d.getMonth()+1)}-${_cppdPad(d.getDate())}`; }
+function _cppdFmtFecha(ds){
+  if(!ds) return '—';
+  try{ const [y,m,d]=String(ds).split('-').map(Number); if(!y||!m||!d) return ds; return `${d}/${_cppdPad(m)}/${y}`; }catch(e){ return ds; }
+}
+function _cppdFmtDT(ts){ if(!ts) return ''; try{ const d=new Date(ts); return `${d.getDate()}/${_cppdPad(d.getMonth()+1)}/${d.getFullYear()} ${_cppdPad(d.getHours())}:${_cppdPad(d.getMinutes())}`; }catch(e){ return ''; } }
+function _cppdWho(){
+  try{ const u=(typeof getCurrentUser==='function')?getCurrentUser():null; if(u&&u.name) return { id:u.id||'', name:u.name }; }catch(e){}
+  return { id:'', name:'Staff (sin usuario)' };
+}
+function _cppdIsAdmin(){ return !!(typeof state!=='undefined' && state && state.isAdmin); }
+
+// Privacidad: solo iniciales (máx 6) y sin RUT / nombre completo.
+function _cppdSanitize(r){
+  if(!r || typeof r!=='object' || r.deleted) return r;
+  let ch=false;
+  ['rut','nombre','ficha','paciente'].forEach(k=>{ if(r[k]!==undefined){ delete r[k]; ch=true; } });
+  if(typeof r.iniciales==='string'){
+    let ini=r.iniciales.trim();
+    if(/\s/.test(ini) && ini.length>6){ ini=ini.split(/[\s.]+/).filter(Boolean).slice(0,3).map(p=>(p[0]||'').toUpperCase()).join('.')+'.'; }
+    ini=ini.slice(0,6);
+    if(ini!==r.iniciales){ r.iniciales=ini; ch=true; }
+  }
+  if(ch) r.updatedAt=Date.now();
+  return r;
+}
+function cppdLoadData(){
+  try{ let a=JSON.parse(localStorage.getItem(CPPD_LS_KEY)||'[]'); if(!Array.isArray(a)) a=[]; a.forEach(_cppdSanitize); return a; }
+  catch(e){ return []; }
+}
+function cppdSaveData(arr){ try{ localStorage.setItem(CPPD_LS_KEY, JSON.stringify(Array.isArray(arr)?arr:[])); }catch(e){} }
+function _cppdMergeData(remoteArr, localArr){
+  const map={}; const cutoff=Date.now()-180*24*3600*1000; // tombstones se purgan a los 180 días
+  (Array.isArray(remoteArr)?remoteArr:[]).forEach(r=>{ if(r&&r.id) map[r.id]=r; });
+  (Array.isArray(localArr)?localArr:[]).forEach(r=>{ if(!r||!r.id) return; const ex=map[r.id]; if(!ex||_cppdTs(r)>=_cppdTs(ex)) map[r.id]=r; });
+  return Object.values(map).filter(r=>!(r&&r.deleted&&(r.deletedAt||0)<cutoff));
+}
+let _cppdSyncing=false;
+async function cppdSyncNow(){
+  const base=getBackendURL(); const id=_cppdRemoteId();
+  if(!base||!id||_cppdSyncing) return false;
+  _cppdSyncing=true;
+  try{
+    let remoteArr=[];
+    try{ const r=await fetch(base+'/api/state/'+encodeURIComponent(id), _stateGetOpts()); if(!r.ok) return false; const j=await r.json(); if(j&&!j._empty&&Array.isArray(j.data)) remoteArr=j.data; }catch(e){ return false; }
+    const merged=_cppdMergeData(remoteArr, cppdLoadData()); merged.forEach(_cppdSanitize);
+    cppdSaveData(merged);
+    const token=getBackendToken(); if(!token) return false;
+    try{ const pr=await fetch(base+'/api/state/'+encodeURIComponent(id), {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify({data:merged})}); return pr.ok; }catch(e){ return false; }
+  }catch(e){ return false; } finally{ _cppdSyncing=false; }
+}
+async function _cppdSyncVerified(reqId, predicate, tries){
+  tries=tries||5;
+  for(let i=0;i<tries;i++){
+    let ok=false; try{ ok=await cppdSyncNow(); }catch(e){ ok=false; }
+    if(ok){ try{ const base=getBackendURL(); const id=_cppdRemoteId(); const r=await fetch(base+'/api/state/'+encodeURIComponent(id)+'?cb='+Date.now(), _stateGetOpts()); if(r.ok){ const j=await r.json(); const arr=(j&&Array.isArray(j.data))?j.data:[]; if(predicate(arr.find(x=>x&&x.id===reqId))) return true; } }catch(e){} }
+    await new Promise(res=>setTimeout(res,250+Math.floor(Math.random()*600)));
+  }
+  return false;
+}
+function _cppdRecords(){
+  return cppdLoadData().filter(r=>r && !r.deleted)
+    .sort((a,b)=> String(b.fecha||'').localeCompare(String(a.fecha||'')) || (b.createdAt||0)-(a.createdAt||0));
+}
+// ¿Este registro cuenta como una CPPD? (tipo cppd, o una PDA que evolucionó a cefalea)
+function _cppdEsCefalea(r){ return r.tipo==='cppd' || (r.tipo==='pda' && r.cefalea==='si'); }
+function _cppdTuvoParche(r){ return r.tipo==='parche' || r.parche===true; }
+
+function cppdCreate(f){
+  const arr=cppdLoadData(); const now=Date.now(); const who=_cppdWho();
+  const r=Object.assign({}, f, { id:_cppdGenId(), createdAt:now, updatedAt:now, registradoPor:who, historial:[{ at:now, by:who.name, txt:'Registro creado' }] });
+  _cppdSanitize(r); arr.push(r); cppdSaveData(arr); return r;
+}
+function cppdUpdate(id, f){
+  const arr=cppdLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return null;
+  const who=_cppdWho(); const now=Date.now();
+  const keep={ id:r.id, createdAt:r.createdAt, registradoPor:r.registradoPor, historial:Array.isArray(r.historial)?r.historial.slice():[] };
+  Object.keys(r).forEach(k=>{ if(!(k in keep)) delete r[k]; });
+  Object.assign(r, f, keep, { updatedAt:now });
+  r.historial.push({ at:now, by:who.name, txt:'Registro modificado' });
+  if(r.historial.length>30) r.historial=r.historial.slice(-30);
+  _cppdSanitize(r); cppdSaveData(arr); return r;
+}
+function cppdDelete(id){
+  const arr=cppdLoadData(); const r=arr.find(x=>x&&x.id===id); if(!r) return false;
+  const who=_cppdWho();
+  r.deleted=true; r.deletedAt=Date.now(); r.updatedAt=Date.now(); r.deletedBy=who.name; cppdSaveData(arr); return true;
+}
+
+// ---------------- UI ----------------
+function renderCppd(){
+  const body=document.getElementById('cppdBody'); if(!body) return;
+  let html;
+  if(CPPD_UI.view==='form') html=_cppdRenderForm();
+  else if(CPPD_UI.view==='detail') html=_cppdRenderDetail();
+  else if(CPPD_UI.view==='resumen') html=_cppdRenderResumen();
+  else html=_cppdRenderHome();
+  body.innerHTML=html;
+  if(CPPD_UI.view==='form'){ try{ cppdFormUpdate(); }catch(e){} }
+  window.scrollTo(0,0);
+}
+function cppdOpen(){
+  CPPD_UI.view='home'; renderCppd();
+  try{ cppdSyncNow().then(()=>{ if(CPPD_UI.view==='home'||CPPD_UI.view==='resumen') renderCppd(); }); }catch(e){}
+}
+function cppdGoHome(){ CPPD_UI.view='home'; CPPD_UI.editId=null; renderCppd(); }
+function cppdGoResumen(){ CPPD_UI.view='resumen'; renderCppd(); }
+function cppdGoForm(id){ CPPD_UI.editId=id||null; CPPD_UI.view='form'; renderCppd(); }
+function cppdOpenDetail(id){ CPPD_UI.detailId=id; CPPD_UI.view='detail'; renderCppd(); }
+function cppdSetFilt(k, v){ CPPD_UI[k]=v; renderCppd(); }
+
+function _cppdAnios(recs){
+  const s=new Set(); recs.forEach(r=>{ const y=String(r.fecha||'').slice(0,4); if(y) s.add(y); }); s.add(String(new Date().getFullYear()));
+  return Array.from(s).sort().reverse();
+}
+function _cppdTipoChip(r){
+  const t=CPPD_TIPOS[r.tipo]||CPPD_TIPOS.pda;
+  let extra='';
+  if(r.tipo==='pda' && r.cefalea==='si') extra=' → CPPD';
+  if(r.tipo==='cppd' && r.cppdOrigen) extra = r.cppdOrigen==='inadvertida' ? ' inadvertida' : ' advertida';
+  return `<span class="ic-track-tk ${t.cls}">${t.ico} ${t.short}${extra}</span>`;
+}
+function _cppdRenderHome(){
+  const all=_cppdRecords();
+  const anios=_cppdAnios(all);
+  const recs=all.filter(r=> (!CPPD_UI.filtTipo || r.tipo===CPPD_UI.filtTipo) && (!CPPD_UI.filtCtx || r.contexto===CPPD_UI.filtCtx) && (!CPPD_UI.filtAnio || String(r.fecha||'').slice(0,4)===CPPD_UI.filtAnio));
+  const y=String(new Date().getFullYear());
+  const yr=all.filter(r=>String(r.fecha||'').slice(0,4)===y);
+  const nPda=yr.filter(r=>r.tipo==='pda').length, nCef=yr.filter(_cppdEsCefalea).length, nPar=yr.filter(_cppdTuvoParche).length;
+  const sel=(id,k,list,lbl)=>`<label class="ic-field sm"><span>${lbl}</span><select onchange="cppdSetFilt('${k}',this.value)"><option value="">Todos</option>${list.map(o=>`<option value="${o.v}"${CPPD_UI[k]===o.v?' selected':''}>${_cppdEsc(o.label)}</option>`).join('')}</select></label>`;
+  const head=`
+    <div class="ic-intro">Registro de <b>punciones durales advertidas</b>, <b>cefaleas post punción dural</b> y <b>parches de sangre</b> del servicio, como indicador de calidad. <b>Sin datos identificatorios</b> del paciente: solo fecha, iniciales y contexto. Cada ingreso queda firmado por quien lo registra.</div>
+    <div class="cppd-kpis">
+      <div class="cppd-kpi"><b>${nPda}</b><span>PDA ${y}</span></div>
+      <div class="cppd-kpi"><b>${nCef}</b><span>CPPD ${y}</span></div>
+      <div class="cppd-kpi"><b>${nPar}</b><span>Parches ${y}</span></div>
+    </div>
+    <button type="button" class="ic-newbtn" onclick="cppdGoForm()">+ Registrar evento</button>
+    <div class="ic-modehead">
+      <button type="button" class="ic-back" onclick="cppdGoResumen()">📊 Resumen e indicadores</button>
+      <button type="button" class="ic-back" onclick="cppdExportCsv()">⬇️ Exportar CSV</button>
+    </div>
+    <div class="ic-frow">
+      ${sel('t','filtTipo',[{v:'pda',label:'PDA'},{v:'cppd',label:'CPPD'},{v:'parche',label:'Parche (otra indicación)'}],'Tipo')}
+      ${sel('c','filtCtx',CPPD_CONTEXTOS,'Contexto')}
+      ${sel('a','filtAnio',anios.map(a=>({v:a,label:a})),'Año')}
+    </div>`;
+  if(recs.length===0){
+    return `<div class="ic-wrap">${head}<div class="ic-empty"><span>🗂️</span>${all.length?'No hay registros con estos filtros.':'Aún no hay eventos registrados.'}</div></div>`;
+  }
+  const rows=recs.map(_cppdRow).join('');
+  return `<div class="ic-wrap">${head}<div class="ic-list">${rows}</div><div style="font-size:11.5px;color:var(--muted);text-align:center">${recs.length} registro${recs.length===1?'':'s'}</div></div>`;
+}
+function _cppdRow(r){
+  const t=CPPD_TIPOS[r.tipo]||CPPD_TIPOS.pda;
+  const ctx = r.contexto==='otro' && r.contextoOtro ? r.contextoOtro : _cppdLbl(CPPD_CONTEXTOS, r.contexto);
+  const bits=[ctx];
+  if(r.tipo!=='parche' && r.procedimiento) bits.push(_cppdLbl(CPPD_PROCS, r.procedimiento));
+  if(r.tipo==='parche' && r.parcheIndicacion) bits.push(_cppdLbl(CPPD_PARCHE_INDIC, r.parcheIndicacion));
+  if(_cppdEsCefalea(r)){ if(r.cppdManejoMedico) bits.push('manejo médico'); if(r.parche) bits.push('parche'); }
+  if(r.evolucion && r.evolucion!=='pendiente') bits.push(_cppdLbl(CPPD_EVOL, r.evolucion));
+  const who = r.registradoPor && r.registradoPor.name ? r.registradoPor.name : '';
+  return `
+    <div class="ic-track-row st-${t.cls}" onclick="cppdOpenDetail('${r.id}')">
+      <div class="ic-track-info">
+        <div class="ic-track-main">${_cppdEsc(r.iniciales||'—')}${r.edad?(' · '+_cppdEsc(String(r.edad))+' a'):''} · ${_cppdEsc(bits.filter(Boolean).join(' · '))}</div>
+        <div class="ic-track-sub">${_cppdFmtFecha(r.fecha)}${who?(' · ✍️ '+_cppdEsc(who)):''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">${_cppdTipoChip(r)}</div>
+    </div>`;
+}
+
+// ---------------- Formulario (crear / editar) ----------------
+function _cppdOpts(list, cur){ return list.map(o=>`<option value="${o.v}"${cur===o.v?' selected':''}>${_cppdEsc(o.label)}</option>`).join(''); }
+function _cppdChecks(name, list, cur){
+  const set=new Set(Array.isArray(cur)?cur:[]);
+  return `<div class="cppd-checks">${list.map(o=>`<label class="cppd-chk"><input type="checkbox" name="${name}" value="${o.v}"${set.has(o.v)?' checked':''}> <span>${_cppdEsc(o.label)}</span></label>`).join('')}</div>`;
+}
+function _cppdRadios(name, list, cur, onchange){
+  return `<div class="cppd-checks">${list.map(o=>`<label class="cppd-chk"><input type="radio" name="${name}" value="${o.v}"${cur===o.v?' checked':''}${onchange?` onchange="${onchange}"`:''}> <span>${_cppdEsc(o.label)}</span></label>`).join('')}</div>`;
+}
+function _cppdRenderForm(){
+  const edit = CPPD_UI.editId ? _cppdRecords().find(x=>x.id===CPPD_UI.editId) : null;
+  const r = edit || { tipo:'', fecha:_cppdTodayStr(), contexto:'maternidad', procedimiento:'epidural', operador:'staff', cefalea:'pendiente', evolucion:'pendiente', parcheResultado:'pendiente', cppdOrigen:'inadvertida' };
+  const who=_cppdWho();
+  const tipoBtns = Object.keys(CPPD_TIPOS).map(k=>{ const t=CPPD_TIPOS[k]; return `
+      <label class="cppd-tipo${r.tipo===k?' on':''}">
+        <input type="radio" name="cfTipo" value="${k}"${r.tipo===k?' checked':''} onchange="cppdFormUpdate()">
+        <div class="cppd-tipo-ico">${t.ico}</div>
+        <div class="cppd-tipo-tx"><b>${_cppdEsc(t.label)}</b><span>${_cppdEsc(t.desc)}</span></div>
+      </label>`; }).join('');
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="${edit?`cppdOpenDetail('${edit.id}')`:'cppdGoHome()'}">‹ ${edit?'Volver al detalle':'Volver'}</button>
+      <div class="ic-intro">${edit?'Editando registro.':'¿Qué quieres ingresar?'} Queda consignado como ingresado por <b>${_cppdEsc(who.name)}</b>. No escribas nombre, RUT ni número de ficha del paciente.</div>
+      <form class="ic-form" onsubmit="cppdSubmit(event)" autocomplete="off">
+        <div class="ic-fsec">Tipo de evento</div>
+        <div class="cppd-tipos">${tipoBtns}</div>
+
+        <div class="ic-fsec">Paciente (anonimizado) y contexto</div>
+        <div class="ic-frow">
+          <label class="ic-field"><span>Iniciales *</span><input id="cfIniciales" type="text" maxlength="6" placeholder="Ej: M.P.R." value="${_cppdEsc(r.iniciales||'')}" required></label>
+          <label class="ic-field sm"><span>Edad</span><input id="cfEdad" type="text" inputmode="numeric" maxlength="3" placeholder="años" value="${_cppdEsc(r.edad||'')}"></label>
+        </div>
+        <div class="ic-frow">
+          <label class="ic-field"><span id="cfFechaLbl">Fecha del evento *</span><input id="cfFecha" type="date" value="${_cppdEsc(r.fecha||'')}" required></label>
+          <label class="ic-field"><span>Contexto *</span><select id="cfContexto" onchange="cppdFormUpdate()">${_cppdOpts(CPPD_CONTEXTOS, r.contexto)}</select></label>
+        </div>
+        <label class="ic-field" id="cfContextoOtroWrap" style="display:none"><span>Especificar contexto</span><input id="cfContextoOtro" type="text" placeholder="Ej: Unidad de Dolor, UPC, Urgencia" value="${_cppdEsc(r.contextoOtro||'')}"></label>
+
+        <div id="cfSecProc">
+          <div class="ic-fsec">Procedimiento neuroaxial</div>
+          <div class="ic-frow">
+            <label class="ic-field"><span>Técnica</span><select id="cfProc" onchange="cppdFormUpdate()">${_cppdOpts(CPPD_PROCS, r.procedimiento)}</select></label>
+            <label class="ic-field sm"><span>Aguja</span><select id="cfAguja">${['',...CPPD_AGUJAS].map(a=>`<option value="${_cppdEsc(a)}"${(r.aguja||'')===a?' selected':''}>${a?_cppdEsc(a):'— No precisada —'}</option>`).join('')}</select></label>
+          </div>
+          <label class="ic-field" id="cfProcOtroWrap" style="display:none"><span>Especificar técnica</span><input id="cfProcOtro" type="text" value="${_cppdEsc(r.procedimientoOtro||'')}"></label>
+          <div class="ic-frow">
+            <label class="ic-field sm"><span>Operador</span><select id="cfOperador">${_cppdOpts(CPPD_OPERADORES, r.operador)}</select></label>
+            <label class="ic-field"><span>Nº de intentos</span><input id="cfIntentos" type="text" inputmode="numeric" maxlength="2" placeholder="opcional" value="${_cppdEsc(r.intentos||'')}"></label>
+          </div>
+          <label class="ic-field"><span>Indicación / cirugía</span><input id="cfIndicacion" type="text" placeholder="Ej: analgesia de parto, cesárea, RTU, cierre de FOP…" value="${_cppdEsc(r.indicacion||'')}"></label>
+        </div>
+
+        <div id="cfSecPda">
+          <div class="ic-fsec">Punción dural advertida · manejo inmediato</div>
+          ${_cppdChecks('cfPdaManejo', CPPD_PDA_MANEJO, r.pdaManejo)}
+          <label class="ic-field" id="cfPdaManejoOtroWrap" style="display:none"><span>Especificar manejo</span><input id="cfPdaManejoOtro" type="text" value="${_cppdEsc(r.pdaManejoOtro||'')}"></label>
+          <div class="ic-field"><span>¿Se informó a la paciente y al equipo tratante?</span>${_cppdRadios('cfPdaInformado', [{v:'si',label:'Sí'},{v:'no',label:'No'},{v:'',label:'No consignado'}], r.pdaInformado||'')}</div>
+          <div class="ic-fsec">Seguimiento · ¿desarrolló cefalea post punción?</div>
+          ${_cppdRadios('cfCefalea', [{v:'pendiente',label:'Pendiente / en seguimiento'},{v:'no',label:'No (seguimiento completado)'},{v:'si',label:'Sí, desarrolló CPPD'}], r.cefalea||'pendiente', 'cppdFormUpdate()')}
+        </div>
+
+        <div id="cfSecCppd">
+          <div class="ic-fsec">Cefalea post punción dural</div>
+          <div id="cfOrigenWrap">
+            <div class="ic-field"><span>Origen de la punción</span>${_cppdRadios('cfOrigen', [{v:'inadvertida',label:'Inadvertida (punción no reconocida durante el procedimiento)'},{v:'advertida',label:'Advertida (punción reconocida en el momento)'}], r.cppdOrigen||'inadvertida')}</div>
+            <div class="ic-intro" style="font-size:12px">Si la punción advertida <b>ya está registrada</b> como PDA, es mejor abrir ese registro y marcar “Sí, desarrolló CPPD” para no duplicar.</div>
+          </div>
+          <div class="ic-frow">
+            <label class="ic-field sm"><span>Inicio (días post punción)</span><input id="cfInicioDias" type="text" inputmode="numeric" maxlength="2" placeholder="Ej: 1" value="${_cppdEsc(r.cppdInicioDias||'')}"></label>
+            <label class="ic-field"><span>Intensidad</span><select id="cfIntensidad"><option value="">— No consignada —</option>${_cppdOpts(CPPD_INTENSIDAD, r.cppdIntensidad)}</select></label>
+          </div>
+          <label class="ic-field"><span>¿Quién la identificó?</span><select id="cfIdent"><option value="">— No consignado —</option>${_cppdOpts(CPPD_IDENTIFICADO, r.cppdIdentificadoPor)}</select></label>
+          <div class="ic-field"><span>Síntomas asociados</span>${_cppdChecks('cfSintomas', CPPD_SINTOMAS, r.cppdSintomas)}</div>
+          <div class="ic-field"><span>¿Requirió manejo médico (conservador)?</span>${_cppdRadios('cfManejoMed', [{v:'si',label:'Sí'},{v:'no',label:'No'}], r.cppdManejoMedico?'si':'no', 'cppdFormUpdate()')}</div>
+          <div id="cfManejoMedWrap">
+            ${_cppdChecks('cfManejoMedDet', CPPD_MANEJO_MED, r.cppdManejoDet)}
+            <label class="ic-field" id="cfManejoOtroWrap" style="display:none"><span>Especificar manejo</span><input id="cfManejoOtro" type="text" value="${_cppdEsc(r.cppdManejoOtro||'')}"></label>
+          </div>
+          <div class="ic-field"><span>¿Requirió parche de sangre?</span>${_cppdRadios('cfParche', [{v:'si',label:'Sí'},{v:'no',label:'No'}], r.parche?'si':'no', 'cppdFormUpdate()')}</div>
+        </div>
+
+        <div id="cfSecParcheIndic">
+          <div class="ic-fsec">Indicación del parche</div>
+          <label class="ic-field"><span>Indicación</span><select id="cfParcheIndic" onchange="cppdFormUpdate()">${_cppdOpts(CPPD_PARCHE_INDIC, r.parcheIndicacion||'hipotension')}</select></label>
+          <label class="ic-field" id="cfParcheIndicOtroWrap" style="display:none"><span>Especificar indicación</span><input id="cfParcheIndicOtro" type="text" value="${_cppdEsc(r.parcheIndicacionOtro||'')}"></label>
+          <label class="ic-field"><span>Solicitado por (interconsulta)</span><select id="cfSolicitante">${_cppdOpts(CPPD_SOLICITANTE, r.parcheSolicitadoPor||'neurologia')}</select></label>
+        </div>
+
+        <div id="cfSecParche">
+          <div class="ic-fsec">Parche de sangre · detalle</div>
+          <div class="ic-frow">
+            <label class="ic-field"><span>Fecha del parche</span><input id="cfParcheFecha" type="date" value="${_cppdEsc(r.parcheFecha||'')}"></label>
+            <label class="ic-field sm"><span>Volumen (ml)</span><input id="cfParcheVol" type="text" inputmode="numeric" maxlength="3" placeholder="Ej: 20" value="${_cppdEsc(r.parcheVolumen||'')}"></label>
+          </div>
+          <div class="ic-frow">
+            <label class="ic-field"><span>Nivel</span><input id="cfParcheNivel" type="text" placeholder="Ej: L3-L4" value="${_cppdEsc(r.parcheNivel||'')}"></label>
+            <label class="ic-field"><span>Resultado</span><select id="cfParcheRes">${_cppdOpts(CPPD_PARCHE_RES, r.parcheResultado||'pendiente')}</select></label>
+          </div>
+          <div class="ic-field"><span>¿Requirió un segundo parche?</span>${_cppdRadios('cfParche2', [{v:'no',label:'No'},{v:'si',label:'Sí'}], r.parcheSegundo?'si':'no')}</div>
+          <label class="ic-field"><span>Complicaciones del parche</span><input id="cfParcheCompl" type="text" placeholder="Ej: dolor lumbar, ninguna" value="${_cppdEsc(r.parcheComplicaciones||'')}"></label>
+          <label class="ic-field"><span>Realizado por (opcional)</span><input id="cfParcheOperador" type="text" placeholder="Nombre del anestesiólogo" value="${_cppdEsc(r.parcheOperador||'')}"></label>
+        </div>
+
+        <div id="cfSecEvol">
+          <div class="ic-fsec">Evolución</div>
+          <label class="ic-field"><span>Estado</span><select id="cfEvol">${_cppdOpts(CPPD_EVOL, r.evolucion||'pendiente')}</select></label>
+          <div class="ic-frow">
+            <div class="ic-field"><span>¿Neuroimagen (TC / RM)?</span>${_cppdRadios('cfImagen', [{v:'no',label:'No'},{v:'si',label:'Sí'}], r.imagen?'si':'no')}</div>
+            <div class="ic-field"><span>¿Prolongó hospitalización o reingresó?</span>${_cppdRadios('cfHosp', [{v:'no',label:'No'},{v:'si',label:'Sí'}], r.hospitalizacion?'si':'no')}</div>
+          </div>
+        </div>
+
+        <div class="ic-fsec">Observaciones</div>
+        <label class="ic-field"><span>Notas</span><textarea id="cfNotas" rows="3" placeholder="Detalles relevantes (sin datos identificatorios)">${_cppdEsc(r.notas||'')}</textarea></label>
+
+        <div class="ic-form-actions">
+          <button type="button" class="ic-btn-sec" onclick="${edit?`cppdOpenDetail('${edit.id}')`:'cppdGoHome()'}">Cancelar</button>
+          <button type="submit" id="cfSubmit" class="ic-btn-pri">${edit?'Guardar cambios':'Guardar registro'}</button>
+        </div>
+      </form>
+    </div>`;
+}
+function _cfRadio(name){ const e=document.querySelector(`input[name="${name}"]:checked`); return e?e.value:''; }
+function _cfChecks(name){ return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(e=>e.value); }
+function _cfShow(id, on){ const e=document.getElementById(id); if(e) e.style.display = on ? '' : 'none'; }
+function cppdFormUpdate(){
+  const tipo=_cfRadio('cfTipo');
+  document.querySelectorAll('.cppd-tipo').forEach(l=>{ const i=l.querySelector('input'); l.classList.toggle('on', !!(i&&i.checked)); });
+  const g=id=>document.getElementById(id);
+  _cfShow('cfContextoOtroWrap', g('cfContexto') && g('cfContexto').value==='otro');
+  _cfShow('cfProcOtroWrap', g('cfProc') && g('cfProc').value==='otro');
+  const lbl=g('cfFechaLbl'); if(lbl) lbl.textContent = tipo==='pda' ? 'Fecha de la punción *' : (tipo==='cppd' ? 'Fecha de diagnóstico de la cefalea *' : (tipo==='parche' ? 'Fecha de la solicitud / evento *' : 'Fecha del evento *'));
+  const esPda = tipo==='pda', esCppd = tipo==='cppd', esParche = tipo==='parche';
+  const cefalea = esPda ? _cfRadio('cfCefalea') : '';
+  const muestraCppd = esCppd || (esPda && cefalea==='si');
+  _cfShow('cfSecProc', esPda || esCppd);
+  _cfShow('cfSecPda', esPda);
+  _cfShow('cfSecCppd', muestraCppd);
+  _cfShow('cfOrigenWrap', esCppd);
+  _cfShow('cfSecParcheIndic', esParche);
+  const parcheSi = esParche || (muestraCppd && _cfRadio('cfParche')==='si');
+  _cfShow('cfSecParche', parcheSi);
+  _cfShow('cfSecEvol', muestraCppd || esParche);
+  _cfShow('cfManejoMedWrap', muestraCppd && _cfRadio('cfManejoMed')==='si');
+  _cfShow('cfPdaManejoOtroWrap', _cfChecks('cfPdaManejo').includes('otro'));
+  _cfShow('cfManejoOtroWrap', _cfChecks('cfManejoMedDet').includes('otro'));
+  _cfShow('cfParcheIndicOtroWrap', g('cfParcheIndic') && g('cfParcheIndic').value==='otro');
+  // Los checkboxes de "otro" también deben refrescar
+  document.querySelectorAll('input[name="cfPdaManejo"],input[name="cfManejoMedDet"]').forEach(i=>{ if(!i._cppdBound){ i._cppdBound=true; i.addEventListener('change', cppdFormUpdate); } });
+}
+async function cppdSubmit(ev){
+  if(ev&&ev.preventDefault) ev.preventDefault();
+  const g=id=>document.getElementById(id); const v=id=>((g(id)&&g(id).value)||'').trim();
+  const tipo=_cfRadio('cfTipo');
+  if(!tipo){ alert('Elige qué quieres ingresar: punción dural advertida, cefalea post punción o parche de sangre.'); return; }
+  const iniciales=v('cfIniciales'); const fecha=v('cfFecha'); const contexto=v('cfContexto');
+  if(!iniciales){ alert('Ingresa las iniciales del paciente.'); return; }
+  if(/\d/.test(iniciales)){ alert('Las iniciales no pueden contener números (no ingreses RUT ni ficha).'); return; }
+  if(!fecha){ alert('Ingresa la fecha del evento.'); return; }
+  if(contexto==='otro' && !v('cfContextoOtro')){ alert('Especifica el contexto.'); return; }
+  const esPda=tipo==='pda', esCppd=tipo==='cppd', esParche=tipo==='parche';
+  const cefalea = esPda ? (_cfRadio('cfCefalea')||'pendiente') : '';
+  const muestraCppd = esCppd || (esPda && cefalea==='si');
+  const f={ tipo, fecha, iniciales, edad:v('cfEdad'), contexto, contextoOtro: contexto==='otro'?v('cfContextoOtro'):'', notas:v('cfNotas') };
+  if(esPda||esCppd){
+    Object.assign(f, { procedimiento:v('cfProc'), procedimientoOtro: v('cfProc')==='otro'?v('cfProcOtro'):'', aguja:v('cfAguja'), operador:v('cfOperador'), intentos:v('cfIntentos'), indicacion:v('cfIndicacion') });
+  }
+  if(esPda){
+    Object.assign(f, { pdaManejo:_cfChecks('cfPdaManejo'), pdaManejoOtro:v('cfPdaManejoOtro'), pdaInformado:_cfRadio('cfPdaInformado'), cefalea });
+  }
+  if(esCppd) f.cppdOrigen=_cfRadio('cfOrigen')||'inadvertida';
+  if(muestraCppd){
+    const mm=_cfRadio('cfManejoMed')==='si';
+    Object.assign(f, { cppdInicioDias:v('cfInicioDias'), cppdIntensidad:v('cfIntensidad'), cppdIdentificadoPor:v('cfIdent'), cppdSintomas:_cfChecks('cfSintomas'), cppdManejoMedico:mm, cppdManejoDet: mm?_cfChecks('cfManejoMedDet'):[], cppdManejoOtro: mm?v('cfManejoOtro'):'', parche:_cfRadio('cfParche')==='si' });
+  }
+  if(esParche){
+    if(v('cfParcheIndic')==='otro' && !v('cfParcheIndicOtro')){ alert('Especifica la indicación del parche.'); return; }
+    Object.assign(f, { parche:true, parcheIndicacion:v('cfParcheIndic'), parcheIndicacionOtro:v('cfParcheIndicOtro'), parcheSolicitadoPor:v('cfSolicitante') });
+  }
+  if(f.parche){
+    Object.assign(f, { parcheFecha:v('cfParcheFecha'), parcheVolumen:v('cfParcheVol'), parcheNivel:v('cfParcheNivel'), parcheResultado:v('cfParcheRes')||'pendiente', parcheSegundo:_cfRadio('cfParche2')==='si', parcheComplicaciones:v('cfParcheCompl'), parcheOperador:v('cfParcheOperador') });
+  }
+  if(muestraCppd||esParche){
+    Object.assign(f, { evolucion:v('cfEvol')||'pendiente', imagen:_cfRadio('cfImagen')==='si', hospitalizacion:_cfRadio('cfHosp')==='si' });
+  }
+  const btn=g('cfSubmit'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  const rec = CPPD_UI.editId ? cppdUpdate(CPPD_UI.editId, f) : cppdCreate(f);
+  if(!rec){ alert('No se encontró el registro a editar.'); cppdGoHome(); return; }
+  try{ logActivity('cppd', (CPPD_UI.editId?'Editó':'Registró')+' evento neuroaxial: '+(CPPD_TIPOS[tipo]||{}).label, { id:rec.id }); save && save(); }catch(e){}
+  const base=getBackendURL();
+  CPPD_UI.editId=null;
+  if(!base){ alert('Registro guardado en este dispositivo (sin nube configurada).'); cppdOpenDetail(rec.id); return; }
+  let ok=false; try{ ok=await _cppdSyncVerified(rec.id, r=>!!r && !r.deleted && (r.updatedAt||0)>=rec.updatedAt); }catch(e){ ok=false; }
+  alert(ok ? '✅ Registro guardado en la nube.' : '⚠️ Guardado en este dispositivo; no se pudo registrar en la nube (se reintentará al reabrir).');
+  cppdOpenDetail(rec.id);
+}
+
+// ---------------- Detalle ----------------
+function _cppdRenderDetail(){
+  const r=_cppdRecords().find(x=>x.id===CPPD_UI.detailId);
+  if(!r){ return `<div class="ic-wrap"><button type="button" class="ic-back" onclick="cppdGoHome()">‹ Volver</button><div class="ic-empty"><span>❓</span>Registro no encontrado.</div></div>`; }
+  const t=CPPD_TIPOS[r.tipo]||CPPD_TIPOS.pda;
+  const row=(k,v)=> (v!==undefined && v!==null && String(v).trim()!=='') ? `<div class="ic-d-row"><div class="ic-d-lbl">${k}</div><div class="ic-d-val">${_cppdEsc(String(v))}</div></div>` : '';
+  const sn=b=> b===true?'Sí':(b===false?'No':'');
+  const ctx = r.contexto==='otro' && r.contextoOtro ? r.contextoOtro : _cppdLbl(CPPD_CONTEXTOS, r.contexto);
+  const lst=(list,arr)=> (Array.isArray(arr)&&arr.length) ? arr.map(x=>_cppdLbl(list,x)).join(', ') : '';
+  const esCef=_cppdEsCefalea(r);
+  let secs='';
+  secs+=`<div class="ic-d-card">
+      ${row('Fecha', _cppdFmtFecha(r.fecha))}
+      ${row('Iniciales', r.iniciales)}
+      ${row('Edad', r.edad?String(r.edad)+' años':'')}
+      ${row('Contexto', ctx)}
+      ${row('Notas', r.notas)}
+    </div>`;
+  if(r.tipo!=='parche'){
+    secs+=`<div class="ic-fsec">Procedimiento</div><div class="ic-d-card">
+      ${row('Técnica', r.procedimiento==='otro'&&r.procedimientoOtro?r.procedimientoOtro:_cppdLbl(CPPD_PROCS,r.procedimiento))}
+      ${row('Aguja', r.aguja)}
+      ${row('Operador', _cppdLbl(CPPD_OPERADORES,r.operador))}
+      ${row('Nº de intentos', r.intentos)}
+      ${row('Indicación', r.indicacion)}
+    </div>`;
+  }
+  if(r.tipo==='pda'){
+    secs+=`<div class="ic-fsec">Punción dural advertida</div><div class="ic-d-card">
+      ${row('Manejo inmediato', lst(CPPD_PDA_MANEJO,r.pdaManejo) + (r.pdaManejoOtro?(' — '+r.pdaManejoOtro):''))}
+      ${row('Informado a paciente/equipo', r.pdaInformado==='si'?'Sí':(r.pdaInformado==='no'?'No':''))}
+      ${row('¿Desarrolló cefalea?', r.cefalea==='si'?'Sí — evolucionó a CPPD':(r.cefalea==='no'?'No (seguimiento completado)':'Pendiente / en seguimiento'))}
+    </div>`;
+  }
+  if(esCef){
+    secs+=`<div class="ic-fsec">Cefalea post punción dural</div><div class="ic-d-card">
+      ${row('Origen', r.tipo==='pda'?'Advertida (registrada como PDA)':(r.cppdOrigen==='advertida'?'Advertida':'Inadvertida'))}
+      ${row('Inicio', r.cppdInicioDias?('Día '+r.cppdInicioDias+' post punción'):'')}
+      ${row('Intensidad', _cppdLbl(CPPD_INTENSIDAD,r.cppdIntensidad))}
+      ${row('Identificada por', _cppdLbl(CPPD_IDENTIFICADO,r.cppdIdentificadoPor))}
+      ${row('Síntomas asociados', lst(CPPD_SINTOMAS,r.cppdSintomas))}
+      ${row('Manejo médico', r.cppdManejoMedico ? ('Sí — '+(lst(CPPD_MANEJO_MED,r.cppdManejoDet)||'sin detalle')+(r.cppdManejoOtro?(' — '+r.cppdManejoOtro):'')) : 'No')}
+      ${row('Parche de sangre', sn(!!r.parche))}
+    </div>`;
+  }
+  if(r.tipo==='parche'){
+    secs+=`<div class="ic-fsec">Indicación del parche</div><div class="ic-d-card">
+      ${row('Indicación', r.parcheIndicacion==='otro'&&r.parcheIndicacionOtro?r.parcheIndicacionOtro:_cppdLbl(CPPD_PARCHE_INDIC,r.parcheIndicacion))}
+      ${row('Solicitado por', _cppdLbl(CPPD_SOLICITANTE,r.parcheSolicitadoPor))}
+    </div>`;
+  }
+  if(r.parche){
+    secs+=`<div class="ic-fsec">Parche de sangre</div><div class="ic-d-card">
+      ${row('Fecha', r.parcheFecha?_cppdFmtFecha(r.parcheFecha):'')}
+      ${row('Volumen', r.parcheVolumen?(r.parcheVolumen+' ml'):'')}
+      ${row('Nivel', r.parcheNivel)}
+      ${row('Resultado', _cppdLbl(CPPD_PARCHE_RES,r.parcheResultado))}
+      ${row('Segundo parche', sn(!!r.parcheSegundo))}
+      ${row('Complicaciones', r.parcheComplicaciones)}
+      ${row('Realizado por', r.parcheOperador)}
+    </div>`;
+  }
+  if(esCef || r.tipo==='parche'){
+    secs+=`<div class="ic-fsec">Evolución</div><div class="ic-d-card">
+      ${row('Estado', _cppdLbl(CPPD_EVOL,r.evolucion||'pendiente'))}
+      ${row('Neuroimagen', sn(!!r.imagen))}
+      ${row('Hospitalización prolongada / reingreso', sn(!!r.hospitalizacion))}
+    </div>`;
+  }
+  const hist=(Array.isArray(r.historial)?r.historial:[]).slice().reverse().map(h=>`<div class="ic-d-row"><div class="ic-d-lbl">${_cppdFmtDT(h.at)}</div><div class="ic-d-val">${_cppdEsc(h.txt||'')} · ${_cppdEsc(h.by||'')}</div></div>`).join('');
+  secs+=`<div class="ic-fsec">Trazabilidad</div><div class="ic-d-card">
+      ${row('Registrado por', (r.registradoPor&&r.registradoPor.name?r.registradoPor.name:'—') + (r.createdAt?(' · '+_cppdFmtDT(r.createdAt)):''))}
+      ${hist}
+    </div>`;
+  const who=_cppdWho();
+  const puedeBorrar = _cppdIsAdmin() || (r.registradoPor && who.id && r.registradoPor.id===who.id);
+  const actions=`<div class="ic-d-actions">
+      <button type="button" class="ic-btn-pri" onclick="cppdGoForm('${r.id}')">✏️ Editar / actualizar seguimiento</button>
+      ${puedeBorrar?`<button type="button" class="ic-btn-danger" onclick="cppdDoDelete('${r.id}')">🗑 Borrar</button>`:''}
+    </div>`;
+  return `
+    <div class="ic-wrap">
+      <button type="button" class="ic-back" onclick="cppdGoHome()">‹ Volver al registro</button>
+      <div class="ic-d-head">
+        <div class="ic-d-tipo">${t.ico} ${_cppdEsc(t.label)}</div>
+        ${_cppdTipoChip(r)}
+      </div>
+      ${secs}
+      ${actions}
+    </div>`;
+}
+async function cppdDoDelete(id){
+  if(!confirm('¿Borrar este registro? Queda consignado quién lo borró. No se puede deshacer.')) return;
+  cppdDelete(id);
+  cppdGoHome();
+  try{ await _cppdSyncVerified(id, r=> !r || r.deleted===true); }catch(e){}
+}
+
+// ---------------- Resumen / indicadores ----------------
+function _cppdRenderResumen(){
+  const all=_cppdRecords(); const anios=_cppdAnios(all);
+  const y = CPPD_UI.resAnio || String(new Date().getFullYear());
+  const recs = y==='todos' ? all : all.filter(r=>String(r.fecha||'').slice(0,4)===y);
+  const n=f=>recs.filter(f).length;
+  const pct=(a,b)=> b? Math.round(a*1000/b)/10+'%' : '—';
+  const pda=n(r=>r.tipo==='pda'), pdaCef=n(r=>r.tipo==='pda'&&r.cefalea==='si'), pdaPend=n(r=>r.tipo==='pda'&&(r.cefalea||'pendiente')==='pendiente');
+  const cef=n(_cppdEsCefalea), cefInad=n(r=>r.tipo==='cppd'&&r.cppdOrigen!=='advertida'), cefAdv=cef-cefInad;
+  const cefMed=n(r=>_cppdEsCefalea(r)&&r.cppdManejoMedico), cefParche=n(r=>_cppdEsCefalea(r)&&r.parche), cefSolo=n(r=>_cppdEsCefalea(r)&&!r.parche);
+  const parOtro=n(r=>r.tipo==='parche'), parTot=n(_cppdTuvoParche), par2=n(r=>_cppdTuvoParche(r)&&r.parcheSegundo);
+  const parOk=n(r=>_cppdTuvoParche(r)&&r.parcheResultado==='completa'), parEval=n(r=>_cppdTuvoParche(r)&&r.parcheResultado&&r.parcheResultado!=='pendiente');
+  const deriv=n(r=>r.evolucion==='derivado'), hosp=n(r=>r.hospitalizacion), img=n(r=>r.imagen);
+  const kpi=(v,l)=>`<div class="cppd-kpi"><b>${v}</b><span>${l}</span></div>`;
+  const tr=(k,v)=>`<div class="ic-d-row"><div class="ic-d-lbl">${k}</div><div class="ic-d-val">${v}</div></div>`;
+  const ctxRows=CPPD_CONTEXTOS.map(c=>{ const s=recs.filter(r=>r.contexto===c.v); if(!s.length) return ''; return tr(c.label, `PDA ${s.filter(r=>r.tipo==='pda').length} · CPPD ${s.filter(_cppdEsCefalea).length} · Parches ${s.filter(_cppdTuvoParche).length}`); }).join('');
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  let mesRows='';
+  if(y!=='todos'){
+    mesRows=meses.map((m,i)=>{ const mm=_cppdPad(i+1); const s=recs.filter(r=>String(r.fecha||'').slice(5,7)===mm); if(!s.length) return ''; return tr(m, `PDA ${s.filter(r=>r.tipo==='pda').length} · CPPD ${s.filter(_cppdEsCefalea).length} · Parches ${s.filter(_cppdTuvoParche).length}`); }).join('');
+  }
+  const opts=['todos',...anios].map(a=>`<option value="${a}"${y===a?' selected':''}>${a==='todos'?'Todos los años':a}</option>`).join('');
+  return `
+    <div class="ic-wrap">
+      <div class="ic-modehead">
+        <button type="button" class="ic-back" onclick="cppdGoHome()">‹ Volver al registro</button>
+        <select class="ic-back" onchange="CPPD_UI.resAnio=this.value;renderCppd()">${opts}</select>
+      </div>
+      <div class="ic-intro">Indicadores de calidad del registro neuroaxial · <b>${y==='todos'?'todos los años':y}</b> · ${recs.length} registro${recs.length===1?'':'s'}. Para calcular tasas (p. ej. CPPD por cada 1.000 neuroaxiales) hay que cruzar con el denominador de procedimientos del período.</div>
+      <div class="cppd-kpis">${kpi(pda,'Punciones durales advertidas')}${kpi(cef,'Cefaleas post punción')}${kpi(parTot,'Parches de sangre')}</div>
+      <div class="ic-fsec">Punción dural advertida (PDA)</div>
+      <div class="ic-d-card">
+        ${tr('PDA registradas', pda)}
+        ${tr('PDA que desarrollaron CPPD', `${pdaCef} (${pct(pdaCef,pda-pdaPend)} de las con seguimiento completo)`)}
+        ${tr('PDA con seguimiento pendiente', pdaPend)}
+      </div>
+      <div class="ic-fsec">Cefalea post punción dural (CPPD)</div>
+      <div class="ic-d-card">
+        ${tr('Total CPPD', cef)}
+        ${tr('Por punción advertida', `${cefAdv} (${pct(cefAdv,cef)})`)}
+        ${tr('Por punción inadvertida', `${cefInad} (${pct(cefInad,cef)})`)}
+        ${tr('Con manejo médico', `${cefMed} (${pct(cefMed,cef)})`)}
+        ${tr('Requirieron parche de sangre', `${cefParche} (${pct(cefParche,cef)})`)}
+        ${tr('Solo manejo conservador', `${cefSolo} (${pct(cefSolo,cef)})`)}
+      </div>
+      <div class="ic-fsec">Parches de sangre</div>
+      <div class="ic-d-card">
+        ${tr('Total parches', parTot)}
+        ${tr('Por CPPD', cefParche)}
+        ${tr('Por otra indicación (neurología, fístula LCR…)', parOtro)}
+        ${tr('Resolución completa', `${parOk} de ${parEval} evaluados (${pct(parOk,parEval)})`)}
+        ${tr('Requirieron segundo parche', par2)}
+      </div>
+      <div class="ic-fsec">Evolución</div>
+      <div class="ic-d-card">
+        ${tr('Derivados a Neurología', deriv)}
+        ${tr('Con neuroimagen', img)}
+        ${tr('Hospitalización prolongada / reingreso', hosp)}
+      </div>
+      ${ctxRows?`<div class="ic-fsec">Por contexto</div><div class="ic-d-card">${ctxRows}</div>`:''}
+      ${mesRows?`<div class="ic-fsec">Por mes</div><div class="ic-d-card">${mesRows}</div>`:''}
+      <button type="button" class="ic-back" onclick="cppdExportCsv()">⬇️ Exportar CSV (todos los registros)</button>
+    </div>`;
+}
+function cppdExportCsv(){
+  const recs=_cppdRecords();
+  if(!recs.length){ alert('No hay registros para exportar.'); return; }
+  const cols=['id','tipo','fecha','iniciales','edad','contexto','contextoOtro','procedimiento','procedimientoOtro','aguja','operador','intentos','indicacion','pdaManejo','pdaManejoOtro','pdaInformado','cefalea','cppdOrigen','cppdInicioDias','cppdIntensidad','cppdIdentificadoPor','cppdSintomas','cppdManejoMedico','cppdManejoDet','cppdManejoOtro','parche','parcheIndicacion','parcheIndicacionOtro','parcheSolicitadoPor','parcheFecha','parcheVolumen','parcheNivel','parcheResultado','parcheSegundo','parcheComplicaciones','parcheOperador','evolucion','imagen','hospitalizacion','notas','registradoPor','createdAt','updatedAt'];
+  const rows=[cols];
+  recs.forEach(r=>{ rows.push(cols.map(c=>{ let v=r[c]; if(c==='registradoPor') v=(v&&v.name)||''; else if(c==='createdAt'||c==='updatedAt') v=v?_cppdFmtDT(v):''; else if(Array.isArray(v)) v=v.join('|'); else if(typeof v==='boolean') v=v?'si':'no'; return v==null?'':v; })); });
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Registro_CPPD_'+_cppdTodayStr()+'.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} }, 800);
+  try{ toast('CSV exportado'); }catch(e){}
+}
 
 // INIT — boot async (selecciona institución y carga su config)
 boot();

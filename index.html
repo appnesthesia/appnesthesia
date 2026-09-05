@@ -150,6 +150,29 @@ main{padding:18px;padding-bottom:env(safe-area-inset-bottom);max-width:900px;mar
 .card.c12 .ico svg .clk-hand-m{stroke:#1e6b54;stroke-width:2.2;stroke-linecap:round}
 .card.c12 .ico svg .clk-hand-s{stroke:#dc2626;stroke-width:1.8;stroke-linecap:round}
 .card.c12 .ico svg .clk-hub{fill:#dc2626;stroke:#fff;stroke-width:0.8}
+/* Cefalea Post Punción (c13) — cabeza/aguja */
+.card.c13 .ico{background:linear-gradient(135deg,#7f1d1d 0%,#b91c1c 55%,#dc2626 100%)}
+.card.c13 .ico svg .cp-head{fill:#fffaf0;stroke:#fff;stroke-width:1.4}
+.card.c13 .ico svg .cp-bolt{fill:#fbbf24;stroke:none}
+.card.c13 .ico svg .cp-needle{stroke:#fff;stroke-width:2.2;stroke-linecap:round;fill:none}
+/* ===== Registro CPPD (vista Staff) ===== */
+.cppd-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cppd-kpi{background:var(--card);border:1.5px solid var(--border);border-radius:13px;padding:12px 10px;text-align:center;box-shadow:var(--shadow)}
+.cppd-kpi b{display:block;font-size:24px;font-family:'Manrope','Inter',sans-serif;font-weight:800;color:var(--primary-dark);line-height:1.1}
+.cppd-kpi span{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.cppd-tipos{display:flex;flex-direction:column;gap:9px}
+.cppd-tipo{position:relative;display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid var(--border);border-radius:14px;padding:12px 14px;cursor:pointer;transition:border-color .15s,box-shadow .2s}
+.cppd-tipo input{position:absolute;opacity:0;width:0;height:0}
+.cppd-tipo.on{border-color:var(--green-forest);box-shadow:0 0 0 3px rgba(76,160,133,.18);background:var(--tint1)}
+.cppd-tipo-ico{font-size:26px;flex-shrink:0;width:38px;text-align:center}
+.cppd-tipo-tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cppd-tipo-tx b{font-size:14px;color:var(--primary-dark);font-family:'Manrope','Inter',sans-serif}
+.cppd-tipo-tx span{font-size:12px;color:var(--muted);line-height:1.4}
+.cppd-checks{display:flex;flex-direction:column;gap:6px}
+.cppd-chk{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text);background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;cursor:pointer}
+.cppd-chk input{width:17px;height:17px;accent-color:var(--green-forest);margin:0;flex-shrink:0}
+.cppd-chk:has(input:checked){border-color:var(--green-sage);background:var(--tint1)}
+#view-cppd select.ic-back{appearance:auto;padding:8px 10px}
 .card.c10 .ico svg .evt-body{fill:#fffaf0;stroke:#fff;stroke-width:1.6}
 .card.c10 .ico svg .evt-header{fill:#dc2626;stroke:none}
 .card.c10 .ico svg .evt-ring{stroke:#fff;stroke-width:2.4;fill:none;stroke-linecap:round}
@@ -2498,6 +2521,11 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
       <h3>Cobertura Emergencia</h3>
       <p>Listado y puntaje para cobertura de emergencias</p>
     </button>
+    <button class="card c13" onclick="showView('cppd')">
+      <div class="ico"><svg viewBox="0 0 24 24"><path class="cp-head" d="M12 3.2a6.3 6.3 0 0 0-6.3 6.3c0 2.3 1 3.6 1.9 4.9.6.9.9 1.6.9 2.6v1.5h7v-1.5c0-1 .3-1.7.9-2.6.9-1.3 1.9-2.6 1.9-4.9A6.3 6.3 0 0 0 12 3.2z"/><path class="cp-head" d="M9.2 20.5h5.6"/><polygon class="cp-bolt" points="12.6,6.2 9.8,11 12,11 11.2,14.6 14.4,9.6 12.2,9.6"/><line class="cp-needle" x1="19.5" y1="4.5" x2="16.4" y2="7.6"/></svg></div>
+      <h3>Cefalea Post Punción</h3>
+      <p>Registro de punciones durales, CPPD y parches de sangre · indicador de calidad</p>
+    </button>
     <button class="card c3" onclick="showView('intercambios')">
       <span class="card-notif" id="exchNotif" style="display:none">0</span>
       <div class="ico"><svg viewBox="0 0 24 24"><polyline class="arrow-blue" points="17 1 21 5 17 9"/><path class="arrow-blue" d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline class="arrow-orange" points="7 23 3 19 7 15"/><path class="arrow-orange" d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
@@ -2689,6 +2717,11 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
     <p class="help" style="margin-top:8px"><b>Orden:</b> el listado se muestra de menor a mayor puntaje. Los anestesiólogos al inicio (con menos puntaje) son los más prioritarios para cubrir; los del final ya han cubierto más y bajan en prioridad.</p>
     <p class="help" style="margin-top:8px"><b>Exentos del listado:</b> Guerrero, Veliz, Julio V., Ricke (no aparecen en el ranking).</p>
   </div>
+</section>
+
+<!-- CEFALEA POST PUNCIÓN · REGISTRO NEUROAXIAL (indicador de calidad, solo Staff) -->
+<section class="view" id="view-cppd">
+  <div id="cppdBody"></div>
 </section>
 
 <!-- INTERCAMBIOS -->
@@ -3014,6 +3047,6 @@ html[data-theme="dark"] .pu-j.pm{background:#4d7fb5}
 
 <script src="vendor/fflate.min.js?v=1"></script>
 <script src="horario-xlsx.js?v=1"></script>
-<script src="app.js?v=93"></script>
+<script src="app.js?v=94"></script>
 </body>
 </html>
