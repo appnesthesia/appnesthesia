@@ -947,7 +947,7 @@ function showView(name){
   if(name==='cppd') cppdOpen();
   window.scrollTo(0,0);
 }
-function showHome(){ showView('home'); }
+function showHome(){ showView('home'); try{ _appxFlushPendingDeepLink(); }catch(e){} }
 
 // ============================================================
 // ADMIN
@@ -2008,7 +2008,7 @@ async function saveVacation(id, isNew){
   if(ok){
     toast(isNew ? '✅ Solicitud enviada' : '✅ Cambios sincronizados');
     // Aviso push al admin solo si la solicitud realmente llegó a la nube.
-    if(isNew && v.status === 'pending'){ try{ notifyAdminsPush('vacaciones'); }catch(e){} }
+    if(isNew && v.status === 'pending'){ try{ notifyAdminsPush('vacaciones', v.id); }catch(e){} }
   } else {
     toast('⚠️ Guardada en este equipo, pero NO se pudo enviar a la nube. Se reintentará al reabrir la app.');
   }
@@ -4275,12 +4275,22 @@ function notifyAdminsPush(tipo, id){
 function notifyAdminsOfNewRequest(reqId){ notifyAdminsPush('agendamiento', reqId); }
 
 // ============================================================
-// DEEP-LINK desde notificaciones push (?ic=<id> / ?agend=<id>)
+// DEEP-LINK desde notificaciones push (?ic= / ?agend= / ?vev= / ?vac=)
 // La notificación abre la solicitud EXACTA: si la app ya está abierta, el
 // service worker manda un mensaje; si arranca en frío, se lee de la URL y se
 // aplica al entrar a la institución (INSTITUTION disponible).
+// Robustez (sep 2026):
+//   · El deep-link pendiente se guarda en localStorage (2 min) → sobrevive a
+//     una recarga (p.ej. banner "Nueva versión" o relanzamiento en iOS).
+//   · Antes de buscar la solicitud se ESPERA a que termine cualquier sync en
+//     curso (agendSyncNow/icSyncNow devuelven false de inmediato si ya hay uno
+//     corriendo → antes se buscaba en datos viejos y caía en la lista).
+//   · Si aún no aparece, se reintenta la búsqueda varias veces (hasta ~6 s).
+//   · Si la sesión activa es Administrador, abre directo en modo admin (con
+//     los botones de visar/aceptar), no en la vista de seguimiento.
 // ============================================================
 let _appxPendingDeepLink = null;
+const _APPX_DL_LS = 'appnesthesia_deeplink';
 function _appxParseDeepLink(urlStr){
   try{
     const qi = String(urlStr||'').indexOf('?');
@@ -4289,53 +4299,138 @@ function _appxParseDeepLink(urlStr){
     if(p.get('ic')) return { kind:'ic', id:p.get('ic') };
     if(p.get('agend')) return { kind:'agend', id:p.get('agend') };
     if(p.get('vev')) return { kind:'vev', id:p.get('vev') };
+    if(p.get('vac')) return { kind:'vac', id:p.get('vac') };
   }catch(e){}
   return null;
 }
+function _appxSavePending(dl){
+  try{ if(dl) localStorage.setItem(_APPX_DL_LS, JSON.stringify({ kind:dl.kind, id:dl.id, ts:Date.now() })); }catch(e){}
+}
+function _appxClearPending(){ try{ localStorage.removeItem(_APPX_DL_LS); }catch(e){} }
+function _appxLoadPendingFromStorage(){
+  try{
+    const raw = localStorage.getItem(_APPX_DL_LS); if(!raw) return null;
+    const d = JSON.parse(raw);
+    if(!d || !d.kind || !d.id) return null;
+    if(Date.now() - (d.ts||0) > 2*60*1000){ _appxClearPending(); return null; }
+    return { kind:d.kind, id:d.id };
+  }catch(e){ return null; }
+}
+let _appxLastDl = { key:'', at:0 };
 function _appxHandleDeepLink(urlStr){
   const dl = _appxParseDeepLink(urlStr);
   if(!dl) return;
+  // Dedupe: el SW manda el mensaje dos veces (0 y 400 ms) por robustez.
+  const key = dl.kind + ':' + dl.id;
+  if(_appxLastDl.key === key && Date.now() - _appxLastDl.at < 3000) return;
+  _appxLastDl = { key, at: Date.now() };
+  _appxSavePending(dl);
   if(typeof INSTITUTION === 'undefined' || !INSTITUTION){ _appxPendingDeepLink = dl; return; }
   _appxApplyDeepLink(dl);
 }
 function _appxFlushPendingDeepLink(){
+  if(!_appxPendingDeepLink) _appxPendingDeepLink = _appxLoadPendingFromStorage();
   if(_appxPendingDeepLink && typeof INSTITUTION !== 'undefined' && INSTITUTION){
     const dl = _appxPendingDeepLink; _appxPendingDeepLink = null;
     setTimeout(()=>{ try{ _appxApplyDeepLink(dl); }catch(e){} }, 150);
   }
 }
+function _appxIsAdminSession(){
+  try{ return !!(state && state.currentUserId === ADMIN_USER_ID); }catch(e){ return false; }
+}
+// Espera a que termine un sync en curso (flag) y luego ejecuta uno propio.
+async function _appxWaitSync(isSyncingFn, syncFn){
+  for(let i=0;i<40;i++){ // máx ~4 s esperando el sync ajeno
+    let busy=false; try{ busy = !!isSyncingFn(); }catch(e){}
+    if(!busy) break;
+    await new Promise(r=>setTimeout(r,100));
+  }
+  try{ await syncFn(); }catch(e){}
+}
+// Reintenta findFn() hasta que devuelva algo (o se agoten los intentos).
+async function _appxRetryFind(findFn, syncFn){
+  const delays=[0,600,1200,2000,3000];
+  for(let i=0;i<delays.length;i++){
+    if(delays[i]) await new Promise(r=>setTimeout(r,delays[i]));
+    let r=null; try{ r = findFn(); }catch(e){}
+    if(r) return r;
+    if(i < delays.length-1){ try{ await syncFn(); }catch(e){} }
+  }
+  return null;
+}
 function _appxApplyDeepLink(dl){
   if(!dl) return;
+  _appxClearPending();
   if(dl.kind === 'ic'){ try{ icOpenRequestById(dl.id); }catch(e){} }
   else if(dl.kind === 'agend'){ try{ agendOpenRequestById(dl.id); }catch(e){} }
   else if(dl.kind === 'vev'){ try{ vascOpenEvalById(dl.id); }catch(e){} }
+  else if(dl.kind === 'vac'){ try{ vacOpenRequestById(dl.id); }catch(e){} }
 }
 // Abre el módulo Interconsultas directo en el detalle de la solicitud dada.
+// Admin con sesión activa → modo admin (gestión); si no → seguimiento (lectura).
 function icOpenRequestById(id){
   const mod=document.getElementById('modulesScreen'); if(mod) mod.classList.add('hidden');
-  const g=document.getElementById('guiasScreen'); if(g) g.classList.add('hidden');
+  ['solChooser','portalChooser','guiasScreen','agendScreen','vascScreen'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
   const s=document.getElementById('icScreen'); if(s) s.classList.remove('hidden');
-  IC_UI.admin=false; IC_UI.view='seguimiento'; IC_UI.detailReturn='seguimiento';
+  const admin = _appxIsAdminSession();
+  IC_UI.admin=admin; IC_UI.view = admin ? 'home' : 'seguimiento'; IC_UI.detailReturn = admin ? 'home' : 'seguimiento'; IC_UI.tab='pendiente';
   const t=new Date(); IC_UI.calYear=t.getFullYear(); IC_UI.calMonth=t.getMonth(); IC_UI.selectedDate=null;
+  try{ _icUpdateHeadSub(); }catch(e){}
   renderIcModule();
-  const show=()=>{
-    const scr=document.getElementById('icScreen'); if(!scr || scr.classList.contains('hidden')) return;
-    const r=icLoadData().find(x=>x&&x.id===id && !x.deleted);
-    if(r){ IC_UI.detailReturn='seguimiento'; IC_UI.detailId=id; IC_UI.view='detail'; }
-    else { IC_UI.view='seguimiento'; }
-    renderIcModule(); try{ updateIcBadges(); }catch(e){}
-  };
   try{ icMarkSeen(); }catch(e){}
-  try{ icSyncNow().then(show).catch(show); }catch(e){ show(); }
+  const find=()=> icLoadData().find(x=>x&&x.id===id && !x.deleted);
+  (async()=>{
+    await _appxWaitSync(()=>_icSyncing, icSyncNow);
+    const r = await _appxRetryFind(find, icSyncNow);
+    const scr=document.getElementById('icScreen'); if(!scr || scr.classList.contains('hidden')) return;
+    if(r){ IC_UI.detailReturn = admin ? 'home' : 'seguimiento'; IC_UI.detailId=id; IC_UI.view='detail'; }
+    else { IC_UI.view = admin ? 'home' : 'seguimiento'; try{ toast('No se encontró la interconsulta del aviso'); }catch(e){} }
+    try{ _icUpdateHeadSub(); }catch(e){}
+    renderIcModule(); try{ updateIcBadges(); }catch(e){}
+  })();
 }
-// Abre el módulo Agendamiento directo en el detalle de la solicitud dada.
+// Abre Agendamiento directo en el detalle de la solicitud dada. Si la sesión
+// activa es Administrador, entra en modo admin (para poder visar).
 function agendOpenRequestById(id){
+  ['solChooser','portalChooser','guiasScreen','icScreen','vascScreen'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
   try{ openAgendamientoModule(); }catch(e){}
-  const show=()=>{
+  if(_appxIsAdminSession() && AGEND_STATE.mode !== 'admin'){
+    try{
+      const u = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+      AGEND_STATE.mode = 'admin';
+      AGEND_STATE.staffNombre = (u && (u.displayName || u.name)) || 'Administrador';
+      AGEND_STATE.navStack = [];
+      agendShowSalasView();
+    }catch(e){}
+  }
+  const find=()=> _agendFindRequest(id);
+  (async()=>{
+    await _appxWaitSync(()=>_agendSyncing, agendSyncNow);
+    const r = await _appxRetryFind(find, agendSyncNow);
     const scr=document.getElementById('agendScreen'); if(!scr || scr.classList.contains('hidden')) return;
-    try{ if(_agendFindRequest(id)) agendOpenDetalle(id); }catch(e){}
-  };
-  try{ agendSyncNow().then(show).catch(show); }catch(e){ show(); }
+    if(r){ try{ agendOpenDetalle(id); }catch(e){} }
+    else { try{ toast('No se encontró la solicitud del aviso'); }catch(e){} }
+  })();
+}
+// Abre la solicitud de vacaciones del aviso (módulo principal, vista
+// Vacaciones). Requiere sesión de staff/admin; si no la hay, queda pendiente y
+// se aplica al iniciar sesión (showHome).
+function vacOpenRequestById(id){
+  if(!(state && state.currentUserId)){
+    _appxPendingDeepLink = { kind:'vac', id:id }; _appxSavePending(_appxPendingDeepLink);
+    ['solChooser','portalChooser','guiasScreen','icScreen','agendScreen','vascScreen','modulesScreen'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
+    try{ openStaffModule(); }catch(e){}
+    return;
+  }
+  ['solChooser','portalChooser','guiasScreen','icScreen','agendScreen','vascScreen','modulesScreen','userPicker'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
+  try{ showView('vacaciones'); }catch(e){}
+  const find=()=> (state.vacations||[]).find(v=>v && v.id===id && !v.deleted);
+  (async()=>{
+    const r = await _appxRetryFind(find, bootSync);
+    try{ showView('vacaciones'); }catch(e){}
+    if(r){ try{ viewVacation(id); }catch(e){} }
+    else { try{ toast('No se encontró la solicitud de vacaciones del aviso'); }catch(e){} }
+  })();
 }
 // Muestra/actualiza el botón de activar avisos (solo admin)
 function updatePushBtn(){
@@ -13181,8 +13276,14 @@ function vascOpenEvalById(id){
   ['modulesScreen','solChooser','portalChooser','guiasScreen','icScreen','agendScreen'].forEach(x=>{ const e=document.getElementById(x); if(e) e.classList.add('hidden'); });
   const s=document.getElementById('vascScreen'); if(s) s.classList.remove('hidden');
   VASC_UI.evalAdmin=false; VASC_UI.view='eval'; renderVascModule();
-  const show=()=>{ const scr=document.getElementById('vascScreen'); if(!scr||scr.classList.contains('hidden')) return; const r=vascLoadData().find(x=>x&&x.id===id && x.tipo==='evaluacion' && !x.deleted); if(r){ VASC_UI.detailId=id; VASC_UI.view='evaldetail'; } else { VASC_UI.view='eval'; } renderVascModule(); };
-  try{ vascSyncNow().then(show).catch(show); }catch(e){ show(); }
+  const find=()=> vascLoadData().find(x=>x&&x.id===id && x.tipo==='evaluacion' && !x.deleted);
+  (async()=>{
+    await _appxWaitSync(()=>_vascSyncing, vascSyncNow);
+    const r = await _appxRetryFind(find, vascSyncNow);
+    const scr=document.getElementById('vascScreen'); if(!scr||scr.classList.contains('hidden')) return;
+    if(r){ VASC_UI.detailId=id; VASC_UI.view='evaldetail'; } else { VASC_UI.view='eval'; try{ toast('No se encontró la evaluación del aviso'); }catch(e){} }
+    renderVascModule();
+  })();
 }
 
 async function boot(){
@@ -13190,6 +13291,7 @@ async function boot(){
   //    guarda para aplicarlo al entrar a la institución. Y si ya está abierta,
   //    el service worker nos avisa por mensaje para abrir el detalle exacto.
   try{ _appxHandleDeepLink(location.search || ''); }catch(e){}
+  try{ if(!_appxPendingDeepLink){ const st=_appxLoadPendingFromStorage(); if(st) _appxPendingDeepLink = st; } }catch(e){}
   try{
     if('serviceWorker' in navigator){
       navigator.serviceWorker.addEventListener('message', ev=>{

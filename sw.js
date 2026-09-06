@@ -10,7 +10,7 @@
 // ⚠️ SUBIR ESTE NÚMERO EN CADA DEPLOY (v72 → v73 → …). Es lo que hace que el
 // navegador detecte un service worker nuevo y muestre el aviso "Nueva versión
 // disponible". Si no cambia, la app NO se entera de que hay una actualización.
-const CACHE = 'anestesia-v132';
+const CACHE = 'anestesia-v133';
 const ASSETS = [
   './',
   './index.html',
@@ -118,7 +118,7 @@ self.addEventListener('message', e => {
 // aviso genérico; el admin abre la app para ver el detalle.
 // ============================================================
 self.addEventListener('push', e => {
-  let titulo = '📋 Appnesthesia';
+  let titulo = '📋 Solicitud nueva';
   let cuerpo = 'Tienes una nueva solicitud por revisar. Toca para abrir.';
   let targetUrl = './';
   // El payload (cifrado por el worker de push) trae {title, body, url}. Si no
@@ -151,12 +151,21 @@ self.addEventListener('notificationclick', e => {
   const target = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil((async () => {
     const cl = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of cl) {
+    // Preferir la ventana visible/enfocada (si hay varias), luego cualquiera.
+    const ordered = cl.slice().sort((a, b) => {
+      const va = (a.visibilityState === 'visible' ? 1 : 0) + (a.focused ? 2 : 0);
+      const vb = (b.visibilityState === 'visible' ? 1 : 0) + (b.focused ? 2 : 0);
+      return vb - va;
+    });
+    for (const c of ordered) {
       if ('focus' in c) {
         try { await c.focus(); } catch (_) {}
         // La ventana ya está cargada: no cambia de URL, así que le avisamos por
-        // mensaje para que navegue al detalle exacto dentro de la app.
+        // mensaje para que navegue al detalle exacto dentro de la app. Lo
+        // mandamos dos veces (0 y 400 ms) por si la página recién despierta
+        // del segundo plano y aún no procesa el primero. La app es idempotente.
         try { c.postMessage({ type: 'appx-open', url: target }); } catch (_) {}
+        setTimeout(() => { try { c.postMessage({ type: 'appx-open', url: target }); } catch (_) {} }, 400);
         return;
       }
     }
